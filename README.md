@@ -9,6 +9,15 @@ ZaturoBot adapter are additive.
 For coding agents: start with [AGENTS.md](AGENTS.md), then [the component map](docs/ARCHITECTURE.md).
 There is no agent harness, dynamic rule tree or required Git-hook framework.
 
+## Install on Ubuntu/Debian
+
+From the permanent project folder, run `bash scripts/install-linux.sh`. This prepares the
+desktop app and a dedicated browser that loads the Chrome extension automatically, keeps
+existing accounts, and opens the guided account manager. No folder selection is needed.
+See [installation, sign-in and recovery instructions](docs/INSTALL-LINUX.md).
+With Codex installed, thumbnails and metadata use [Codex media](docs/CODEX-MEDIA.md):
+Terra low by default, or Luna 6 low. ChatGPT handles article generation and Read aloud.
+
 ## Existing workflows
 
 Firefox: load `manifest.json` from `about:debugging#/runtime/this-firefox`.

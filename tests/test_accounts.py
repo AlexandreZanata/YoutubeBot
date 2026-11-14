@@ -28,12 +28,13 @@ class AccountFixture(unittest.TestCase):
         self.patch = patch.object(config, "ROOT", self.root)
         self.patch.start()
         self.addCleanup(self.patch.stop)
-        previous = (config.PROFILE, config.CDP_PORT, config.ACCOUNT_ID)
+        previous = (config.PROFILE, config.CDP_PORT, config.ACCOUNT_ID, config.BROWSER_MODE)
         self.addCleanup(
             lambda: (
                 setattr(config, "PROFILE", previous[0]),
                 setattr(config, "CDP_PORT", previous[1]),
                 setattr(config, "ACCOUNT_ID", previous[2]),
+                setattr(config, "BROWSER_MODE", previous[3]),
             )
         )
         self.store = AccountStore()
@@ -436,7 +437,8 @@ class ServiceContracts(AccountFixture):
         operation = str(uuid.uuid4())
         self.submit(operation, launcher=lambda *_a, **_k: None)
 
-        def fake_batch(_count):
+        def fake_batch(_count, *, parallel):
+            self.assertEqual(parallel, 1)
             run = config.RUNS / "fixture"
             run.mkdir(parents=True)
             (run / "record.json").write_text(
@@ -462,7 +464,7 @@ class ServiceContracts(AccountFixture):
         result = service_jobs.status(operation)
         self.assertEqual(result["state"], "completed")
         self.assertEqual(result["result"]["scheduled_count"], 1)
-        actor.assert_called_once()
+        actor.assert_called_once_with(1, parallel=1)
         empty = str(uuid.uuid4())
         with patch.object(service_jobs, "process_identity", return_value=None):
             self.submit(empty, launcher=lambda *_a, **_k: None)

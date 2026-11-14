@@ -37,7 +37,14 @@ def strip_dashes(text: str, title: bool = False) -> str:
 
 def parse_metadata(text: str) -> dict:
     titles = re.findall(r"^\s*\d+\.\s*(.+)$", text, re.M)
-    title = strip_dashes(titles[0].strip(), title=True) if titles else "Untitled"
+    if not titles:
+        # Browser innerText omits CSS-generated numbers from an ordered list.
+        block = re.search(r"TITLE OPTIONS:\s*(.*?)(?=\n\s*DESCRIPTION:|$)", text, re.S | re.I)
+        if block:
+            titles = [line.strip().strip("*_ ") for line in block.group(1).splitlines() if line.strip()]
+    if not titles:
+        raise ValueError("metadata has no title options")
+    title = strip_dashes(titles[0].strip(), title=True)
     match = re.search(r"DESCRIPTION:\s*(.*?)(?:\n\s*\\?#|\n\s*TAGS:)", text, re.S | re.I)
     description = strip_dashes(match.group(1).strip()) if match else ""
     hashtags = " ".join(

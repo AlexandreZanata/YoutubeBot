@@ -86,15 +86,30 @@ def render_single_pass_video(
     )
     if progress_callback:
         cmd[-1:-1] = ["-progress", "pipe:1", "-nostats"]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        for line in proc.stdout:
-            sec = parse_out_time_sec(line.strip())
-            if sec >= 0 and total_duration > 0:
-                progress_callback(min(99.0, (sec / total_duration) * 100.0), sec)
-        _, errs = proc.communicate()
-        if proc.returncode != 0 and errs:
-            print(f"[FFmpeg error]: {errs[-500:]}")
-        return proc.returncode == 0
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    return result.returncode == 0
+    def execute(command):
+        if progress_callback:
+            proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            for line in proc.stdout:
+                sec = parse_out_time_sec(line.strip())
+                if sec >= 0 and total_duration > 0:
+                    progress_callback(min(99.0, (sec / total_duration) * 100.0), sec)
+            _, errors = proc.communicate()
+            return proc.returncode == 0, errors
+        result = subprocess.run(command, capture_output=True, text=True)
+        return result.returncode == 0, result.stderr
+
+    ok, errors = execute(cmd)
+    unavailable = ("cannot load libcuda", "no nvenc capable devices", "unsupported device",
+                   "openencodesessionex failed", "unknown encoder 'h264_nvenc'")
+    if not ok and any(message in errors.lower() for message in unavailable):
+        # Keep resolution, frame rate, filters, audio and output timing intact.
+        # CRF 18 provides a high-quality CPU path on PCs without NVIDIA hardware.
+        cmd = list(cmd)
+        index = cmd.index("-c:v")
+        cmd[index:index + 8] = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18"]
+        print("[render] NVIDIA encoding unavailable; using CPU H.264 at CRF 18.", flush=True)
+        ok, errors = execute(cmd)
+    if not ok and errors:
+        print(f"[FFmpeg error]: {errors[-500:]}")
+    return ok

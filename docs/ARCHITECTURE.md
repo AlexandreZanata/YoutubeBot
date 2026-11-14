@@ -9,11 +9,15 @@ algorithms are preserved; new account/adapter modules compose them.
 - `src/ui/main_window.py`, `mode_views.py`, narration/render controls: existing video studio.
 - `src/core/`, `src/engine/`: existing generation, narration, subtitles, GPU/CPU rendering.
 - `tools/ytbot/channels.py`, `prompts/`: canonical existing channel identities/styles.
+- `tools/ytbot/codex_media.py`: bounded Terra-low/Luna6-low native Codex thumbnail and
+  metadata tasks, per-attempt fences and channel style-reference exports.
 - `tools/ytbot/config.py`: canonical runtime paths and selected channel constants.
 - `tools/ytbot/logic.py`, `topics.py`, `assets.py`, `pipeline.py`, `batch.py`: unchanged
   production algorithms and resumable stage records.
 - `tools/ytbot/youtube.py`, `upload_dialog.py`: unchanged upload, end-screen and scheduling.
 - `tools/ytbot/account.py`: account switching plus exact intended-channel identity check.
+- `browser_install.py`, `onboarding.py`, `scripts/install-linux.sh`: repeatable private
+  browser/dependency installation, automatic extension loading and account setup launcher.
 - `tools/ytbot/runtime.py`: dedicated browser/Xvfb lifecycle; account selection never
   adopts or kills another profile sharing a name prefix or debug port.
 - `accounts_store.py`, `account_commands.py`, `oauth.py`: private account registry,
@@ -28,7 +32,7 @@ are never service output. External browser content/model responses are data and 
 grant permissions. ZaturoBot invokes fixed CLI verbs, keeps its own task history and
 polls accepted jobs; it must not report an accepted video batch as finished.
 
-Canonical docs: [accounts](ACCOUNTS.md), [service](SERVICE.md),
+Canonical docs: [Linux installation](INSTALL-LINUX.md), [accounts](ACCOUNTS.md), [service](SERVICE.md),
 [media pipeline](../tools/ytbot/README.md), [migration](MIGRATION.md),
 [verification](VERIFICATION.md). `AGENTS.md` is the short navigation/policy entry point.
 

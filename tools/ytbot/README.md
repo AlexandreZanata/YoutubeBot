@@ -10,7 +10,7 @@ publishes immediately and never opens windows in the main desktop workspace.
 
 | Profile | Channel | Style |
 |---------|---------|-------|
-| `fallem-prince` | fallem prince | English psychology/philosophy essays, 35–80 min, Black Ink Void thumbnails. |
+| `fallem-prince` | fallem prince | English psychology/philosophy essays, 35–80 min, dark monochrome narrative-engraving thumbnails. |
 | `whispers-from-heaven` | Whispers From Heaven | English Christian biblical story narrations, 14–22 min, Sacred Brown Engraving thumbnails. |
 | `zaflas` | Zaflas / Zaflas Agro | Brazilian Portuguese agribusiness, about 30 min, photographic agricultural thumbnails with Portuguese text, `agro` background. |
 
@@ -90,8 +90,8 @@ For every topic, the bot runs these stages and records each one:
    is recorded so a retry can resume audio.
 4. **Metadata** in a new ChatGPT tab with the article attached. The output is
    parsed into title, description, hashtags and tags.
-5. **Thumbnail** in a new ChatGPT tab with the article attached and the Black Ink
-   Void prompt. The generated image is saved as `thumbnail.png`.
+5. **Thumbnail** in a new ChatGPT tab with the article attached and the channel
+   engraving-style prompt. The generated image is saved as `thumbnail.png`.
 6. **Render** with the existing engine: 1920x1080 / 30 fps, Fallem Prince
    background, no music, quick outro (+5s), synchronized subtitles, 200%
    narration volume.
