@@ -159,7 +159,10 @@ def load_catalog() -> list[dict]:
 
 
 def run_path(topic: str) -> Path:
-    return config.RUNS / slug(topic)
+    path = config.RUNS / slug(topic)
+    path.mkdir(parents=True, exist_ok=True)
+    path.chmod(0o700)
+    return path
 
 
 def record_event(run_dir: Path, stage: str, status: str, detail: str = "") -> None:
