@@ -9,20 +9,21 @@ from . import config, logic
 
 
 def answer_audience(page) -> None:
-    radio = page.locator('tp-yt-paper-radio-button[name="VIDEO_MADE_FOR_KIDS_NOT_MFK"]')
-    if not radio.count():
+    if not page.locator('ytkc-made-for-kids-select').count():
         return
-    for _ in range(3):
-        try:
-            radio.first.click(force=True)
-        except Exception:
-            pass
-        page.wait_for_timeout(700)
-        checked = page.evaluate(
-            "()=>document.querySelector('tp-yt-paper-radio-button[name=\"VIDEO_MADE_FOR_KIDS_NOT_MFK\"]')?.hasAttribute('checked')")
-        if checked:
-            return
-    raise RuntimeError("could not answer the audience question")
+    page.evaluate(
+        "()=>{document.querySelectorAll('ytkc-made-for-kids-select').forEach(c=>{"
+        "const g=c.querySelector('tp-yt-paper-radio-group.made-for-kids-group');"
+        "if(g)g.selected='VIDEO_MADE_FOR_KIDS_NOT_MFK';"
+        "c.madeForKids='VIDEO_MADE_FOR_KIDS_NOT_MFK';"
+        "c.onMadeForKidsRatingChange({detail:{selected:'VIDEO_MADE_FOR_KIDS_NOT_MFK'}})})}")
+    page.wait_for_timeout(700)
+    checked = page.evaluate(
+        "()=>[...document.querySelectorAll('ytkc-made-for-kids-select')]"
+        ".every(c=>c.madeForKids==='VIDEO_MADE_FOR_KIDS_NOT_MFK'"
+        " && !c.getAttribute('crosswalk-rating-error'))")
+    if not checked:
+        raise RuntimeError("could not answer the audience question")
 
 
 def _show_visibility(page) -> None:
@@ -33,7 +34,7 @@ def _show_visibility(page) -> None:
             return
         button = page.locator("#next-button")
         if button.count() and button.first.is_visible() and button.first.get_attribute("aria-disabled") != "true":
-            button.first.click()
+            page.evaluate("()=>{const b=document.querySelector('#next-button'); if(b)b.click()}")
         page.wait_for_timeout(2500)
 
 
