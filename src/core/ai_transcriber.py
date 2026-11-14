@@ -66,7 +66,8 @@ def transcribe_audio_in_language(
                                 _transcribe_uncached)
 
 
-def _transcribe_uncached(audio_path, model_name, language, word_timestamps):
+def _transcribe_uncached(audio_path, model_name, language, word_timestamps, *,
+                         cpu_threads=0, batch_size=0, vad_filter=True, progress_callback=None):
     """Transcribe audio file into timestamped segments using faster-whisper on GPU."""
     try:
         from faster_whisper import WhisperModel
@@ -75,13 +76,23 @@ def _transcribe_uncached(audio_path, model_name, language, word_timestamps):
         compute_type = "int8_float16" if torch.cuda.is_available() else "int8"
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        model = WhisperModel(model_name, device=device, compute_type=compute_type)
-        segments, info = model.transcribe(
+        options = {"cpu_threads": cpu_threads} if cpu_threads else {}
+        model = WhisperModel(model_name, device=device, compute_type=compute_type, **options)
+        transcriber = model
+        options = {}
+        if batch_size:
+            from faster_whisper import BatchedInferencePipeline
+
+            transcriber = BatchedInferencePipeline(model=model)
+            options["batch_size"] = batch_size
+            options["without_timestamps"] = False
+        segments, info = transcriber.transcribe(
             audio_path,
             language=language,
             beam_size=1,
-            vad_filter=True,
-            word_timestamps=word_timestamps
+            vad_filter=vad_filter,
+            word_timestamps=word_timestamps,
+            **options,
         )
 
         formatted = []
@@ -93,9 +104,11 @@ def _transcribe_uncached(audio_path, model_name, language, word_timestamps):
                 "text": s.text.strip(),
                 "avg_logprob": round(s.avg_logprob, 3)
             })
+            if progress_callback:
+                progress_callback(s.end)
 
         # Explicit unload to free VRAM immediately for the image diffusion phase
-        del model
+        del transcriber, segments, model
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()

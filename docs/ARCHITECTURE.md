@@ -41,3 +41,9 @@ Canonical docs: [Linux installation](INSTALL-LINUX.md), [accounts](ACCOUNTS.md),
 `generation.py` reuses the existing assets/render pipeline without the upload stage.
 `service_jobs.py` keeps generation and scheduled-publication modes distinct under the same
 operation/admission fences and independent media resource unit. Original batch defaults remain.
+
+`flow_profiles.py` captures the optional ASR/render selection with legacy-safe admission.
+`flow_media.py`, `openvino_engine.py` and `subtitle_cache.py` compose local alternatives
+behind the explicit qualification gate. Standard recognition/cache/render behavior stays
+on the original path. `flow_benchmark.py` runs isolated private media experiments under
+bounded systemd units; it never invokes browser, generation, upload or scheduling APIs.
