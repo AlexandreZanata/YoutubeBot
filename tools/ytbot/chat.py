@@ -19,21 +19,27 @@ def log(message: str) -> None:
 
 
 def dismiss_notice(page) -> None:
-    for name in ("Keep using GPT", "Use plugin"):
-        button = page.get_by_role("button", name=name, exact=True)
-        if button.count():
-            button.first.click(force=True)
-            page.wait_for_timeout(1200)
-            return
+    button = page.get_by_text("Keep using GPT", exact=True)
+    if button.count():
+        button.first.click(force=True)
+        page.wait_for_timeout(1200)
 
 
 def send_text(page, text: str) -> None:
     # Input focus is shared by the dedicated browser, even across CDP clients.
     with INPUT_LOCK:
         page.bring_to_front()
-        dismiss_notice(page)
-        editor = page.get_by_role("textbox")
-        editor.wait_for(state="visible", timeout=15000)
+        deadline = time.time() + 120
+        editor = None
+        while time.time() < deadline:
+            dismiss_notice(page)
+            candidate = page.get_by_role("textbox")
+            if candidate.count() and candidate.first.is_visible():
+                editor = candidate.first
+                break
+            page.wait_for_timeout(1500)
+        if editor is None:
+            raise TimeoutError("ChatGPT editor did not become visible")
         editor.fill(text)
         page.wait_for_timeout(400)
         send = page.locator('button[aria-label="Send"]')
