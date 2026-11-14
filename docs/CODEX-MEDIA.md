@@ -1,4 +1,4 @@
-# Codex thumbnails and metadata
+# Codex thumbnails, metadata and topics
 
 On a PC with `codex` in PATH or the installed Linux Codex desktop package, YoutubeBot uses Codex for thumbnails, metadata and automatic topic suggestions by default.
 ChatGPT remains the article and Read aloud path. Sign in to the owner's installed Codex;
@@ -6,7 +6,7 @@ no separate image API key is required. The Codex build/account must expose its n
 image-generation tool. This was verified on the work PC with codex-cli 0.169.0-alpha.11.1.
 
 The coordinator is **gpt-6.1-terra, reasoning effort low**. The owner can instead choose
-**gpt-6-luna, low** in the account window's **Codex · thumbnails e metadados** selector.
+**gpt-6-luna, low** in the account window's **Codex · temas, thumbnails e metadados** selector.
 The coordinator sends the request; the native image-generation engine produces the image.
 Changing the coordinator does not select a different image engine.
 
