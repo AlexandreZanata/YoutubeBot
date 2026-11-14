@@ -9,6 +9,8 @@ English in code, comments, documentation and commits; user-facing UI may use Por
 
 - Extension capture, filename templates and download behavior stay unchanged.
 - Keep the existing generation modes, narration, voices, subtitles, backgrounds and rendering.
+- Fallem Prince and Whispers From Heaven use English narration, subtitles and metadata.
+  Only Zaflas uses Brazilian Portuguese. Operator/browser interface language never changes content language.
 - `tools/ytbot` keeps channel prompts, deduplication, resumable stage records and sequential
   upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`.
 - Require an explicit channel. Verify its YouTube channel ID before mutating Studio.
