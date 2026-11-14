@@ -47,6 +47,28 @@
       "max_rss_kib": 2501620.0
     },
     {
+      "scope": ".",
+      "cpu_quota_percent": 200,
+      "stage": "render",
+      "candidate": "vaapi-qp20-cached-ass",
+      "input": 1,
+      "repeats": 1,
+      "median_seconds": 1583.87,
+      "min_seconds": 1583.87,
+      "max_seconds": 1583.87,
+      "stdev_seconds": null,
+      "gain": null,
+      "timing_measured": true,
+      "approved": false,
+      "quality": [],
+      "duration_seconds": 4305.16,
+      "effective_fps": 81.54393984354778,
+      "size_bytes": 638267462,
+      "cpu_seconds": 2498.3700000000003,
+      "mean_cpu_percent": 157.73832448370135,
+      "max_rss_kib": 210996.0
+    },
+    {
       "scope": "screening/quota-200-offset-900-seconds-300",
       "cpu_quota_percent": 200,
       "stage": "asr",
@@ -322,6 +344,28 @@
       "max_rss_kib": 653140.0
     },
     {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "render",
+      "candidate": "vaapi-qp20-cached-ass",
+      "input": 2,
+      "repeats": 1,
+      "median_seconds": 109.49,
+      "min_seconds": 109.49,
+      "max_seconds": 109.49,
+      "stdev_seconds": null,
+      "gain": 3.5765823362864193,
+      "timing_measured": true,
+      "approved": false,
+      "quality": [],
+      "duration_seconds": 305.0,
+      "effective_fps": 83.56927573294365,
+      "size_bytes": 43807955,
+      "cpu_seconds": 174.32999999999998,
+      "mean_cpu_percent": 159.22002009315918,
+      "max_rss_kib": 190760.0
+    },
+    {
       "scope": "screening/quota-200-offset-900-seconds-300/calibration/seconds-30",
       "cpu_quota_percent": 200,
       "stage": "render",
@@ -444,10 +488,72 @@
       "cpu_seconds": 19.189999999999998,
       "mean_cpu_percent": 154.6333601933924,
       "max_rss_kib": 168036.0
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300/calibration/seconds-30",
+      "cpu_quota_percent": 200,
+      "stage": "render",
+      "candidate": "vaapi-qp20-cached-ass",
+      "input": 2,
+      "repeats": 1,
+      "median_seconds": 12.4,
+      "min_seconds": 12.4,
+      "max_seconds": 12.4,
+      "stdev_seconds": null,
+      "gain": 3.5016129032258063,
+      "timing_measured": true,
+      "approved": false,
+      "quality": [
+        {
+          "ssim": 0.988996,
+          "psnr_db": 44.746007,
+          "vmaf": 95.819298,
+          "audio_aac_sha256_equal": true,
+          "dimensions": [
+            1920,
+            1080
+          ],
+          "fps": "30/1",
+          "frame_count_equal": true,
+          "duration_equal_within_one_frame": true,
+          "size_ratio": 0.9989474020041207,
+          "visual_ab_frames_reviewed": 0,
+          "subtitle_windows_reviewed": 0,
+          "approved": false
+        }
+      ],
+      "duration_seconds": 30,
+      "effective_fps": 72.58064516129032,
+      "size_bytes": 4320935,
+      "cpu_seconds": 19.21,
+      "mean_cpu_percent": 154.9193548387097,
+      "max_rss_kib": 168332.0
+    },
+    {
+      "scope": "screening/quota-400-offset-900-seconds-300/calibration/seconds-30",
+      "cpu_quota_percent": 400,
+      "stage": "render",
+      "candidate": "vaapi-qp20-cached-ass",
+      "input": 1,
+      "repeats": 1,
+      "median_seconds": 12.309999999999999,
+      "min_seconds": 12.309999999999999,
+      "max_seconds": 12.309999999999999,
+      "stdev_seconds": null,
+      "gain": null,
+      "timing_measured": true,
+      "approved": false,
+      "quality": [],
+      "duration_seconds": 30,
+      "effective_fps": 73.11129163281885,
+      "size_bytes": 4368181,
+      "cpu_seconds": 18.990000000000002,
+      "mean_cpu_percent": 154.2648253452478,
+      "max_rss_kib": 167652.0
     }
   ],
   "reason": "Full timing, objective quality and blind review are all required; missing evidence never passes.",
-  "status": "in-progress",
+  "status": "partial-window-complete",
   "measurement_date": "2026-11-14",
   "timezone": "America/Cuiaba",
   "pause_deadline": "2026-11-14T18:00:00-04:00",
@@ -505,7 +611,7 @@
     },
     {
       "candidate": "CPU4/8, batch8, VAD-off, oneDNN, distil/medium, whisper.cpp",
-      "status": "not_yet_measured",
+      "status": "not_measured",
       "reason": "Three-hour pause budget; no speed/quality claim or adoption."
     }
   ],
@@ -514,5 +620,470 @@
     "openvino_pip_seconds": 16.97,
     "public_model_download_seconds": 31.04,
     "note": "Separate measured stages, not a complete cold-install total."
-  }
+  },
+  "sampled_environment": [
+    {
+      "scope": ".",
+      "cpu_quota_percent": 200,
+      "stage": "asr",
+      "candidate": "openvino-gpu",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 50.0,
+        "maximum": 94.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1299.987125,
+        "maximum": 1604.093125
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 1100
+      },
+      "sampled_cgroup_memory_peak_bytes": 3255406592
+    },
+    {
+      "scope": ".",
+      "cpu_quota_percent": 200,
+      "stage": "render",
+      "candidate": "vaapi-qp20-cached-ass",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 58.05,
+        "maximum": 66.0
+      },
+      "mean_clock_mhz": {
+        "minimum": 1594.30875,
+        "maximum": 1602.9295
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 1100
+      },
+      "sampled_cgroup_memory_peak_bytes": 1091477504
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "asr",
+      "candidate": "openvino-gpu",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 51.05,
+        "maximum": 83.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1450.016125,
+        "maximum": 1600.87525
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 1100
+      },
+      "sampled_cgroup_memory_peak_bytes": 2873663488
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "asr",
+      "candidate": "openvino-gpu",
+      "input": 2,
+      "max_temperature_c": {
+        "minimum": 58.05,
+        "maximum": 82.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1215.30375,
+        "maximum": 1603.037625
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 1100
+      },
+      "sampled_cgroup_memory_peak_bytes": 2199420928
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "asr",
+      "candidate": "turbo-b4-t2",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 53.0,
+        "maximum": 63.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1449.623125,
+        "maximum": 1601.5695
+      }
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "asr",
+      "candidate": "turbo-b4-t2",
+      "input": 2,
+      "max_temperature_c": {
+        "minimum": 57.05,
+        "maximum": 63.0
+      },
+      "mean_clock_mhz": {
+        "minimum": 1449.975875,
+        "maximum": 1607.25075
+      }
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "asr",
+      "candidate": "turbo-t2",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 51.05,
+        "maximum": 62.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1450.26,
+        "maximum": 1601.633625
+      }
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "asr",
+      "candidate": "turbo-t2",
+      "input": 2,
+      "max_temperature_c": {
+        "minimum": 57.05,
+        "maximum": 62.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1599.59125,
+        "maximum": 1605.89475
+      }
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "filters",
+      "candidate": "ass",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 53.05,
+        "maximum": 54.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1449.9436249999999,
+        "maximum": 1600.418125
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 317
+      },
+      "sampled_cgroup_memory_peak_bytes": 56389632
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "filters",
+      "candidate": "audio-volume-aac",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 55.05,
+        "maximum": 55.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1600.042625,
+        "maximum": 1600.042625
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 300
+      },
+      "sampled_cgroup_memory_peak_bytes": 3379200
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "filters",
+      "candidate": "decode-loop",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 53.0,
+        "maximum": 53.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1600.08075,
+        "maximum": 1600.176375
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 300
+      },
+      "sampled_cgroup_memory_peak_bytes": 34791424
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "filters",
+      "candidate": "scale-crop",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 53.0,
+        "maximum": 54.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1600.002625,
+        "maximum": 1600.266875
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 300
+      },
+      "sampled_cgroup_memory_peak_bytes": 45649920
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "filters",
+      "candidate": "x264-video-only",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 54.05,
+        "maximum": 56.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1450.0665,
+        "maximum": 1600.529125
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 317
+      },
+      "sampled_cgroup_memory_peak_bytes": 264577024
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "render",
+      "candidate": "standard",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 53.05,
+        "maximum": 59.0
+      },
+      "mean_clock_mhz": {
+        "minimum": 1449.83525,
+        "maximum": 1601.03525
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 350
+      },
+      "sampled_cgroup_memory_peak_bytes": 697122816
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "render",
+      "candidate": "standard",
+      "input": 2,
+      "max_temperature_c": {
+        "minimum": 56.05,
+        "maximum": 59.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1580.450375,
+        "maximum": 1600.9882499999999
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 350
+      },
+      "sampled_cgroup_memory_peak_bytes": 674668544
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300",
+      "cpu_quota_percent": 200,
+      "stage": "render",
+      "candidate": "vaapi-qp20-cached-ass",
+      "input": 2,
+      "max_temperature_c": {
+        "minimum": 59.0,
+        "maximum": 63.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1599.60525,
+        "maximum": 1600.586625
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 1100
+      },
+      "sampled_cgroup_memory_peak_bytes": 235372544
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300/calibration/seconds-30",
+      "cpu_quota_percent": 200,
+      "stage": "render",
+      "candidate": "standard",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 56.05,
+        "maximum": 57.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1599.82875,
+        "maximum": 1600.48675
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 333
+      },
+      "sampled_cgroup_memory_peak_bytes": 564359168
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300/calibration/seconds-30",
+      "cpu_quota_percent": 200,
+      "stage": "render",
+      "candidate": "standard",
+      "input": 2,
+      "max_temperature_c": {
+        "minimum": 56.05,
+        "maximum": 58.0
+      },
+      "mean_clock_mhz": {
+        "minimum": 1599.93425,
+        "maximum": 1600.59375
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 317
+      },
+      "sampled_cgroup_memory_peak_bytes": 564322304
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300/calibration/seconds-30",
+      "cpu_quota_percent": 200,
+      "stage": "render",
+      "candidate": "vaapi-qp20-cached-ass",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 56.05,
+        "maximum": 59.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1599.94475,
+        "maximum": 1600.138125
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 1100
+      },
+      "sampled_cgroup_memory_peak_bytes": 193519616
+    },
+    {
+      "scope": "screening/quota-200-offset-900-seconds-300/calibration/seconds-30",
+      "cpu_quota_percent": 200,
+      "stage": "render",
+      "candidate": "vaapi-qp20-cached-ass",
+      "input": 2,
+      "max_temperature_c": {
+        "minimum": 63.0,
+        "maximum": 64.05
+      },
+      "mean_clock_mhz": {
+        "minimum": 1599.936375,
+        "maximum": 1600.03225
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 1100
+      },
+      "sampled_cgroup_memory_peak_bytes": 175493120
+    },
+    {
+      "scope": "screening/quota-400-offset-900-seconds-300/calibration/seconds-30",
+      "cpu_quota_percent": 400,
+      "stage": "render",
+      "candidate": "vaapi-qp20-cached-ass",
+      "input": 1,
+      "max_temperature_c": {
+        "minimum": 61.05,
+        "maximum": 64.0
+      },
+      "mean_clock_mhz": {
+        "minimum": 1599.829375,
+        "maximum": 1600.145
+      },
+      "intel_gpu_clock_mhz": {
+        "minimum": 300,
+        "maximum": 1100
+      },
+      "sampled_cgroup_memory_peak_bytes": 180011008
+    }
+  ],
+  "resource_limits": {
+    "default_cpu_quota_percent": 200,
+    "memory_high_bytes": 12884901888,
+    "memory_max_bytes": 17179869184,
+    "runtime_max_seconds": 43200,
+    "production_settings_changed": false
+  },
+  "full_input_1_candidate": {
+    "asr_seconds": 2522.52,
+    "render_seconds_including_preparation": 1583.87,
+    "caption_preparation_seconds": 122.32,
+    "encoding_seconds": 1461.55,
+    "asr_plus_render_seconds": 4106.389999999999,
+    "note": "Sum of measured stages, excluding article, narration and thumbnail generation.",
+    "full_standard_comparison_measured": false,
+    "projected_gain_using_observed_asr_and_unfinished_render_projection": [
+      3.0878703678900448,
+      3.2096318177279803
+    ],
+    "artifact_check": {
+      "width": 1920,
+      "height": 1080,
+      "fps": "30/1",
+      "container_frames": 129155,
+      "duration_seconds": 4305.166667,
+      "audio_codec": "aac",
+      "audio_duration_seconds": 4300.202667,
+      "progress_counters": {
+        "frame": 129155,
+        "dup_frames": 0,
+        "drop_frames": 0
+      },
+      "full_quality_approved": false,
+      "note": "Container/progress checks only; full reference, AAC equivalence and video metric gates remain pending."
+    }
+  },
+  "full_input_1_static_review": {
+    "frames_exported": 10,
+    "caption_window_centers_exported": 10,
+    "reviewed": false,
+    "note": "Static centers do not prove temporal/audio review; operator review still required.",
+    "visual_ab_frames_reviewed": 10,
+    "caption_window_centers_reviewed": 10,
+    "temporal_subtitle_windows_reviewed": 0,
+    "observations": [
+      "The20 static pairs were inspected before consulting the blind mapping.",
+      "No obvious clipping or major background damage was visible in these static samples.",
+      "Caption segmentation and blank/nonblank differences were visible, including around622.4s and4084.9s. These require audio/temporal review, not automatic approval."
+    ],
+    "reviewer": "Codex visual inspection; not independent human/audio review"
+  },
+  "quota_400_artifact_equivalence": {
+    "same_complete_mp4_bytes_as_200_percent": true,
+    "note": "Same30-second input1 caption/encoder settings; no full400% timing or ASR measurement."
+  },
+  "experiments_stopped_before_deadline": true,
+  "remaining_gates": [
+    "Complete input2 finalist ASR/render",
+    "Complete standard render references on both inputs",
+    "Full reference-relative video and audio metrics",
+    "Ten temporal subtitle windows per video and independent audio/caption review",
+    "Measured combined gain on both videos; run-to-run variation remains unknown"
+  ]
 }

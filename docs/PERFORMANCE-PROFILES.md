@@ -221,7 +221,10 @@ an architectural assessment, not a measured GUI speed comparison.
 | ASR, 300s input2, CPU2 versus OpenVINO GPU | 351.38s | 236.66s | 1.48x versus CPU2 | Full-corpus quality pending |
 | Render-only, 30s input1, same ASS | Standard x264 42.03s | Cached ASS + VAAPI QP22/one filter thread 13.12s including preparation | 3.20x | VMAF95.247; SSIM0.986084; PSNR43.774dB; identical AAC; full qualification pending |
 | Render-only, 30s input1, final candidate | Standard x264 42.03s | Cached ASS + VAAPI QP20/two filter threads 12.41s including preparation | 3.39x | VMAF95.811; SSIM0.988978; PSNR44.835dB; identical AAC; size0.994x; numeric sample gate passed |
+| Render-only, 30s input2, final candidate | Standard x264 43.42s | Cached ASS + VAAPI QP20/two filter threads 12.40s including preparation | 3.50x | VMAF95.819; SSIM0.988996; PSNR44.746dB; identical AAC; size0.999x; numeric sample gate passed |
 | ASR, full input1 | Original standard 7840s | OpenVINO GPU 2522.52s | 3.11x | WER0.2594% ->0.1431%; CER0.1985% ->0.0584%; estimated median token timing0.159s; whole-profile qualification pending |
+| Render, full input1, final candidate | Complete standard reference unavailable | 1583.87s including 122.32s caption preparation and 1461.55s encoding | Not measured against a complete reference | 129155 frames, no duplicates/drops; full video/audio metrics pending |
+| ASR + render, full input1 | Standard ASR observed; standard render projected only | 4106.39s (68min26.39s), sum of measured stages | Full paired gain not established | Complete input2 and remaining full quality gates pending |
 | Complete standard/fast videos, both inputs | Not complete | Not complete | Not established | Fast stays disabled |
 
 The CPU2 screening reference is an explicitly threaded candidate, not the unmodified
@@ -230,3 +233,41 @@ MP4 is unfinished and was excluded. QP20/two-filter-thread calibration is separa
 the QP22/one-thread proof; neither short test qualifies the full profile. Detailed tables and updates:
 [measured evidence](performance/flow-profile-results.md),
 [aggregated JSON](performance/flow-profile-results.json).
+
+## Bounded-window outcome
+
+The owner-authorized pause ends at 18:00 America/Cuiaba on 2026-11-14. Experiments stop
+within that window. This is a partial qualification result: both existing inputs were
+screened, and the complete first finalist ASR/render finished. The second full finalist
+and complete standard render references remain pending. The proposed fast profile stays
+disabled; this branch is a draft PR, not an installed production change.
+
+Input1 candidate processing took 68min26.39s for ASR plus render. Applying its measured
+stage rates to input2 suggests approximately 54 minutes, but that is a projection, not a
+completed input2 measurement. The observed standard ASR plus unfinished-render projection
+would imply roughly 3.09–3.21x for input1; this is also a projection and does not pass the
+measured end-to-end gate. Content creation and optional tool installation are excluded.
+
+Resume the remaining private experiments only in a new independently authorized idle
+window. First complete input2, then obtain complete standard render references and full
+video/audio metrics, review temporal subtitle windows and confirm combined gain on both
+inputs. A reviewed qualification change is required before fast can actually activate.
+The paused production operation remains under the owner's/OpenCode's control.
+
+A separate 400% quota test on the same 30-second input1 render took 12.31s versus 12.41s
+at 200%. The 0.10-second difference is not an established improvement: each condition has
+one trial, and the complete MP4 bytes match. Keep 200% as the default. No full-video or ASR
+400% measurement was completed, and the production service quota was never changed.
+
+The complete input1 artifact received a static blind comparison of ten sampled frames
+and ten caption-window centers. Text remained within the image and no obvious major
+background damage was visible in those samples. Segmentation and blank/nonblank caption
+differences require temporal/audio review; static centers do not satisfy ten temporal
+subtitle windows. The whole-profile gate remains pending. Review images and mapping stay
+private and are not committed.
+
+The final input2 render screening covered 305 seconds (300s speech plus 5s outro):
+standard CPU render took 391.60s; the cached-ASS/VAAPI candidate took 109.49s
+including preparation, a measured render-only gain of 3.58x. All 9150
+frames were emitted with no duplicates/drops. Objective quality was measured on its
+30-second calibration, not all 305 seconds. Neither is a complete input2 validation.
