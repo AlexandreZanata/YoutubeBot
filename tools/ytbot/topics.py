@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from . import chat, config, logic
+from . import chat, codex_media, config, logic
 
 
 def _sanitize_topic(topic: str) -> str:
@@ -33,7 +33,9 @@ def prepare_topics(context, count: int, scheduled_titles: list[str] | None = Non
     for _ in range(3):
         if len(chosen) >= count:
             break
-        generated = chat.generate_topics(context, count - len(chosen) + 2, existing + chosen)
+        requested = count - len(chosen) + 2
+        generated = (codex_media.generate_topics(requested, existing + chosen) if codex_media.available()
+                     else chat.generate_topics(context, requested, existing + chosen))
         _add_new_topics(generated, existing, chosen, count)
     if len(chosen) < count:
         raise RuntimeError(f"only {len(chosen)} unique topics available, requested {count}")
