@@ -41,7 +41,8 @@ at 65,536 bytes. The caller must further bound results to its task/wire budget.
 Rejected operations exit nonzero with `{ "schema_version": 1, "error": "operation_rejected" }`.
 Host media capacity is one active job across all accounts/channels. A busy new operation
 exits nonzero with `{ "schema_version": 1, "error": "capacity_reached" }`; it creates no
-job or waiting unit. Count 1–10 remains a sequential batch in that one actor.
+job or waiting unit. Count 1–10 remains a sequential batch in that one actor. Browser article/audio/assets
+are explicitly serialized as well, so shared composer focus cannot mix prompts between tabs.
 
 ## Durable execution and notifications
 

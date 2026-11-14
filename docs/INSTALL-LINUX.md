@@ -88,3 +88,8 @@ or installation report.
 References: [Chrome for Testing](https://developer.chrome.com/docs/automation-and-testing/chrome-for-testing),
 [Chrome extension loading change](https://developer.chrome.com/blog/extension-news-june-2025),
 [sandbox troubleshooting](https://pptr.dev/troubleshooting).
+
+On PCs without NVIDIA encoding, the renderer keeps 1920×1080/30 fps, subtitles and audio
+settings and uses CPU H.264 (libx264, veryfast, CRF 18). Rendering and large-v3-turbo
+transcription can take substantially longer on the CPU. Missing subtitle transcription
+stops rendering instead of uploading a video with empty subtitles.

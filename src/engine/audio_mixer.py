@@ -16,22 +16,25 @@ def get_audio_duration(audio_path: Path) -> float:
                 return duration
     except (OSError, EOFError, wave.Error):
         pass
-    cmd_probe = [
-        "ffprobe", "-v", "error", "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)
-    ]
-    try:
-        res_p = subprocess.run(cmd_probe, capture_output=True, text=True, check=True)
-        duration = float(res_p.stdout.strip())
-        if math.isfinite(duration) and duration > 0:
-            return duration
-    except (OSError, subprocess.SubprocessError, ValueError):
-        pass
-    cmd = ["ffmpeg", "-i", str(audio_path), "-c", "copy", "-f", "null", "-"]
+    # ADTS AAC has no reliable container timeline: bitrate estimates can add
+    # minutes of silence or truncate narration. Scan its packet timestamps.
+    if Path(audio_path).suffix.lower() != ".aac":
+        cmd_probe = [
+            "ffprobe", "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)
+        ]
+        try:
+            res_p = subprocess.run(cmd_probe, capture_output=True, text=True, check=True)
+            duration = float(res_p.stdout.strip())
+            if math.isfinite(duration) and duration > 0:
+                return duration
+        except (OSError, subprocess.SubprocessError, ValueError):
+            pass
+    cmd = ["ffmpeg", "-nostdin", "-hide_banner", "-i", str(audio_path), "-c", "copy", "-f", "null", "-"]
     try:
         res = subprocess.run(cmd, capture_output=True, text=True)
         times = re.findall(r"time=(\d+):(\d+):(\d+\.\d+)", res.stderr)
-        if times:
+        if res.returncode == 0 and times:
             h, m, s = times[-1]
             return float(h) * 3600 + float(m) * 60 + float(s)
     except (OSError, subprocess.SubprocessError):

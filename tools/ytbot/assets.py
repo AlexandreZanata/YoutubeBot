@@ -1,4 +1,4 @@
-"""Metadata and Black Ink Void thumbnail generation."""
+"""Channel metadata and thumbnail generation."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import time
 from pathlib import Path
 
-from . import config, logic
+from . import codex_media, config, logic
 from .chat import copy_last, dismiss_notice, log, send_text, wait_for_assistant
 
 
@@ -16,6 +16,8 @@ def article_excerpt(run_dir: Path, limit: int = 8000) -> str:
 
 
 def generate_metadata(context, run_dir: Path, topic: str) -> dict:
+    if codex_media.available():
+        return codex_media.generate_metadata(run_dir, topic)
     page = context.new_page()
     try:
         page.goto("https://chatgpt.com/", timeout=90000)
@@ -57,6 +59,8 @@ def image_data_url(page) -> str | None:
 
 
 def generate_thumbnail(context, run_dir: Path, timeout: int = 1200) -> Path | None:
+    if codex_media.available():
+        return codex_media.generate_thumbnail(run_dir)
     page = context.new_page()
     try:
         page.goto("https://chatgpt.com/", timeout=90000)
@@ -75,6 +79,10 @@ def generate_thumbnail(context, run_dir: Path, timeout: int = 1200) -> Path | No
                 destination.write_bytes(base64.b64decode(data.split(",", 1)[1]))
                 log("thumbnail saved")
                 return destination
+            body = page.locator("body").inner_text()
+            if "Image generation failed" in body:
+                (run_dir / "thumbnail-response.txt").write_text(body, encoding="utf-8")
+                raise RuntimeError("ChatGPT image generation failed; completed assets were preserved. Supply a channel-style thumbnail before resuming this run.")
         (run_dir / "thumbnail-response.txt").write_text(page.locator("body").inner_text(), encoding="utf-8")
         raise RuntimeError("thumbnail image was not generated")
     finally:

@@ -42,9 +42,14 @@ def _render_video(run_dir: Path) -> Path:
         config.ROOT / "assets" / "backgrounds" / f"{config.THUMBNAIL_THEME}.jpg")
     background, is_video = resolve_standard_background(
         background_image, config.THUMBNAIL_THEME)
-    duration = get_audio_duration(narration) + config.QUICK_OUTRO_SECONDS
-    log(f"narration {get_audio_duration(narration):.1f}s, output {duration:.1f}s")
+    narration_seconds = get_audio_duration(narration)
+    if narration_seconds <= 0:
+        raise RuntimeError("narration duration is unknown; rendering and upload were stopped")
+    duration = narration_seconds + config.QUICK_OUTRO_SECONDS
+    log(f"narration {narration_seconds:.1f}s, output {duration:.1f}s")
     segments = transcribe_narration(narration)
+    if not segments or not any(segment.get("text", "").strip() for segment in segments):
+        raise RuntimeError("subtitle transcription produced no text; rendering and upload were stopped")
     log(f"transcribed {len(segments)} segments")
     subtitle = save_ass_subtitles(
         segments, run_dir / "narration.ass",

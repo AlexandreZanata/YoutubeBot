@@ -11,7 +11,7 @@ from pathlib import Path
 
 from . import config, logic
 
-COPY_LOCK = threading.Lock()
+INPUT_LOCK = threading.Lock()
 
 
 def log(message: str) -> None:
@@ -28,28 +28,42 @@ def dismiss_notice(page) -> None:
 
 
 def send_text(page, text: str) -> None:
-    page.evaluate("document.querySelector('[role=\"textbox\"]').focus()")
-    page.keyboard.insert_text(text)
-    page.wait_for_timeout(400)
-    send = page.locator('button[aria-label="Send"]')
-    if send.count() and send.first.is_enabled() and send.first.get_attribute("aria-disabled") != "true":
-        send.first.click()
-    else:
-        page.keyboard.press("Enter")
-    page.wait_for_timeout(500)
+    # Input focus is shared by the dedicated browser, even across CDP clients.
+    with INPUT_LOCK:
+        page.bring_to_front()
+        dismiss_notice(page)
+        editor = page.get_by_role("textbox")
+        editor.wait_for(state="visible", timeout=15000)
+        editor.fill(text)
+        page.wait_for_timeout(400)
+        send = page.locator('button[aria-label="Send"]')
+        if send.count() and send.first.is_enabled() and send.first.get_attribute("aria-disabled") != "true":
+            send.first.click()
+        else:
+            editor.press("Enter")
+        page.wait_for_function(
+            "() => !document.querySelector('[role=\"textbox\"]')?.innerText.trim()",
+            timeout=15000,
+        )
+        page.wait_for_timeout(500)
 
 
-def extract_assistant_text(page) -> str:
+def _assistant_response(page) -> str:
     body = page.locator("body").inner_text()
     marker = "ChatGPT said:"
     start = body.rfind(marker)
     text = body[start + len(marker):] if start != -1 else body
     for stop in ("ChatGPT can make mistakes", "Latest response",
-                 "Simple Deep Dive is now a plugin", "Thinking effort"):
+                 "Simple Deep Dive is now a plugin", "Thinking effort",
+                 "Do you like this personality?"):
         index = text.find(stop)
         if index != -1:
             text = text[:index]
-    return clean_article(text)
+    return text.strip()
+
+
+def extract_assistant_text(page) -> str:
+    return clean_article(_assistant_response(page))
 
 
 def wait_for_assistant(page, timeout: int = 1800) -> None:
@@ -64,7 +78,7 @@ def wait_for_assistant(page, timeout: int = 1800) -> None:
         if "Something went wrong" in body or "Error generating" in body:
             raise RuntimeError("ChatGPT reported a generation error")
         length = len(body)
-        streaming = page.locator('button[aria-label="Stop"]').count() > 0
+        streaming = page.locator('[data-testid="stop-button"], button[aria-label="Stop"]').count() > 0
         if not streaming and length > 2000 and length == last_len:
             stable += 1
             if stable >= 2:
@@ -78,18 +92,9 @@ def wait_for_assistant(page, timeout: int = 1800) -> None:
 
 
 def copy_last(page) -> str:
-    with COPY_LOCK:
-        has_copy = page.evaluate("document.querySelectorAll('button[aria-label=\"Copy\"]').length") > 0
-        if has_copy:
-            page.evaluate(
-                "()=>{const b=[...document.querySelectorAll('button[aria-label=\"Copy\"]')];"
-                "if(b.length)b[b.length-1].click()}"
-            )
-            page.wait_for_timeout(700)
-            text = page.evaluate("navigator.clipboard.readText()")
-            if text:
-                return text
-        return extract_assistant_text(page)
+    # Read this page's response directly. The desktop clipboard is global and
+    # can mix responses or wait on a permission prompt in background tabs.
+    return _assistant_response(page)
 
 
 def clean_article(text: str) -> str:

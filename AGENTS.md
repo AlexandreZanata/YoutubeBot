@@ -46,3 +46,18 @@ actual positive/login-required/unknown browser evidence without raw credential o
 `generation.py` reuses the existing assets/render core sequentially. Uncertain operations
 remain fenced; only verified ready video artifacts count as completion. No live account,
 media generation or paid action belongs in CI fixtures.
+
+## Codex media on work PCs
+
+When Codex is installed, use `codex_media.py` for thumbnails and metadata; ChatGPT keeps
+article generation and Read aloud only. The coordinator must be `gpt-6.1-terra` with low
+reasoning effort, or owner-selected `gpt-6-luna` with low effort. The native image tool
+renders the thumbnail. Never silently use a more expensive coordinator, API-key fallback,
+or ChatGPT image fallback after a Codex failure. Preserve media-attempt fences and existing
+artifacts. See [Codex media setup](docs/CODEX-MEDIA.md).
+
+Fallem Prince thumbnails now follow the owner's dense, dark monochrome narrative
+engravings. Always attach the two sanitized style references in
+`assets/styles/fallem_prince/`; adapt the subject and metaphor to the article. Preserve
+etched midtones and full-scene depth. The earlier large white void/two-color poster
+interpretation is superseded.

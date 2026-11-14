@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
 )
-from tools.ytbot import browser_install, channels, config, library
+from tools.ytbot import browser_install, channels, codex_media, config, library
 from tools.ytbot.accounts_store import AccountStore
 
 
@@ -79,6 +79,12 @@ class AccountsWindow(QDialog):
         self.channel.setCurrentIndex(self.channel.findData(preferred))
         self.channel.currentIndexChanged.connect(self.refresh_library)
         form.addRow("Perfil do canal", self.channel)
+        self.media_model = QComboBox()
+        self.media_model.addItem("Terra · baixo", "gpt-6.1-terra")
+        self.media_model.addItem("Luna 6 · baixo", "gpt-6-luna")
+        self.media_model.setCurrentIndex(self.media_model.findData(codex_media.settings()["model"]))
+        self.media_model.currentIndexChanged.connect(self.change_media_model)
+        form.addRow("Codex · thumbnails e metadados", self.media_model)
         layout.addLayout(form)
         add = QHBoxLayout()
         self.identifier = QLineEdit()
@@ -152,6 +158,13 @@ class AccountsWindow(QDialog):
         layout.addWidget(self.status)
         self.account.currentIndexChanged.connect(self.refresh_verified)
         self.refresh()
+
+    def change_media_model(self):
+        try:
+            codex_media.configure(self.media_model.currentData())
+            self.status.setText("Modelo de apoio do Codex salvo com esforço baixo para as próximas thumbnails e metadados.")
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, "Codex", str(error))
 
     def selected_account(self):
         return self.account.currentData() or "legacy"
@@ -241,7 +254,10 @@ class AccountsWindow(QDialog):
             "Se houver duas cópias da extensão, use a que fica em dist/chrome.\n\n"
             "Os logins ficam no perfil privado deste PC. Em outro PC ou após expirar a sessão, "
             "o Google e o ChatGPT podem pedir um novo login. Reinstalar não apaga as contas. "
-            "Guia completo: docs/INSTALL-LINUX.md.",
+            "Nos PCs com Codex, thumbnails e metadados são preparados nele, com Terra ou Luna 6 em esforço baixo. "
+            "O modelo organiza o pedido; a ferramenta de imagens do Codex desenha a thumbnail. "
+            "O ChatGPT fica com artigo e áudio. Faça o login no próprio Codex em cada PC. "
+            "Guia completo: docs/INSTALL-LINUX.md e docs/CODEX-MEDIA.md.",
         )
 
     def check_connection(self):

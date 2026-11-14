@@ -437,7 +437,8 @@ class ServiceContracts(AccountFixture):
         operation = str(uuid.uuid4())
         self.submit(operation, launcher=lambda *_a, **_k: None)
 
-        def fake_batch(_count):
+        def fake_batch(_count, *, parallel):
+            self.assertEqual(parallel, 1)
             run = config.RUNS / "fixture"
             run.mkdir(parents=True)
             (run / "record.json").write_text(
@@ -463,7 +464,7 @@ class ServiceContracts(AccountFixture):
         result = service_jobs.status(operation)
         self.assertEqual(result["state"], "completed")
         self.assertEqual(result["result"]["scheduled_count"], 1)
-        actor.assert_called_once()
+        actor.assert_called_once_with(1, parallel=1)
         empty = str(uuid.uuid4())
         with patch.object(service_jobs, "process_identity", return_value=None):
             self.submit(empty, launcher=lambda *_a, **_k: None)

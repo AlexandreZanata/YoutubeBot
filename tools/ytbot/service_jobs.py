@@ -206,6 +206,7 @@ ACTOR_ENVIRONMENT = {
     "LC_ALL",
     "TZ",
     "PYTHONPATH",
+    "CODEX_HOME",
     "DISPLAY",
     "WAYLAND_DISPLAY",
     "XDG_RUNTIME_DIR",
@@ -476,7 +477,7 @@ def execute(operation_id: str) -> None:
                                 runtime.configure_extension(context)
                                 failures = run_generation(request["count"], context)
                         else:
-                            failures = run_batch(request["count"])
+                            failures = run_batch(request["count"], parallel=1)
                         changed = {
                             p.parent.name
                             for p in config.RUNS.glob("*/record.json")
