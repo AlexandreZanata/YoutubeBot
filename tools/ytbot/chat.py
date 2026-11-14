@@ -114,6 +114,13 @@ def generate_article(page, topic: str, run_dir: Path, extra_header: str = "") ->
     header = config.prompt("article_header.txt")
     if extra_header:
         header += "\n\n" + extra_header
+    language = config.CHANNEL.language if config.CHANNEL else "en"
+    names = {"en": "English", "pt-BR": "Brazilian Portuguese"}
+    if language not in names:
+        raise ValueError("unsupported channel narration language")
+    header += ("\n\nMANDATORY NARRATION LANGUAGE: " + names[language]
+               + ". Write the entire spoken article in this language, regardless of the operator's "
+               "message or the browser/YouTube interface language. Return only the narration text.")
     send_text(page, header + "\n\nTheme: " + topic)
     log(f"article prompt sent: {topic}")
     wait_for_assistant(page)

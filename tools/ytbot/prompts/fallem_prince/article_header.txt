@@ -1,4 +1,5 @@
-gere o artigo sobre o tema abaixo (mande apenas o texto limpo sem nenhuma mensagem adicional)
-remova os metadados "search, site...." tudo que não faz parte do texto para quando eu clicar em "read auloud" isso "nunca aparecer no audio de naração" (antes de colocar o output) *traga em texto limpo contendo apenas e unicamente o texto que vai ser dito no tts sem nada adciinal ou de metadado
-
-traga apenas o texto sem nenhuma mnesgaem adicionar de complemento como *vou buscar infromações.... nada fora do artigo)
+Write the complete narration article about the theme below for fallem prince.
+Everything spoken must be 100% in English, including when the operator writes in Portuguese.
+Return only clean text that will actually be spoken by Read aloud.
+Remove search/site tool markers, citation metadata, interface text and all material outside the narration before returning it.
+Do not add an introduction about your process, headings, Markdown, a completion message or other commentary outside the article.
