@@ -49,7 +49,7 @@ media generation or paid action belongs in CI fixtures.
 
 ## Codex media on work PCs
 
-When Codex is installed, use `codex_media.py` for thumbnails and metadata; ChatGPT keeps
+When Codex is installed, use `codex_media.py` for thumbnails, metadata and automatic topic suggestions; ChatGPT keeps
 article generation and Read aloud only. The coordinator must be `gpt-6.1-terra` with low
 reasoning effort, or owner-selected `gpt-6-luna` with low effort. The native image tool
 renders the thumbnail. Never silently use a more expensive coordinator, API-key fallback,

@@ -9,8 +9,8 @@ algorithms are preserved; new account/adapter modules compose them.
 - `src/ui/main_window.py`, `mode_views.py`, narration/render controls: existing video studio.
 - `src/core/`, `src/engine/`: existing generation, narration, subtitles, GPU/CPU rendering.
 - `tools/ytbot/channels.py`, `prompts/`: canonical existing channel identities/styles.
-- `tools/ytbot/codex_media.py`: bounded Terra-low/Luna6-low native Codex thumbnail and
-  metadata tasks, per-attempt fences and channel style-reference exports.
+- `tools/ytbot/codex_media.py`: bounded Terra-low/Luna6-low native Codex thumbnail,
+  metadata and topic tasks, per-attempt fences and channel style-reference exports.
 - `tools/ytbot/config.py`: canonical runtime paths and selected channel constants.
 - `tools/ytbot/logic.py`, `topics.py`, `assets.py`, `pipeline.py`, `batch.py`: unchanged
   production algorithms and resumable stage records.

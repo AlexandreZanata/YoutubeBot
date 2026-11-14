@@ -1,6 +1,6 @@
 # Codex thumbnails and metadata
 
-On a PC with `codex` in PATH or the installed Linux Codex desktop package, YoutubeBot uses Codex for thumbnails and metadata by default.
+On a PC with `codex` in PATH or the installed Linux Codex desktop package, YoutubeBot uses Codex for thumbnails, metadata and automatic topic suggestions by default.
 ChatGPT remains the article and Read aloud path. Sign in to the owner's installed Codex;
 no separate image API key is required. The Codex build/account must expose its native
 image-generation tool. This was verified on the work PC with codex-cli 0.169.0-alpha.11.1.
@@ -24,6 +24,10 @@ No more expensive coordinator is an automatic fallback.
 
 ## Fixed worker flow
 
+- The owner's queued topics are used first. When more candidates are needed, Codex follows
+  the channel's topic rules and the last 120 existing titles, with the same low coordinator
+  and no tools. Requests/results are privately cached and fenced; a Codex failure stops
+  rather than opening a ChatGPT topic conversation. Existing similarity filtering remains.
 - Metadata uses the channel rules and complete saved article, returning bounded JSON with
   three title options, description, hashtags and tags. The original first-title selection,
   description formatting and tag budget remain in force.
