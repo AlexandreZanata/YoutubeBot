@@ -60,27 +60,68 @@ def _download(url: str, directory: Path, product_id: str, index: int) -> str:
     return str(destination)
 
 
+def _select_product_ld(scripts: list[str]) -> dict | None:
+    for raw in scripts:
+        try:
+            value = json.loads(raw)
+        except (ValueError, TypeError):
+            continue
+        entries = value if isinstance(value, list) else [value]
+        for entry in entries:
+            if isinstance(entry, dict) and entry.get("@type") in ("Product", "ProductGroup"):
+                return entry
+    return None
+
+
+def _extract_brand_name(ld: dict | None, specs: list[dict] | None = None) -> str:
+    if ld:
+        brand = ld.get("brand")
+        if isinstance(brand, dict):
+            name = str(brand.get("name", "")).strip()
+            if name:
+                return name
+        elif isinstance(brand, list) and brand:
+            first = brand[0]
+            name = str(first.get("name", "")).strip() if isinstance(first, dict) else str(first).strip()
+            if name:
+                return name
+        elif isinstance(brand, str) and brand.strip():
+            return brand.strip()
+    for spec in specs or []:
+        if str(spec.get("name", "")).strip().lower() == "marca" and spec.get("value"):
+            return str(spec["value"]).strip()
+    return ""
+
+
+def _extract_seller_name(lines: list[str]) -> str:
+    cleaned = [line.strip() for line in lines if line and line.strip()]
+    if "Vendido por" in cleaned:
+        idx = cleaned.index("Vendido por")
+        return cleaned[idx + 1] if idx + 1 < len(cleaned) else ""
+    if "Loja oficial" in cleaned:
+        idx = cleaned.index("Loja oficial")
+        name = cleaned[idx + 1] if idx + 1 < len(cleaned) else ""
+        return f"Loja oficial {name}".strip()
+    return cleaned[0] if cleaned else ""
+
+
 def _details(page, product_url: str, image_dir: Path) -> dict:
     page.goto(product_url, wait_until="domcontentloaded", timeout=90000)
     page.wait_for_timeout(7000)
     product_id_match = re.search(r"/p/(MLB\d+)", product_url)
     product_id = product_id_match.group(1) if product_id_match else "product"
-    ld = None
-    for item in page.locator('script[type="application/ld+json"]').all():
-        try:
-            value = json.loads(item.inner_text())
-        except (ValueError, TypeError):
-            continue
-        if value.get("@type") in ("Product", "ProductGroup"):
-            ld = value
-            break
+    ld_scripts = [item.inner_text() for item in page.locator('script[type="application/ld+json"]').all()]
+    ld = _select_product_ld(ld_scripts)
     variant = {}
     variants = []
     if ld:
-        variants = ld.get("hasVariant") or []
-        variant = next((item for item in variants if item.get("productID") == product_id or item.get("sku") == product_id), {})
-        if not variant and variants:
-            variant = variants[0]
+        variants = [v for v in (ld.get("hasVariant") or []) if isinstance(v, dict)]
+        variant = next(
+            (item for item in variants if item.get("productID") == product_id or item.get("sku") == product_id),
+            {},
+        )
+        if not variant:
+            variant = variants[0] if variants else ld
     offers = variant.get("offers") or {}
     if isinstance(offers, list):
         offers = offers[0] if offers else {}
@@ -113,28 +154,50 @@ def _details(page, product_url: str, image_dir: Path) -> dict:
     seller = ""
     box = page.locator('[class*="ui-pdp-seller"]').first
     if box.count():
-        lines = [line.strip() for line in box.inner_text().splitlines() if line.strip()]
-        if "Vendido por" in lines:
-            idx = lines.index("Vendido por")
-            seller = lines[idx + 1] if idx + 1 < len(lines) else ""
+        seller = _extract_seller_name(box.inner_text().splitlines())
     long_description = ""
     description_box = page.locator('[class*="ui-pdp-description"]').first
     if description_box.count():
         text = description_box.inner_text().strip()
         long_description = text.split("\n", 1)[1].strip() if "\n" in text else text
+        if long_description.endswith("Ver descrição completa"):
+            long_description = long_description[: -len("Ver descrição completa")].strip()
     specs = []
+    seen_spec_names = set()
     for prop in variant.get("additionalProperty") or []:
         if isinstance(prop, dict) and prop.get("name"):
-            specs.append({"name": prop["name"], "value": prop.get("value", "")})
+            name = str(prop["name"]).strip()
+            value = str(prop.get("value", "")).strip()
+            if name and name not in seen_spec_names:
+                seen_spec_names.add(name)
+                specs.append({"name": name, "value": value})
+    for row in page.locator("tr.andes-table__row").all():
+        try:
+            name = row.locator("th").first.inner_text().strip()
+            value = row.locator("td").first.inner_text().strip()
+        except Exception:
+            continue
+        if name and value and name not in seen_spec_names:
+            seen_spec_names.add(name)
+            specs.append({"name": name, "value": value})
+        if len(specs) >= 40:
+            break
+    model_name = (ld.get("model", "") if ld else "") or next(
+        (s["value"] for s in specs if s["name"].lower() == "modelo"),
+        "",
+    )
     meta_price = page.locator('[itemprop="price"]')
+    return_policy = offers.get("hasMerchantReturnPolicy") or {}
     return {
         "product_id": product_id,
         "canonical_url": variant.get("url") or product_url,
-        "brand": (ld.get("brand") or {}).get("name", "") if ld else "",
-        "model": ld.get("model", "") if ld else "",
+        "brand": _extract_brand_name(ld, specs),
+        "model": model_name,
         "price": offers.get("price"),
         "currency": offers.get("priceCurrency", "BRL"),
         "availability": offers.get("availability", "").rsplit("/", 1)[-1],
+        "price_valid_until": offers.get("priceValidUntil", ""),
+        "return_days": return_policy.get("merchantReturnDays"),
         "meta_price": meta_price.first.get_attribute("content") if meta_price.count() else "",
         "seller": seller,
         "long_description": long_description,
