@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import time
@@ -48,7 +49,11 @@ def upload_video(context, run_dir: Path, meta: dict) -> str:
     page.wait_for_selector('input[type=file][name="Filedata"]', state="attached", timeout=60000)
     upload_file = run_dir / f"upload-{run_dir.name}.mp4"
     upload_file.unlink(missing_ok=True)
-    shutil.copy2(run_dir / "video.mp4", upload_file)
+    try:
+        os.link(run_dir / "video.mp4", upload_file)
+    except OSError:
+        # Different filesystem or a filesystem without hard links.
+        shutil.copy2(run_dir / "video.mp4", upload_file)
     upload_dialog.set_file_input(page, str(upload_file))
     page.wait_for_selector("#textbox", state="attached", timeout=120000)
     page.wait_for_timeout(4000)

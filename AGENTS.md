@@ -129,3 +129,8 @@ Every performance or reliability fix must be documented in README,
 `docs/UPLOAD-RECOVERY.md` or the relevant contract, covered by `npm run verify`, and
 pushed to GitHub through a branch and PR after CI passes. Never keep a silent local
 optimization.
+
+Disk exhaustion is a media failure, not a retry problem. Keep batch, audio, render and capture
+space guards; fail early with the available and required gigabytes. Upload files are hard
+links to `video.mp4`. Large runs may live on `/data` through the `.local/ytbot/runs` symlink;
+never delete recorded media to free space.

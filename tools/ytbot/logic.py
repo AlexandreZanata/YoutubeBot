@@ -5,10 +5,20 @@ from __future__ import annotations
 import difflib
 import json
 import re
+import shutil
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from . import config
+
+def require_free_space(path: Path, minimum_gb: float, context: str) -> float:
+    free_gb = shutil.disk_usage(path).free / (1024 ** 3)
+    if free_gb < minimum_gb:
+        raise RuntimeError(
+            f"{context}: at least {minimum_gb:.2f} GB free is required, only {free_gb:.2f} GB available"
+        )
+    return free_gb
+
 
 MONTHS = {
     1: "jan.", 2: "fev.", 3: "mar.", 4: "abr.", 5: "mai.", 6: "jun.",

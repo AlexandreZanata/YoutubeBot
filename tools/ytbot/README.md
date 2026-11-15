@@ -168,6 +168,14 @@ The default shape is one tab per video:
 Use `--parallel N` to override the tab count (`0` means one tab per video).
 With 5 requested videos the bot opens 5 tabs.
 
+### Disk and media
+
+The batch requires at least `max(2 GB, 0.32 GB per video)` free before assets start. Audio
+and render stages require 0.8 GB; audio capture requires 0.5 GB before the click and checks
+0.25 GB while waiting. Uploads hard-link `video.mp4` into the temporary upload name and only
+fall back to a copy on another filesystem. Large run media may live on `/data` with
+`.local/ytbot/runs` as a symlink; never delete recorded media to free space.
+
 When the main Chrome profile is the only one with a valid YouTube session,
 launch it on Xvfb with remote debugging and pass its port:
 

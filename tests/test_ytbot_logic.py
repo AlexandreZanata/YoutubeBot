@@ -1,5 +1,6 @@
 import unittest
 from datetime import date, datetime
+from unittest.mock import patch
 
 from tools.ytbot import config, logic
 
@@ -85,6 +86,19 @@ class TopicTests(unittest.TestCase):
         catalog = [{"title": "Why We Fall in Love With People Who Are Wrong for Us"}]
         self.assertTrue(logic.similar_topics("Why We Fall in Love With the Wrong Person", catalog))
         self.assertFalse(logic.similar_topics("The Mathematics of Loneliness", catalog))
+
+
+class DiskSpaceTests(unittest.TestCase):
+    def test_low_space_is_rejected_before_media_starts(self):
+        usage = type("Usage", (), {"free": int(1.5 * 1024 ** 3)})
+        with patch.object(logic.shutil, "disk_usage", return_value=usage):
+            with self.assertRaisesRegex(RuntimeError, "at least 2.00 GB"):
+                logic.require_free_space(config.RUNS, 2.0, "batch")
+
+    def test_enough_space_returns_free_gigabytes(self):
+        usage = type("Usage", (), {"free": int(3 * 1024 ** 3)})
+        with patch.object(logic.shutil, "disk_usage", return_value=usage):
+            self.assertEqual(logic.require_free_space(config.RUNS, 2.0, "batch"), 3.0)
 
 
 if __name__ == "__main__":

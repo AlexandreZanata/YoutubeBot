@@ -41,7 +41,7 @@ retry the Codex thumbnail.
 | End screen missing | Best for viewer/Subscribe absent | `verify_end_screen`; retry `add_end_screen`; a verification warning does not block scheduling | Fix during the final audit |
 | Codex thumbnail empty path | image path empty/invalid | Preserve the fence; automatic retry once | Block the upload; no ChatGPT fallback |
 | Codex login/model unavailable | Codex exits or no image tool | Stop; sign in/configure | Do not switch providers |
-| Read aloud unavailable/audio timeout | article/audio stage error | Record the asset failure; no upload | Rerun the audio stage |
+| Read aloud unavailable/audio timeout | article/audio stage error; often low disk | Record the asset failure; no upload | Free disk space and rerun the audio stage |
 | Wrong account/channel | channel ID mismatch | `ensure_channel` stops | Sign in/select the channel |
 
 ## Rules
@@ -56,9 +56,28 @@ retry the Codex thumbnail.
   schedule block; the final audit fixes it.
 - Keep media, references and private logs out of Git.
 
+## Disk space and media
+
+The 15/11 audio timeouts happened because the root volume reached 100% while twelve
+videos and upload copies were being written. The capture loop waited until its one hour
+timeout because no download entry appeared.
+
+The bot now checks free space before the batch, before audio, before render and inside the
+audio wait loop. A low disk condition fails early with the available and required gigabytes
+instead of waiting an hour. Batch guard: `max(2 GB, 0.32 GB per requested video)`; audio and
+render stages require 0.8 GB; audio capture requires 0.5 GB before the click and 0.25 GB
+while waiting. The upload file is hard-linked to `video.mp4`, with a copy fallback for a
+different filesystem.
+
+Large run media can stay on the larger `/data` volume. `.local/ytbot/runs` may be a symlink
+to `/data/ytbot-runs`; the logical path and all records stay the same. Never delete recorded
+run media to make space; move it to the larger volume or clear disposable browser/build
+caches.
+
 ## Performance and reliability changes
 
 - Articles and Read aloud use one tab per video; `--parallel N` caps the tabs.
+- Batch, audio, render and capture check free disk before writing; uploads use hard links.
 - Codex topics are requested in chunks of at most 12, so batches above 12 loop\n  and an empty/invalid Codex thumbnail is retried once automatically.
 - Upload waits are bounded and logged; title, description, thumbnail and end screen are
   verified before scheduling.
