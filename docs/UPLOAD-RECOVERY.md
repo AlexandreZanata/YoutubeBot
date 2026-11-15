@@ -89,8 +89,9 @@ caches.
   newest capture/download id and page Read aloud/audio state only when they change. It acts on
   the download state, not on a blind sleep.
 - Codex topics are requested in chunks of at most 12, so batches above 12 loop\n  and an empty/invalid Codex thumbnail is retried once automatically.
-- Upload waits are bounded and logged; title, description, thumbnail and end screen are
-  verified before scheduling.
+- Upload waits are bounded and logged; title, description, tags, thumbnail and end screen
+  are verified before scheduling. Tags are entered in the Studio chip field after
+  "Mostrar mais" and checked after save.
 - Scheduling confirms the slot first, opens the Programar block, supports the calendar,
   and retries the end screen verification; checks are bounded.
 - Fallem prince uses up to four daily slots from 2026-11-15 (00:00, 06:00, 12:00,

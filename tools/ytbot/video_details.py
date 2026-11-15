@@ -13,9 +13,43 @@ def log(message: str) -> None:
     print(f"[details] {message}", flush=True)
 
 
+def _show_more(page) -> None:
+    if page.locator('input[aria-label="Tags"]').count():
+        return
+    for label in ("Mostrar mais", "Show more"):
+        more = page.get_by_text(label, exact=True)
+        if more.count():
+            more.last.click()
+            page.wait_for_timeout(2000)
+            return
+
+
+def _tag_bar(page):
+    return page.locator("ytcp-chip-bar").first
+
+
+def _apply_tags(page, meta: dict) -> None:
+    tags = [tag.strip() for tag in meta.get("tags", "").split(",") if tag.strip()]
+    if not tags:
+        return
+    _show_more(page)
+    field = page.locator('input[aria-label="Tags"]')
+    if not field.count():
+        raise UploadBlocked("tags field was not available on the edit page")
+    existing = [text.strip() for text in _tag_bar(page).locator("ytcp-chip").all_inner_texts()]
+    if existing:
+        return
+    field.click()
+    for tag in tags:
+        page.keyboard.type(tag + ",", delay=10)
+    page.keyboard.press("Tab")
+    page.wait_for_timeout(800)
+
+
 def apply_details(page, run_dir: Path, meta: dict) -> None:
     upload_dialog.fill_editable(page, 0, meta["title"])
     upload_dialog.fill_editable(page, 1, meta["description"])
+    _apply_tags(page, meta)
     thumbnail = run_dir / "thumbnail.png"
     field = page.locator('input[type=file][accept*="image"]')
     if thumbnail.is_file() and field.count():
@@ -43,4 +77,10 @@ def apply_details(page, run_dir: Path, meta: dict) -> None:
     description = page.evaluate("()=>document.querySelectorAll('#textbox')[1]?.innerText || ''")
     if title.strip() != meta["title"].strip() or not description.strip():
         raise UploadBlocked("title or description did not persist; retry the details step")
+    expected = [tag.strip() for tag in meta.get("tags", "").split(",") if tag.strip()]
+    if expected:
+        _show_more(page)
+        saved = [text.strip() for text in _tag_bar(page).locator("ytcp-chip").all_inner_texts()]
+        if not set(expected).issubset(set(saved)):
+            raise UploadBlocked("tags did not persist; retry the details step")
     log("details saved")

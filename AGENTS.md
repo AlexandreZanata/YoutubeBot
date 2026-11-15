@@ -132,8 +132,9 @@ work to the upload profile. Verify the channel identity in the upload profile be
 
 Every upload wait is bounded and logged. `upload_guard` blocks before Studio when the
 video, metadata title/description or a valid thumbnail is missing. After upload,
-`video_details` applies title, description and thumbnail on the edit page, waits for the
-`studiothumbnail` 200 and verifies the title/description before checks and the end screen.
+`video_details` applies title, description, tags and thumbnail on the edit page, waits for the
+`studiothumbnail` 200 and verifies title, description and tags before checks and the end
+screen. The tags field is behind "Mostrar mais" in YouTube Studio.
 An end-screen verification warning does not block scheduling; the final audit fixes it.
 
 Never re-upload a video that already has an `upload.json` video ID: schedule the existing
