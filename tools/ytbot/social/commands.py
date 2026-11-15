@@ -56,13 +56,16 @@ def command_status(args) -> None:
 
 
 def command_agenda(args) -> None:
-    store = SocialStore()
-    data = agenda_module.load_agenda(Path(args.file))
-    posts = agenda_module.read_posts(store, args.network).get("posts", {})
-    for item in data["items"]:
-        state = posts.get(item["id"], {}).get("state", "pending")
-        print(f"{item['id']}  {item['date']}  {item['product']:<14}  "
-              f"{item['format']:<6}  {item['status']:<8}  {state}")
+    try:
+        store = SocialStore()
+        data = agenda_module.load_agenda(Path(args.file))
+        posts = agenda_module.read_posts(store, args.network).get("posts", {})
+        for item in data["items"]:
+            state = posts.get(item["id"], {}).get("state", "pending")
+            print(f"{item['id']}  {item['date']}  {item['product']:<14}  "
+                  f"{item['format']:<6}  {item['status']:<8}  {state}")
+    except Exception as error:
+        raise SystemExit(f"[social] {error}")
 
 
 def command_post(args) -> None:
