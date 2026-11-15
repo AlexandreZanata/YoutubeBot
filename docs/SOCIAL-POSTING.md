@@ -4,6 +4,11 @@ The X publisher posts one reviewed item from the private promotion agenda. It is
 small: text or one image, one account, one post at a time, no threads, polls, replies,
 scheduling, follows or engagement automation.
 
+Runtime rule: a visible Chrome window is used only for login and platform challenges. After
+login, agenda validation, status and publishing run in hidden Xvfb on display `:90` with the
+same private profile and CDP port `9322`. Every future network module must follow the same
+model with its own display and port.
+
 ## Inputs
 
 | Path | Purpose | Git |
@@ -61,9 +66,12 @@ The tracked URL keeps existing query parameters, for example SorriFit `?idioma=p
 
 ## First post
 
-The first item, P01, was published on 15/11/2026:
+The first item, P01, was published on 15/11/2026. The original wording was deleted with owner
+approval and republished with the conversational revision:
 
-- URL: <https://x.com/AlexandreZanat/status/2121920819635130591>
+- Current URL: <https://x.com/AlexandreZanat/status/2121924243122171996>
+- Previous URL: <https://x.com/AlexandreZanat/status/2121920819635130591> (`P01-old` in the
+  journal, state `deleted`)
 - Format: text
 - Image: none
 - Destination: Abastevo ethanol/gasoline calculator with UTM
@@ -74,9 +82,9 @@ fake calculator screen would damage trust. The post therefore uses the real link
 builds from the Abastevo page. A real screenshot is allowed in a future image item only after
 review, with no private data and with alt text.
 
-The private agenda now carries a more conversational P01 revision. The live post still has the
-first wording because X editing requires a paid Plus/Premium entitlement. The account showed
-the upgrade prompt instead of an editor.
+X editing requires a paid Plus/Premium entitlement; the account showed the upgrade prompt
+instead of an editor. The owner authorized deletion and replacement, so the old post is
+preserved only as a journal audit record and the new post uses the conversational copy.
 
 ## Editing a published post
 

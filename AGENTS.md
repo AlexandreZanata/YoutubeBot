@@ -83,10 +83,14 @@ private paths. `social status` saves only the handle, display name and verificat
 not publish or change a profile until the owner gives explicit copy and action instructions.
 See [social](docs/SOCIAL.md), [promotion focus](docs/PROMOTION.md) and the
 [agenda runbook](docs/PROMOTION-AGENDA.md). X publishing is limited to one approved agenda
-item, text or one reviewed image, with UTM and the private idempotency journal. Status and
-posting use a hidden Xvfb Chrome; only login opens a visible window. Never retry an item marked
-started or unconfirmed, and never delete a published post without owner approval. See
-[X publishing](docs/SOCIAL-POSTING.md).
+item, text or one reviewed image, with UTM and the private idempotency journal. Never retry an
+item marked started or unconfirmed, and never delete a published post without owner approval.
+Every social-network module follows the YouTube runtime model: a visible Chrome window is
+used only for owner login and platform challenges. After login, catalog or agenda checks,
+status and publishing run in a hidden Chrome/Xvfb runtime on a dedicated display, with the
+same private profile and a separate CDP port. No publishing path may require a visible
+window.
+See [X publishing](docs/SOCIAL-POSTING.md).
 
 ## Community
 
