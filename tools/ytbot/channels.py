@@ -46,6 +46,7 @@ CHANNELS = {
         language="en",
         min_article_chars=40000,
         article_retry="Target narration length: at least 6,500 words.",
+        slots=(0, 6, 12, 18),
     ),
     "whispers-from-heaven": Channel(
         slug="whispers-from-heaven",

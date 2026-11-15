@@ -105,9 +105,12 @@ For every topic, the bot runs these stages and records each one:
 8. **End screen** on the draft edit page: adds the Subscribe element and a Video
    element set to **Melhor para o espectador** (YouTube chooses the best video).
 9. **Schedule** on the visibility tab, never publish now:
-   - 2 videos per day: **00:00** and **12:00** (12 hours apart)
-   - if one slot already has a scheduled video, use the missing slot
-   - if both are taken, move to the next day
+   - up to 4 videos per day for fallem prince: **00:00**, **06:00**, **12:00** and **18:00**
+   - the 4/day expansion starts on **2026-11-15**; days that already have 00:00/12:00
+     keep them, and the new videos fill the exact middle slots 06:00/18:00 (2/day),
+     completing 4/day
+   - use `--start-date YYYY-MM-DD` when a batch must start on a specific day
+   - if a slot is taken, use the next free slot; if all four are taken, move to the next day
    - existing slots are read from YouTube Studio's `list_creator_videos` data
    - starts at least 60 minutes in the future
 10. **Records** are appended to:
