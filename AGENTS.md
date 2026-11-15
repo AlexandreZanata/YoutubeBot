@@ -71,6 +71,16 @@ but invent a unique subject and metaphor for each article. The earlier large whi
 void/two-color poster interpretation is superseded. Alternate the dense prompt with
 `thumbnail-classic.txt`: six dense and six classic in a twelve-video batch.
 
+## Social promotion
+
+The promotion module publishes the owner's GitHub projects in Brazilian Portuguese. Keep
+one code folder and one private browser profile per network under `tools/ytbot/social/` and
+`.local/social/`. Require an explicit network. X sign-in is manual in the visible browser;
+never automate passwords, two-factor or challenges, and never commit cookies, tokens,
+screenshots with account data or private paths. `social status` saves only the handle,
+display name and verification time. Do not publish or change a profile until the owner gives
+explicit copy and action instructions. See [social](docs/SOCIAL.md).
+
 ## Community
 
 After the asset stage of every batch, check the selected channel's Community tab. The rule

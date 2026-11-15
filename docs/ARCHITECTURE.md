@@ -17,6 +17,8 @@ algorithms are preserved; new account/adapter modules compose them.
 - `tools/ytbot/youtube.py`, `upload_dialog.py`: unchanged upload, end-screen and scheduling.
 - `tools/ytbot/community.py`: Community tab check and first image/question post; see
   [community](COMMUNITY.md).
+- `tools/ytbot/social/`: private per-network promotion profiles, visible login and account
+  recognition; X starts the module. See [social](SOCIAL.md).
 - `tools/ytbot/account.py`: account switching plus exact intended-channel identity check.
 - `browser_install.py`, `onboarding.py`, `scripts/install-linux.sh`: repeatable private
   browser/dependency installation, automatic extension loading and account setup launcher.

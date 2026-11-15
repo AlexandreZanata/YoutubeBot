@@ -102,6 +102,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.set_defaults(func=command_run)
     from .account_commands import add_parser
     add_parser(sub)
+    from .social.commands import add_parser as add_social_parser
+    add_social_parser(sub)
     return parser
 
 
