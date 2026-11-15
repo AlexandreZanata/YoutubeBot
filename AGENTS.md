@@ -73,10 +73,11 @@ void/two-color poster interpretation is superseded. Alternate the dense prompt w
 
 ## Community
 
-After the asset stage of every batch, check the selected channel's Community tab. If it has
-no post, publish one question post with the first topic, a short text and a square crop of
-that video's thumbnail. Never post when one already exists and never retry an unconfirmed
-publish blindly. See [community](docs/COMMUNITY.md).
+After the asset stage of every batch, check the selected channel's Community tab. The rule
+is one post per calendar day after 00:00 in the channel timezone. If today already has a
+post, do nothing; otherwise publish one question post with the first topic, a short text and
+a square crop of that video's thumbnail. Never retry an unconfirmed publish blindly. See
+[community](docs/COMMUNITY.md).
 
 ## Upload failure handling
 
