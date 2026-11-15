@@ -79,8 +79,11 @@ def command_products(args) -> None:
                 state = network.inspect(page)
                 if state["state"] != "logged-in":
                     raise RuntimeError(f"{args.network} is {state['state']}; finish login first")
-                rows = products.search(page, args.query, limit=args.limit,
-                                       share=not args.no_share)
+                rows = products.search(
+                    page, args.query, limit=args.limit, share=not args.no_share,
+                    details=not args.no_details,
+                    image_dir=store.network(args.network) / "images",
+                )
             finally:
                 page.close()
         path = store.network(args.network) / "products.json"
@@ -113,6 +116,8 @@ def add_parser(sub) -> None:
     products_parser.add_argument("--limit", type=int, default=5)
     products_parser.add_argument("--no-share", action="store_true",
                                  help="list products without opening the share dialog")
+    products_parser.add_argument("--no-details", action="store_true",
+                                 help="skip the product page details and photo download")
     products_parser.set_defaults(func=command_products)
     stop_parser = actions.add_parser("stop", help="stop the hidden affiliate browser")
     stop_parser.add_argument("--network", choices=NETWORKS, required=True)

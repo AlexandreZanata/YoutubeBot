@@ -77,11 +77,39 @@ The command rejects any share response that is not a `meli.la` link. The raw `/p
 product ID and the affiliate short link are different things; never substitute one for
 another. Links are account-specific and must not be reused from another affiliate account.
 
-### Product result fields
+### Product detail extraction
 
-The private JSON records position, title, product URL, image, raw card text, commission,
-sponsored flag, share link, share ID and share text. Prices and availability must be
-rechecked before publishing. The module does not buy, publish, or modify affiliate links.
+For each result the command also opens the product page and reads the JSON-LD
+`ProductGroup`/`Product` data plus the visible page:
+
+| Field | Source |
+| --- | --- |
+| `product_id` | `/p/MLB...` in the product URL |
+| `canonical_url` | JSON-LD variant URL |
+| `brand`, `model` | JSON-LD |
+| `price`, `currency`, `availability` | JSON-LD `offers` |
+| `meta_price` | visible `itemprop=price` |
+| `seller` | visible seller block |
+| `long_description` | visible product description |
+| `specs` | JSON-LD `additionalProperty` |
+| `variants` | JSON-LD `hasVariant` |
+| `gallery` | large `mlstatic.com` images on the product page |
+| `photos` | downloaded private copies under `.local/commercial/mercadolivre/images/` |
+
+The photos are private working files with mode 0600. When the static site is fed, copy the
+selected images into the site's own asset directory; never publish a `.local/...` path.
+
+The private JSON now carries everything needed for the static-site ingestion: product ID,
+title, canonical URL, brand/model, price and reference price, availability, seller,
+description, specs, variants, gallery, local photos, commission, sponsored flag, affiliate
+link, share ID and share text. Prices and availability must be rechecked before publishing.
+
+### Telegram offers group
+
+The owner created the Telegram offers group. Delivery is **not configured in this repository**
+yet: it needs the group username/ID and a bot token stored privately. Do not guess a group,
+token or chat ID, and never commit them. Until that configuration exists, the commercial
+module only produces the private product JSON and affiliate links.
 
 ## Privacy and limits
 
