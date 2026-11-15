@@ -113,7 +113,7 @@ class CodexMediaContracts(TestCase):
             assets.generate_metadata(context, self.run, 'Topic')
             assets.generate_thumbnail(context, self.run)
         metadata.assert_called_once_with(self.run, 'Topic')
-        thumbnail.assert_called_once_with(self.run)
+        thumbnail.assert_called_once_with(self.run, 'dense')
         context.new_page.assert_not_called()
 
     def test_metadata_normalizes_hashtags_with_leading_space(self):

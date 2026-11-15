@@ -63,6 +63,11 @@ class ScheduleTests(unittest.TestCase):
         labels = [logic.slot_label(slot) for slot in slots]
         self.assertEqual(labels, ["2026-11-10 00:00", "2026-11-10 12:00", "2026-11-11 00:00"])
 
+    def test_start_date_includes_its_midnight_slot(self):
+        config.SLOT_HOURS = (0,)
+        slots = logic.next_slots(1, set(), start=datetime(2026, 11, 16, 0, 0))
+        self.assertEqual([logic.slot_label(slot) for slot in slots], ["2026-11-16 00:00"])
+
     def test_fills_middle_slots_for_four_per_day(self):
         config.SLOT_HOURS = (0, 6, 12, 18)
         start = datetime(2026, 11, 15, 0, 0)
