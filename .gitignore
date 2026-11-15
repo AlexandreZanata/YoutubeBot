@@ -56,3 +56,6 @@ venv/
 credentials.json
 token.json
 *.client-secret.json
+
+# Generated promotion research, calendar and drafts; only the agent runbook is versioned.
+docs/promotion/
