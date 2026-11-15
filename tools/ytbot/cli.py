@@ -58,8 +58,15 @@ def command_community(args) -> None:
         community.ensure_post(context, topics or ["What do you think?"])
 
 
+def command_cleanup(args) -> None:
+    from .cleanup import before_run
+    before_run(args.dry_run)
+
+
 def command_shorts(args) -> None:
+    from . import cleanup
     from .shorts import run_shorts
+    cleanup.before_run()
     start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date() if args.start_date else None
     failures = run_shorts(args.channel, args.count, args.per_day, start_date,
                           args.upload_account, args.start_index, args.skip_slots)
@@ -79,6 +86,8 @@ def command_distribute(args) -> None:
 
 
 def command_run(args) -> None:
+    from . import cleanup
+    cleanup.before_run()
     flow_profiles.activate(flow_profiles.name(getattr(args, "flow_profile", None), environment=True))
     channels.apply(args.channel)
     start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date() if args.start_date else None
@@ -139,6 +148,9 @@ def build_parser() -> argparse.ArgumentParser:
     shorts.add_argument("--skip-slots", type=int, default=0,
                         help="skip this many leading schedule slots")
     shorts.set_defaults(func=command_shorts)
+    clean = sub.add_parser("cleanup", help="free trash, staging and already scheduled media")
+    clean.add_argument("--dry-run", action="store_true")
+    clean.set_defaults(func=command_cleanup)
     distribute = sub.add_parser("distribute",
                                 help="spread new videos over the channels with fewer scheduled")
     distribute.add_argument("--count", type=int, default=20)

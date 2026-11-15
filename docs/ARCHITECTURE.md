@@ -21,6 +21,8 @@ algorithms are preserved; new account/adapter modules compose them.
   render, upload-only account and 09:00/18:00 scheduling. See [Shorts](SHORTS.md).
 - `tools/ytbot/distribute.py`: audits the future scheduled uploads per channel and spreads a
   block of new videos toward the emptiest channels. See [distribution](DISTRIBUTE.md).
+- `tools/ytbot/cleanup.py`: pre-run trash, staging and scheduled-media cleanup with the space
+  report. See [cleanup](CLEANUP.md).
 - `tools/ytbot/commercial/`: private affiliate sessions, starting with Mercado Livre.
   See [commercial](COMMERCIAL.md).
 - `tools/ytbot/social/`: private per-network promotion profiles, visible login and hidden
