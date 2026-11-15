@@ -74,6 +74,7 @@ Every upload wait is bounded and logged. `upload_guard` blocks before Studio whe
 video, metadata title/description or a valid thumbnail is missing. After upload,
 `video_details` applies title, description and thumbnail on the edit page, waits for the
 `studiothumbnail` 200 and verifies the title/description before checks and the end screen.
+An end-screen verification warning does not block scheduling; the final audit fixes it.
 
 Never re-upload a video that already has an `upload.json` video ID: schedule the existing
 draft. If checks do not finish, leave the draft, record the video ID and slot, and report;

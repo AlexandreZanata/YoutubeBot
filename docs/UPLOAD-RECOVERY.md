@@ -38,7 +38,7 @@ retry the Codex thumbnail.
 | Done button label changed | `Concluir`/`Done`/`Publish` | Accept the known labels; click via JS | Block; inspect the dialog |
 | Video already scheduled | `scheduled_at` true | Return success; no dialog | None |
 | False confirmation | one `scheduled_at` read fails | Three reads with delays | Do not open the dialog again blindly |
-| End screen missing | Best for viewer/Subscribe absent | `verify_end_screen`; retry `add_end_screen` | Block; fix the end screen |
+| End screen missing | Best for viewer/Subscribe absent | `verify_end_screen`; retry `add_end_screen`; a verification warning does not block scheduling | Fix during the final audit |
 | Codex thumbnail empty path | image path empty/invalid | Preserve the fence; retry once intentionally | Block the upload; no ChatGPT fallback |
 | Codex login/model unavailable | Codex exits or no image tool | Stop; sign in/configure | Do not switch providers |
 | Read aloud unavailable/audio timeout | article/audio stage error | Record the asset failure; no upload | Rerun the audio stage |
@@ -52,6 +52,8 @@ retry the Codex thumbnail.
 - If checks are pending, leave the draft, record the video ID and slot, and report.
 - The description carries the hashtags and `TAGS:` line; the SEO tags field may need a
   separate manual pass.
+- A failed end-screen verification immediately after `add_end_screen` is a warning, not a
+  schedule block; the final audit fixes it.
 - Keep media, references and private logs out of Git.
 
 ## Performance and reliability changes
