@@ -60,7 +60,15 @@ def image_data_url(page) -> str | None:
 
 def generate_thumbnail(context, run_dir: Path, timeout: int = 1200) -> Path | None:
     if codex_media.available():
-        return codex_media.generate_thumbnail(run_dir)
+        for attempt in range(2):
+            try:
+                return codex_media.generate_thumbnail(run_dir)
+            except (ValueError, RuntimeError):
+                if attempt:
+                    raise
+                state = run_dir / ".codex-media" / "thumbnail"
+                if state.is_dir():
+                    state.rename(state.with_name(f"thumbnail-attempt-{int(time.time())}"))
     page = context.new_page()
     try:
         page.goto("https://chatgpt.com/", timeout=90000)

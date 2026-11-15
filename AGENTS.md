@@ -58,7 +58,8 @@ media generation or paid action belongs in CI fixtures.
 When Codex is installed, use `codex_media.py` for thumbnails, metadata and automatic topic suggestions; ChatGPT keeps
 article generation and Read aloud only. The coordinator must be `gpt-6.1-terra` with low
 reasoning effort, or owner-selected `gpt-6-luna` with low effort. The native image tool
-renders the thumbnail. Never silently use a more expensive coordinator, API-key fallback,
+renders the thumbnail. An empty or invalid Codex image path is retried once automatically; if it persists,
+stop. Never silently use a more expensive coordinator, API-key fallback,
 or ChatGPT image fallback after a Codex failure. Preserve media-attempt fences and existing
 artifacts. See [Codex media setup](docs/CODEX-MEDIA.md).
 
