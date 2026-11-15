@@ -158,6 +158,10 @@ def load_catalog() -> list[dict]:
     return json.loads(config.CATALOG.read_text(encoding="utf-8"))
 
 
+def thumbnail_style(index: int) -> str:
+    return "dense" if index % 2 == 0 else "classic"
+
+
 def run_path(topic: str) -> Path:
     path = config.RUNS / slug(topic)
     path.mkdir(parents=True, exist_ok=True)

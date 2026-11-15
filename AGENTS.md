@@ -63,11 +63,20 @@ stop. Never silently use a more expensive coordinator, API-key fallback,
 or ChatGPT image fallback after a Codex failure. Preserve media-attempt fences and existing
 artifacts. See [Codex media setup](docs/CODEX-MEDIA.md).
 
-Fallem Prince thumbnails now follow the owner's dense, dark monochrome narrative
-engravings. Always attach the two sanitized style references in
-`assets/styles/fallem_prince/`; adapt the subject and metaphor to the article. Preserve
-etched midtones and full-scene depth. The earlier large white void/two-color poster
-interpretation is superseded.
+Fallem Prince thumbnails follow the owner's dense, dark monochrome narrative
+engravings. The style is written into `tools/ytbot/prompts/fallem_prince/thumbnail.txt`;
+never attach the two style-reference images, because they override the subject and make
+every thumbnail reuse the same character. Keep the etched midtones and full-scene depth,
+but invent a unique subject and metaphor for each article. The earlier large white
+void/two-color poster interpretation is superseded. Alternate the dense prompt with
+`thumbnail-classic.txt`: six dense and six classic in a twelve-video batch.
+
+## Community
+
+After the asset stage of every batch, check the selected channel's Community tab. If it has
+no post, publish one question post with the first topic, a short text and a square crop of
+that video's thumbnail. Never post when one already exists and never retry an unconfirmed
+publish blindly. See [community](docs/COMMUNITY.md).
 
 ## Upload failure handling
 

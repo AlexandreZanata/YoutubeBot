@@ -8,7 +8,7 @@ from datetime import datetime
 
 from playwright.sync_api import sync_playwright
 
-from . import account, catalog, config, logic, pipeline, runtime
+from . import account, catalog, community, config, logic, pipeline, runtime
 from .topics import prepare_topics
 
 
@@ -112,11 +112,18 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
         if start and start < datetime.now():
             start = None
         slots = logic.next_slots(len(topics), occupied, start=start)
+        for index, topic in enumerate(topics):
+            logic.set_run_field(logic.run_path(topic),
+                                thumbnail_style=logic.thumbnail_style(index))
         workers = parallel if parallel > 0 else len(topics)
         log(f"topics: {topics}")
         log(f"tabs: {workers}, slots: {[logic.slot_label(slot) for slot in slots]}")
         asset_failures = _asset_phase(context, topics, workers)
         failures += asset_failures
+        try:
+            community.ensure_post(context, topics)
+        except Exception as error:
+            log(f"community post warning: {error}")
         failed_topics = {topic for topic, _error in asset_failures}
         for topic, slot in zip(topics, slots):
             if topic in failed_topics:

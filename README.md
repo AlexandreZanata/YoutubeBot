@@ -42,6 +42,7 @@ YouTube production keeps its existing command and channel-specific behavior:
 
 ```bash
 python3 -m tools.ytbot run --channel fallem-prince --count 1
+python3 -m tools.ytbot community --channel fallem-prince
 python3 -m tools.ytbot catalog --channel whispers-from-heaven
 python3 -m tools.ytbot check "An exact topic" --channel zaflas
 ```

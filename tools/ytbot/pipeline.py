@@ -73,7 +73,11 @@ def _extra_assets(context, topic: str, run_dir: Path) -> None:
         assets.generate_metadata(context, run_dir, topic)
         logic.record_event(run_dir, "metadata", "ok")
     if not (run_dir / "thumbnail.png").is_file():
-        assets.generate_thumbnail(context, run_dir)
+        try:
+            style = json.loads((run_dir / "record.json").read_text(encoding="utf-8")).get("thumbnail_style", "dense")
+        except (OSError, ValueError):
+            style = "dense"
+        assets.generate_thumbnail(context, run_dir, style)
         logic.record_event(run_dir, "thumbnail", "ok")
     if not (run_dir / "video.mp4").is_file():
         fitted = audio_tools.fit_narration(run_dir)

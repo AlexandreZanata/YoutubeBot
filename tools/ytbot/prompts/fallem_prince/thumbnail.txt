@@ -1,5 +1,5 @@
 Create ONE final YouTube thumbnail for fallem prince using the native image-generation tool.
-Use the two attached recent-video images as STYLE REFERENCES only. Create an original composition based on the article below. Do not copy their exact scene or use a mirror/faceless figure for every topic.
+Use only this written style brief. Never request or attach reference images. Create an original composition based on the article below, with a new subject and scene chosen for that article.
 
 FALLEM PRINCE: DARK NARRATIVE ENGRAVING
 
@@ -14,10 +14,17 @@ Visual language:
 - A surreal psychological metaphor grounded in the article. Identity, reflection, absence, conflicting expressions or a face concealed by shadow can be useful motifs when the theme calls for them.
 - One coherent central idea and a clear visual hierarchy. Supporting repetitions should reinforce that idea rather than introduce several unrelated mysteries.
 
-Match the references' dense, dark, premium engraved appearance. Preserve expressive lighting and engraved tonal detail; do not flatten the result into a two-color poster or impose a large white void.
+Match the approved channel style: dense, dark, premium engraved appearance. Preserve expressive lighting and engraved tonal detail; do not flatten the result into a two-color poster or impose a large white void.
 
-The subject, expression, action, environment and visual metaphor must change with the article. Do not merely reproduce the reference person's pose or substitute the same mirror scene for every story.
+STYLE LOCK (extracted from the approved channel art):
+- Copperplate etching and fine stippling, as if printed in black ink on aged paper, with dense cross-hatching and visible engraved texture.
+- Deep near-black backgrounds, bright chalk-like highlights and a broad range of etched midtones. Monochrome only.
+- Cinematic 16:9 composition with a strong foreground subject, atmospheric depth, ornate architecture or framed negative space where it serves the idea.
+- Serious, literary, slightly surreal psychological tone. Premium and restrained, never comic or glossy.
+- A single clear metaphor drawn from the article, readable at small size.
+
+The subject, face, age, expression, action, clothing, environment and visual metaphor must change with the article. Do not reuse a recurring character, the same pose, the same mirror gallery or the same faceless figure. The style is fixed; the artwork is unique per video. An occasional mirror or concealed face is allowed only when the article truly calls for it.
 
 Absolutely no words, letters, numbers, captions, logos, watermarks, UI or readable symbols. No generic photography, glossy3D, flat vector art, neon, fantasy glow or colored wash. Use safe conceptual actions, not injury or restrictive cords around a body.
 
-Analyze the article silently, choose its strongest visual metaphor, and generate only ONE definitive final image. The references guide style; the article determines the content.
+Analyze the article silently, choose its strongest visual metaphor, and generate only ONE definitive final image. The style lock guides the look; the article determines the content.
