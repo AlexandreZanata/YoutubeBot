@@ -168,7 +168,7 @@ def generate_metadata(run_dir: Path, topic: str) -> dict:
             raise ValueError("Zaflas metadata needs its 120 to 170 word topic paragraph")
     elif not 100 <= len(description.split()) <= 180:
         raise ValueError("Codex metadata description must contain 100 to 180 words")
-    hashtags = value.get("hashtags", [])
+    hashtags = [tag.strip() for tag in value.get("hashtags", [])]
     if not 5 <= len(hashtags) <= 8 or any(not isinstance(tag, str) or not tag.startswith("#") or tag.lower() != tag for tag in hashtags):
         raise ValueError("Codex metadata requires five to eight lowercase hashtags")
     if zaflas and len(hashtags) != 7:

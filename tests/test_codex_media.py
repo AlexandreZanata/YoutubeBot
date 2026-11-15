@@ -116,6 +116,12 @@ class CodexMediaContracts(TestCase):
         thumbnail.assert_called_once_with(self.run)
         context.new_page.assert_not_called()
 
+    def test_metadata_normalizes_hashtags_with_leading_space(self):
+        value = {'title_options':['First Actual Title','Second Title','Third Title'], 'description':' '.join(['Narrative']*120), 'hashtags':['#faith',' #hope','#jesus','#bible','#prayer'], 'tags':['faith','hope']}
+        with patch.object(config, 'CHANNEL', SimpleNamespace(slug='fallem-prince')), patch.object(codex_media, '_execute', return_value=self.fake_result('metadata', value)):
+            result = codex_media.generate_metadata(self.run, 'Topic')
+        self.assertIn('#faith #hope', result['description'])
+
     def test_zaflas_keeps_fixed_links_and_its_own_paragraph_and_hashtag_rules(self):
         prefix = "🌱 Conheça o Zaflas:  https://zaflas.com.br/\n\n" + "Fixed social prefix words "*25 + "\nGitHub: https://github.com/zaflas"
         rules = "DESCRIPTION:\n" + prefix + "\n\n[topic paragraph]"

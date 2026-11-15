@@ -78,6 +78,10 @@ caches.
 
 - Articles and Read aloud use one tab per video; `--parallel N` caps the tabs.
 - Batch, audio, render and capture check free disk before writing; uploads use hard links.
+- Thumbnail style alternation is fallem-only. Other channels always use their single
+  `thumbnail.txt`; a stale classic style falls back to dense.
+- Codex metadata hashtags are trimmed before validation, so a leading space does not fail a
+  complete metadata result.
 - Read aloud waits up to 60 seconds for the button. If no captureHistory entry appears in 10
   minutes, it reloads the conversation and retries once; the whole capture is bounded to 30
   minutes. A click that enters playback without a download no longer blocks a tab for an hour.

@@ -115,8 +115,9 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
         free_gb = logic.require_free_space(config.RUNS, max(2.0, len(topics) * 0.32), "batch")
         log(f"free disk: {free_gb:.2f} GB")
         for index, topic in enumerate(topics):
-            logic.set_run_field(logic.run_path(topic),
-                                thumbnail_style=logic.thumbnail_style(index))
+            style = (logic.thumbnail_style(index)
+                     if config.THUMBNAIL_THEME == "fallem_prince" else "dense")
+            logic.set_run_field(logic.run_path(topic), thumbnail_style=style)
         workers = parallel if parallel > 0 else len(topics)
         log(f"topics: {topics}")
         log(f"tabs: {workers}, slots: {[logic.slot_label(slot) for slot in slots]}")
