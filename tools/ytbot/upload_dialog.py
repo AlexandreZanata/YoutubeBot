@@ -78,6 +78,9 @@ def schedule_in_dialog(page, slot) -> None:
     answer_audience(page)
     _show_visibility(page)
     if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
+        page.evaluate("()=>{const e=[...document.querySelectorAll('*')].find(x=>x.children.length===0 && (x.innerText||'').trim()==='Programar'); if(e){const c=e.closest('#second-container')||e.parentElement; if(c)c.click()}}")
+        page.wait_for_timeout(2500)
+    if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
         log("schedule dialog is not open")
         return
     log("waiting for checks")
@@ -95,6 +98,9 @@ def schedule_in_dialog(page, slot) -> None:
     else:
         raise RuntimeError("video checks did not finish")
     log("setting schedule date")
+    if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
+        page.evaluate("()=>{const e=[...document.querySelectorAll('*')].find(x=>x.children.length===0 && (x.innerText||'').trim()==='Programar'); if(e){const c=e.closest('#second-container')||e.parentElement; if(c)c.click()}}")
+        page.wait_for_timeout(2500)
     if not page.locator("#datepicker-trigger").is_visible():
         page.evaluate("()=>{const b=document.querySelector('#second-container-expand-button'); if(b)b.click()}")
         page.wait_for_timeout(1500)
