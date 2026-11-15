@@ -192,6 +192,13 @@ pushed to GitHub through a branch and PR after CI passes. Never keep a silent lo
 optimization.
 
 Disk exhaustion is a media failure, not a retry problem. Keep batch, audio, render and capture
-space guards; fail early with the available and required gigabytes. Upload files are hard
-links to `video.mp4`. Large runs may live on `/data` through the `.local/ytbot/runs` symlink;
-never delete recorded media to free space.
+space guards; fail early with the available and required gigabytes. Upload files are staged in
+`.local/ytbot/upload-tmp`. Large runs may live on `/data` through the `.local/ytbot/runs`
+symlink.
+
+Cleanup runs before every `run` and `shorts`: empty the trash, clear the upload staging and
+remove `video.mp4`, `narration.wav`, `thumbnail.frame.png` and `upload-*.mp4` from runs whose
+`upload.json` is already scheduled with a video ID. Keep the article, `narration.aac`,
+subtitles, metadata, thumbnail and every record. Never prune an unscheduled or uncertain run,
+and never delete browser state, credentials or another repository. See
+[cleanup](docs/CLEANUP.md).
