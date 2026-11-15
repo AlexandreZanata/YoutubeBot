@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from . import channels, config
+from . import channels, config, flow_profiles
 from .accounts_store import AccountStore
 from . import library, service_jobs
 
@@ -28,6 +28,8 @@ def parser() -> argparse.ArgumentParser:
     generate.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True)
     generate.add_argument("--count", type=int, required=True)
     generate.add_argument("--approved-generation", action="store_true")
+    for command in (submit, generate):
+        command.add_argument("--flow-profile", choices=flow_profiles.NAMES, default=None)
     for verb in ["status", "_execute"]:
         command = commands.add_parser(verb)
         command.add_argument("--operation-id", required=True)
@@ -63,13 +65,15 @@ def dispatch(args) -> dict | None:
             args.account,
             args.count,
             args.approved_schedule,
+            flow_profile=flow_profiles.name(getattr(args, "flow_profile", None), environment=True),
         )
     if args.command == "generate":
         store = AccountStore()
         binding = store.load()["bindings"].get(args.channel, {})
         account = binding.get("account_id", "legacy")
         return service_jobs.submit(args.operation_id, args.channel, account, args.count, False,
-                                   mode="generate", approved_generate=args.approved_generation, store=store)
+                                   mode="generate", approved_generate=args.approved_generation, store=store,
+                                   flow_profile=flow_profiles.name(getattr(args, "flow_profile", None), environment=True))
     if args.command == "status":
         return service_jobs.status(args.operation_id)
     if args.command == "_execute":

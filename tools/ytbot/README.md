@@ -105,9 +105,12 @@ For every topic, the bot runs these stages and records each one:
 8. **End screen** on the draft edit page: adds the Subscribe element and a Video
    element set to **Melhor para o espectador** (YouTube chooses the best video).
 9. **Schedule** on the visibility tab, never publish now:
-   - 2 videos per day: **00:00** and **12:00** (12 hours apart)
-   - if one slot already has a scheduled video, use the missing slot
-   - if both are taken, move to the next day
+   - up to 4 videos per day for fallem prince: **00:00**, **06:00**, **12:00** and **18:00**
+   - the 4/day expansion starts on **2026-11-15**; days that already have 00:00/12:00
+     keep them, and the new videos fill the exact middle slots 06:00/18:00 (2/day),
+     completing 4/day
+   - use `--start-date YYYY-MM-DD` when a batch must start on a specific day
+   - if a slot is taken, use the next free slot; if all four are taken, move to the next day
    - existing slots are read from YouTube Studio's `list_creator_videos` data
    - starts at least 60 minutes in the future
 10. **Records** are appended to:
@@ -184,3 +187,12 @@ python3 -m tools.ytbot run --channel fallem-prince --count 4 --parallel 4 --uplo
   profile because YouTube requires a real browser session for large files.
 - The previously published proof video was an exception from before the
   scheduling rule. Every new video follows the scheduled workflow.
+
+## Optional ASR/render execution profile
+
+Future owner-authorized runs can select `--flow-profile fast`, or use
+`YTBOT_FLOW_PROFILE=fast`; `--flow-profile standard` reverts the choice. Standard remains
+the default. Fast currently falls back to standard pending complete qualification.
+These execution settings are independent of channel/browser profiles and do not change
+publication permissions. See [performance profiles](../../docs/PERFORMANCE-PROFILES.md)
+for measured results and private, browser-free benchmarks of existing audio/video files.

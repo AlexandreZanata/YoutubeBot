@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 from playwright.sync_api import sync_playwright
 
@@ -89,7 +90,8 @@ def _upload_context(playwright, context, upload_cdp):
     return upload_context
 
 
-def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None) -> list:
+def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
+              start_date=None) -> list:
     if not (config.PROFILE / "Default" / "Cookies").is_file():
         runtime.setup_profile()
     runtime.start_hidden_chrome()
@@ -106,7 +108,10 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None) -> l
         scheduled_titles = [item.get("title", "") for item in catalog.studio_videos(studio_payload)] + local_titles
         occupied = logic.scheduled_slots(studio_payload) | local_occupied
         topics = prepare_topics(context, count, scheduled_titles)
-        slots = logic.next_slots(len(topics), occupied)
+        start = datetime.combine(start_date, datetime.min.time()) if start_date else None
+        if start and start < datetime.now():
+            start = None
+        slots = logic.next_slots(len(topics), occupied, start=start)
         workers = parallel if parallel > 0 else len(topics)
         log(f"topics: {topics}")
         log(f"tabs: {workers}, slots: {[logic.slot_label(slot) for slot in slots]}")

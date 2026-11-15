@@ -1,7 +1,7 @@
 import unittest
 from datetime import date, datetime
 
-from tools.ytbot import logic
+from tools.ytbot import config, logic
 
 
 META = """TITLE OPTIONS:
@@ -40,6 +40,12 @@ class MetadataTests(unittest.TestCase):
 
 
 class ScheduleTests(unittest.TestCase):
+    def setUp(self):
+        self.slots = config.SLOT_HOURS
+
+    def tearDown(self):
+        config.SLOT_HOURS = self.slots
+
     def test_existing_scheduled_times(self):
         payload = {"x": {"scheduledPublishingDetails": {"scheduledPublishings": [
             {"scheduledTimeSeconds": "1796227200"}]}}}
@@ -49,11 +55,26 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual((day.month, day.day, hour), (12, 2, 12))
 
     def test_fills_missing_slot_and_skips_occupied(self):
+        config.SLOT_HOURS = (0, 12)
         start = datetime(2026, 11, 9, 9, 0)
         occupied = {(date(2026, 11, 9), 12)}
         slots = logic.next_slots(3, occupied, start=start, lead_minutes=60)
         labels = [logic.slot_label(slot) for slot in slots]
         self.assertEqual(labels, ["2026-11-10 00:00", "2026-11-10 12:00", "2026-11-11 00:00"])
+
+    def test_fills_middle_slots_for_four_per_day(self):
+        config.SLOT_HOURS = (0, 6, 12, 18)
+        start = datetime(2026, 11, 15, 0, 0)
+        occupied = {
+            (date(2026, 11, 15), 0), (date(2026, 11, 15), 12),
+            (date(2026, 11, 16), 0), (date(2026, 11, 16), 12),
+        }
+        slots = logic.next_slots(4, occupied, start=start, lead_minutes=60)
+        labels = [logic.slot_label(slot) for slot in slots]
+        self.assertEqual(labels, [
+            "2026-11-15 06:00", "2026-11-15 18:00",
+            "2026-11-16 06:00", "2026-11-16 18:00",
+        ])
 
     def test_portuguese_date(self):
         self.assertEqual(logic.format_pt_date(date(2026, 12, 2)), "2 de dez. de 2026")

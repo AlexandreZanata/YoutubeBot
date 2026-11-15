@@ -104,3 +104,18 @@ Generation reuses topic selection and the existing sequential assets/narration/r
 pipeline. It never invokes upload/scheduling. Completion requires the requested number of
 ready `video.mp4` artifacts; partial results remain in the existing resumable local records.
 Read-only checks and synthetic tests do not prove an actual account is currently signed in.
+
+## ASR/render execution profiles
+
+`run`, `submit` and `generate` accept optional `--flow-profile standard|fast`.
+`YTBOT_FLOW_PROFILE` supplies a CLI/admission default; explicit CLI selection wins.
+Channel profiles returned by `profiles` retain their existing meaning and values.
+The request omits standard to preserve legacy fingerprints, while fast becomes part
+of the request identity. Actors freeze the admitted selection; an unavailable revision
+falls back to standard. Old operations always select standard, irrespective of later
+environment changes. Status adds `flow_profile` and `flow_selection`; schema remains 1.
+
+Fast is currently qualification-gated and resolves to standard. It never activates from
+hardware discovery and never changes content, accounts or scheduling. Resource limits
+remain unchanged. See [performance profiles](PERFORMANCE-PROFILES.md) for qualification,
+private dependency installation, benchmark boundaries and measured evidence.

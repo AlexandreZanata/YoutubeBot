@@ -30,10 +30,10 @@ def prepare_topics(context, count: int, scheduled_titles: list[str] | None = Non
     existing = [item.get("title", "") for item in logic.load_catalog()] + (scheduled_titles or [])
     chosen: list[str] = []
     _add_new_topics(_read_queued_topics(), existing, chosen, count)
-    for _ in range(3):
+    for _ in range(4):
         if len(chosen) >= count:
             break
-        requested = count - len(chosen) + 2
+        requested = min(count - len(chosen) + 2, 12)
         generated = (codex_media.generate_topics(requested, existing + chosen) if codex_media.available()
                      else chat.generate_topics(context, requested, existing + chosen))
         _add_new_topics(generated, existing, chosen, count)

@@ -14,8 +14,12 @@ English in code, comments, documentation and commits; user-facing UI may use Por
 - `tools/ytbot` keeps channel prompts, deduplication, resumable stage records and sequential
   upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`.
 - Require an explicit channel. Verify its YouTube channel ID before mutating Studio.
-- Schedule only: 00:00/12:00 slots in America/Cuiaba, at least 60 minutes ahead,
-  not made for kids, custom thumbnail and Subscribe + Best for viewer end screen.
+- Schedule only: up to 4 videos/day for fallem prince at 00:00, 06:00, 12:00 and
+  18:00 in America/Cuiaba, at least 60 minutes ahead, not made for kids, custom
+  thumbnail and Subscribe + Best for viewer end screen.
+- The 4/day expansion starts on 2026-11-15. Days that already have 00:00/12:00 keep
+  them; the new videos fill the exact middle slots 06:00/18:00 (2/day), completing
+  4/day. Use `--start-date YYYY-MM-DD` when a batch must start on a specific day.
 - Preserve channel-specific title/description/tags rules and media quality.
 - Never blindly retry an uncertain upload or start the same service operation twice.
 
@@ -63,3 +67,22 @@ engravings. Always attach the two sanitized style references in
 `assets/styles/fallem_prince/`; adapt the subject and metaphor to the article. Preserve
 etched midtones and full-scene depth. The earlier large white void/two-color poster
 interpretation is superseded.
+
+## Upload failure handling
+
+Every upload wait is bounded and logged. `upload_guard` blocks before Studio when the
+video, metadata title/description or a valid thumbnail is missing. After upload,
+`video_details` applies title, description and thumbnail on the edit page, waits for the
+`studiothumbnail` 200 and verifies the title/description before checks and the end screen.
+
+Never re-upload a video that already has an `upload.json` video ID: schedule the existing
+draft. If checks do not finish, leave the draft, record the video ID and slot, and report;
+never retry an uncertain upload or wait 30 minutes silently. Use
+[Upload recovery](docs/UPLOAD-RECOVERY.md) for the full catalog and manual fallbacks.
+
+## Performance and reliability changes
+
+Every performance or reliability fix must be documented in README,
+`docs/UPLOAD-RECOVERY.md` or the relevant contract, covered by `npm run verify`, and
+pushed to GitHub through a branch and PR after CI passes. Never keep a silent local
+optimization.

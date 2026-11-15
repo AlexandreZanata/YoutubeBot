@@ -8,9 +8,7 @@ import shutil
 import time
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
-
-from . import config, logic, runtime, upload_dialog
+from . import config, logic, runtime, upload_dialog, upload_guard, video_details
 
 
 def log(message: str) -> None:
@@ -39,6 +37,7 @@ def upload_video(context, run_dir: Path, meta: dict) -> str:
     page = context.new_page()
     page.goto(config.STUDIO_UPLOAD, timeout=90000)
     runtime.select_channel(page)
+    upload_guard.page_blocked(page)
     try:
         page.get_by_role("button", name="Criar", exact=True).first.click()
     except Exception:
@@ -55,24 +54,16 @@ def upload_video(context, run_dir: Path, meta: dict) -> str:
     page.wait_for_timeout(4000)
     upload_dialog.fill_editable(page, 0, meta["title"])
     upload_dialog.fill_editable(page, 1, meta["description"])
-    page.wait_for_selector('input[type=file][accept*="image"]', state="attached", timeout=60000)
-    page.locator('input[type=file][accept*="image"]').last.set_input_files(str(run_dir / "thumbnail.png"))
-    page.wait_for_timeout(4000)
-    page.evaluate("()=>{const b=document.querySelector('#toggle-button'); if(b)b.click()}")
-    page.wait_for_timeout(1200)
-    if page.evaluate("""()=>{const i=document.querySelector('input[aria-label="Tags"]'); if(!i)return false; i.focus(); return true;}"""):
-        page.keyboard.insert_text(meta["tags"])
-        page.keyboard.press("Enter")
-        page.wait_for_timeout(800)
-    upload_dialog.answer_audience(page)
-    log("audience set to not made for kids")
-    deadline = time.time() + 1800
-    while time.time() < deadline:
-        body = page.locator("body").inner_text()
-        if "Envio concluído" in body or "Upload complete" in body or "processamento vai começar" in body:
-            break
-        page.wait_for_timeout(3000)
-    upload_dialog.ensure_title(page, meta["title"])
+    try:
+        upload_dialog.answer_audience(page)
+        log("audience set to not made for kids")
+    except Exception as error:
+        log(f"audience pending on the draft: {error}")
+    upload_guard.wait_upload(page)
+    try:
+        upload_dialog.ensure_title(page, meta["title"])
+    except Exception as error:
+        log(f"title will be re-applied on the edit page: {error}")
     video_id = video_id_from(page)
     log(f"uploaded video id: {video_id}")
     if not video_id:
@@ -86,6 +77,7 @@ def open_edit(context, video_id: str):
     page = context.new_page()
     page.goto(config.STUDIO_EDIT.format(video_id=video_id), timeout=90000)
     page.wait_for_timeout(8000)
+    upload_guard.page_blocked(page)
     return page
 
 
@@ -156,10 +148,18 @@ def schedule_existing(context, run_dir: Path, result: dict, slot) -> dict:
         title = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8")).get("title", "")
     except (OSError, ValueError):
         pass
+    if upload_dialog.scheduled_at(context, result["videoId"], slot):
+        result["scheduled"] = True
+        result["slot"] = logic.slot_label(slot)
+        write_result(run_dir, result)
+        log(f"scheduled {result['videoId']} at {result['slot']}")
+        return result
     for attempt in range(2):
         page = open_upload_dialog(context, result["videoId"], title)
         try:
             upload_dialog.schedule_in_dialog(page, slot)
+        except Exception as error:
+            log(f"schedule attempt {attempt + 1} failed: {error}")
         finally:
             page.close()
         if upload_dialog.scheduled_at(context, result["videoId"], slot):
@@ -173,6 +173,7 @@ def schedule_existing(context, run_dir: Path, result: dict, slot) -> dict:
 
 
 def upload_and_schedule_with_context(context, run_dir: Path, meta: dict, slot) -> dict:
+    upload_guard.preflight(run_dir, meta)
     video_id = upload_video(context, run_dir, meta)
     result = {"videoId": video_id, "url": f"https://youtu.be/{video_id}",
               "slot": logic.slot_label(slot), "visibility": "scheduled",
@@ -180,19 +181,12 @@ def upload_and_schedule_with_context(context, run_dir: Path, meta: dict, slot) -
     write_result(run_dir, result)
     page = open_edit(context, video_id)
     try:
+        video_details.apply_details(page, run_dir, meta)
         wait_for_checks(page)
         add_end_screen(page)
+        upload_guard.verify_end_screen(page)
     finally:
         page.close()
     result["endScreen"] = True
     write_result(run_dir, result)
     return schedule_existing(context, run_dir, result, slot)
-
-
-def upload_and_schedule(run_dir: Path, meta: dict, slot) -> dict:
-    with sync_playwright() as playwright:
-        context = runtime.launch_upload_context(playwright)
-        try:
-            return upload_and_schedule_with_context(context, run_dir, meta, slot)
-        finally:
-            context.close()
