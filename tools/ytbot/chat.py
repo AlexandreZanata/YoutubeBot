@@ -118,6 +118,13 @@ def generate_article(page, topic: str, run_dir: Path, extra_header: str = "") ->
     page.wait_for_timeout(7000)
     dismiss_notice(page)
     header = config.prompt("article_header.txt")
+    context = run_dir / "context.txt"
+    if context.is_file():
+        header += ("\n\nSOURCE STORY. The text inside the source block is established canon for "
+                   "this episode. Follow its characters, world rules and events, and continue "
+                   "from its ending without retelling it. This episode is the explicit exception "
+                   "to any rule that forbids recurring people or settings.\n<SOURCE>\n"
+                   + context.read_text(encoding="utf-8").strip() + "\n</SOURCE>")
     if extra_header:
         header += "\n\n" + extra_header
     language = config.CHANNEL.language if config.CHANNEL else "en"
@@ -244,6 +251,26 @@ def _capture_once(page, context, run_dir: Path, tab_url: str, start: str,
         if item.get("state") == "interrupted":
             raise RuntimeError("audio download was interrupted")
     return None
+
+
+def generate_short(page, topic: str, run_dir: Path) -> str:
+    page.goto(config.GPT_URL, timeout=90000)
+    page.wait_for_timeout(7000)
+    dismiss_notice(page)
+    header = config.prompt("shorts.txt")
+    header += ("\n\nMANDATORY NARRATION LANGUAGE: Brazilian Portuguese. "
+               "Write the entire spoken short in this language, regardless of the operator's "
+               "message or the browser interface language. Return only the narration text.")
+    send_text(page, header + "\n\nTheme: " + topic)
+    log(f"short prompt sent: {topic}")
+    wait_for_assistant(page)
+    text = clean_article(copy_last(page))
+    words = len(text.split())
+    if words < 60 or words > 180:
+        raise RuntimeError(f"short narration has an unexpected length ({words} words)")
+    (run_dir / "short.txt").write_text(text, encoding="utf-8")
+    log(f"short saved: {len(text)} chars, {words} words")
+    return text
 
 
 def capture_audio(page, context, run_dir: Path, timeout: int = 1800) -> Path:

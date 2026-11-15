@@ -48,12 +48,16 @@ def wait_upload(page, timeout: int = 900) -> None:
     deadline = time.time() + timeout
     last = 0.0
     while time.time() < deadline:
-        body = page.locator("body").inner_text()
-        if "Envio concluído" in body or "Upload complete" in body or "processamento vai começar" in body:
+        if (page.get_by_text("Envio concluído").count()
+                or page.get_by_text("Upload complete").count()
+                or page.get_by_text("processamento vai começar").count()):
             log("upload complete")
             return
+        if page.get_by_text("Arquivo ilegível").count():
+            raise UploadBlocked("Studio cannot read the staged upload file")
         if time.time() - last > 60:
-            log("upload still running")
+            compact = " ".join(page.locator("body").inner_text().split())
+            log(f"upload still running: {compact[:180]}")
             last = time.time()
         page.wait_for_timeout(3000)
     raise UploadBlocked("upload did not finish within 15 minutes; check the connection and Studio")

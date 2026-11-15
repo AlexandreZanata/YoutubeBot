@@ -2,7 +2,7 @@ import unittest
 from datetime import date, datetime
 from unittest.mock import patch
 
-from tools.ytbot import channels, chat, config, logic
+from tools.ytbot import channels, chat, config, logic, youtube
 
 
 META = """TITLE OPTIONS:
@@ -96,6 +96,49 @@ class ChannelProfileTests(unittest.TestCase):
 
     def test_fallem_keeps_four_daily_slots(self):
         self.assertEqual(channels.get("fallem-prince").slots, (0, 6, 12, 18))
+
+    def test_only_zaflas_uses_brazilian_portuguese(self):
+        self.assertEqual(channels.get("zaflas").language, "pt-BR")
+        self.assertEqual(channels.get("fallem-prince").language, "en")
+        self.assertEqual(channels.get("whispers-from-heaven").language, "en")
+        self.assertEqual(channels.get("infinite-random-worlds").language, "en")
+
+    def test_vocal_pages_uses_its_generated_background(self):
+        channel = channels.get("vocal-pages")
+        self.assertEqual(channel.background, "vocal_pages")
+        self.assertEqual(channel.channel_id, "UCm13oIPS1W43j9BYo0kewcQ")
+        self.assertEqual(channel.slots, (0,))
+        self.assertEqual(channel.language, "en")
+
+    def test_infinite_uses_the_thumbnail_as_background(self):
+        channel = channels.get("infinite-random-worlds")
+        self.assertEqual(channel.background, "thumbnail")
+        self.assertEqual(channel.channel_id, "UCY3Zp50I6Y6semQQccJxRPg")
+
+
+class VideoIdTests(unittest.TestCase):
+    class Page:
+        def __init__(self, url: str, body: str):
+            self.url = url
+            self._body = body
+
+        def locator(self, _selector):
+            body = self._body
+
+            class Body:
+                def inner_text(self):
+                    return body
+
+            return Body()
+
+    def test_reads_the_id_from_the_edit_url(self):
+        page = self.Page("https://studio.youtube.com/video/kK_wyNBAxgg/edit", "")
+        self.assertEqual(youtube.video_id_from(page), "kK_wyNBAxgg")
+
+    def test_reads_the_share_link_from_the_dialog(self):
+        page = self.Page("https://studio.youtube.com/channel/UC/videos/upload",
+                         "Link do vídeo https://youtu.be/blAcpdN9bVg")
+        self.assertEqual(youtube.video_id_from(page), "blAcpdN9bVg")
 
 
 class CaptureStatusTests(unittest.TestCase):

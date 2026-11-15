@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 
 from . import config, logic
 
@@ -81,8 +82,7 @@ def schedule_in_dialog(page, slot) -> None:
         page.evaluate("()=>{const e=[...document.querySelectorAll('*')].find(x=>x.children.length===0 && (x.innerText||'').trim()==='Programar'); if(e){const c=e.closest('#second-container')||e.parentElement; if(c)c.click()}}")
         page.wait_for_timeout(2500)
     if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
-        log("schedule dialog is not open")
-        return
+        raise RuntimeError("the schedule dialog did not open")
     log("waiting for checks")
     deadline = time.time() + 300
     while time.time() < deadline:
@@ -92,8 +92,7 @@ def schedule_in_dialog(page, slot) -> None:
         if state and state.get("disabled") != "true" and ("Verificações concluídas" in body or "Checks complete" in body):
             break
         if not page.locator("#step-badge-3").count() and not page.locator("#datepicker-trigger").count():
-            log("dialog closed during checks")
-            return
+            raise RuntimeError("the dialog closed during checks")
         page.wait_for_timeout(5000)
     else:
         raise RuntimeError("video checks did not finish")
@@ -176,6 +175,17 @@ def ensure_title(page, title: str) -> None:
         fill_editable(page, 0, title)
         page.wait_for_timeout(800)
     raise RuntimeError("YouTube overwrote the video title")
+
+
+def set_thumbnail(page, path) -> None:
+    button = page.get_by_text("Enviar arquivo", exact=True)
+    if not button.count():
+        raise RuntimeError("the thumbnail upload button is not available")
+    with page.expect_file_chooser() as chooser:
+        button.first.click()
+    chooser.value.set_files(str(path))
+    page.wait_for_timeout(6000)
+    log(f"thumbnail uploaded: {Path(path).name}")
 
 
 def set_file_input(page, path: str) -> None:

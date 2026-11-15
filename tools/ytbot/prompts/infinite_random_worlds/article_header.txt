@@ -1,0 +1,16 @@
+Write one complete English audio story for Infinite Random Worlds.
+
+REQUIREMENTS:
+
+- Everything must be 100% in English.
+- Length: 4,500 to 6,000 words, about 32 to 43 minutes at a measured narration pace.
+- Each story is self-contained and explores one unique imagined world, era, reality or speculative premise.
+- Do not reuse a recurring protagonist, setting, narrator persona or world from another episode.
+- Open with a concrete hook, image or question that establishes the premise immediately.
+- Build the world through specific details, people, rules, consequences and a clear narrative arc.
+- Let the world and its logic drive the story. Avoid generic summaries and unexplained spectacle.
+- No music cues, headings, lists, labels, notes, citations, links or metadata.
+- Do not use em dashes or en dashes.
+- Output only the narration text that will be read aloud.
+
+THEME:

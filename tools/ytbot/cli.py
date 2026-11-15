@@ -58,6 +58,17 @@ def command_community(args) -> None:
         community.ensure_post(context, topics or ["What do you think?"])
 
 
+def command_shorts(args) -> None:
+    from .shorts import run_shorts
+    start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date() if args.start_date else None
+    failures = run_shorts(args.channel, args.count, args.per_day, start_date,
+                          args.upload_account, args.start_index, args.skip_slots)
+    print("[ytbot] shorts process finished")
+    if failures:
+        print(f"[ytbot] {len(failures)} shorts failure(s): {failures}")
+        raise SystemExit(1)
+
+
 def command_run(args) -> None:
     flow_profiles.activate(flow_profiles.name(getattr(args, "flow_profile", None), environment=True))
     channels.apply(args.channel)
@@ -83,7 +94,8 @@ def command_run(args) -> None:
             stack.enter_context(store.profile_lock(args.upload_account))
         stack.enter_context(channel_lock(args.channel))
         try:
-            failures = run_batch(args.count, args.parallel, upload_cdp or None, start_date)
+            failures = run_batch(args.count, args.parallel, upload_cdp or None, start_date,
+                                 args.topic or None)
         except RuntimeError as error:
             print(f"[ytbot] {error}")
             raise SystemExit(1)
@@ -107,11 +119,24 @@ def build_parser() -> argparse.ArgumentParser:
     community_parser.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True)
     community_parser.add_argument("--topic", action="append", default=[])
     community_parser.set_defaults(func=command_community)
+    shorts = sub.add_parser("shorts", help="generate, render and schedule vertical Shorts")
+    shorts.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True)
+    shorts.add_argument("--count", type=int, default=12)
+    shorts.add_argument("--per-day", type=int, choices=(1, 2), default=2)
+    shorts.add_argument("--start-date", default=None, help="first schedule date (YYYY-MM-DD)")
+    shorts.add_argument("--upload-account", default="zaflas")
+    shorts.add_argument("--start-index", type=int, default=0,
+                        help="skip this many topics in the shorts queue")
+    shorts.add_argument("--skip-slots", type=int, default=0,
+                        help="skip this many leading schedule slots")
+    shorts.set_defaults(func=command_shorts)
     run = sub.add_parser("run", help="generate, render, upload and schedule videos")
     run.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True,
                      help="channel profile; ask the user when it is not specified")
     run.add_argument("--count", type=int, default=1)
     run.add_argument("--start-date", default=None, help="first schedule date (YYYY-MM-DD)")
+    run.add_argument("--topic", action="append", default=[],
+                     help="explicit topic; repeat for many, skips topic suggestion")
     run.add_argument("--account", default=None, help="explicit registered browser account (otherwise the channel binding or legacy session)")
     run.add_argument("--parallel", type=int, default=0,
                      help="tabs used for article and audio stages (0 = one per video)")

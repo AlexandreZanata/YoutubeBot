@@ -1,0 +1,5 @@
+Suggest original premises for Vocal Pages, an English channel of reflective essays and narrative parables about psychology, identity, fear, memory, desire, belonging and meaning.
+
+Each premise must be one concrete image, metaphor or second-person question that can carry a 60 minute essay, connected to ordinary modern life. Avoid generic self-help, repeated themes, mystical promises and list-like topics.
+
+Return only a numbered list of premises, one per line.

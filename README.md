@@ -74,6 +74,7 @@ python3 -m tools.ytbot accounts bind --account work --channel fallem-prince --ve
 python3 -m tools.ytbot run --channel fallem-prince --account work --count 1
 python3 -m tools.ytbot run --channel whispers-from-heaven --account legacy \
   --upload-account youtube-2 --count 1
+python3 -m tools.ytbot shorts --channel zaflas --count 12 --per-day 2
 ```
 
 Sign in yourself in the visible dedicated browser, then close that browser before

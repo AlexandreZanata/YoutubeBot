@@ -43,7 +43,7 @@ def scrape_public_catalog(context) -> list[dict]:
     finally:
         page.close()
     data = sorted(videos.values(), key=lambda item: item.get("title", ""))
-    config.DATA.mkdir(parents=True, exist_ok=True)
+    config.CATALOG.parent.mkdir(parents=True, exist_ok=True)
     config.CATALOG.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     return data
 

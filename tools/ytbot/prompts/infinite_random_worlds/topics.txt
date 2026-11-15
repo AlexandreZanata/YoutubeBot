@@ -1,0 +1,1 @@
+Suggest original standalone story premises for Infinite Random Worlds. Each premise must imply a different world, era, reality or speculative rule. Avoid repeated protagonists, mirror worlds, faceless figures and generic dystopias. Return only a numbered list of premises, one per line.

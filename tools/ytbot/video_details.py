@@ -46,13 +46,13 @@ def _apply_tags(page, meta: dict) -> None:
     page.wait_for_timeout(800)
 
 
-def apply_details(page, run_dir: Path, meta: dict) -> None:
+def apply_details(page, run_dir: Path, meta: dict, *, custom_thumbnail: bool = True) -> None:
     upload_dialog.fill_editable(page, 0, meta["title"])
     upload_dialog.fill_editable(page, 1, meta["description"])
     _apply_tags(page, meta)
     thumbnail = run_dir / "thumbnail.png"
     field = page.locator('input[type=file][accept*="image"]')
-    if thumbnail.is_file() and field.count():
+    if custom_thumbnail and thumbnail.is_file() and field.count():
         try:
             with page.expect_response(
                     lambda response: "studiothumbnail" in response.url and response.status == 200,

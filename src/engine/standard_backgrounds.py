@@ -11,6 +11,7 @@ BACKGROUND_THEMES = {
     "whispers_from_heaven": (
         "Whispers From Heaven · brown stippling and particles", "whispers_from_heaven.mp4"
     ),
+    "vocal_pages": ("Vocal Pages · navy, gold dust and book line", "vocal_pages.mp4"),
 }
 PORTRAIT_BACKGROUND_FILES = {
     theme: f"{Path(filename).stem}_shorts.mp4"

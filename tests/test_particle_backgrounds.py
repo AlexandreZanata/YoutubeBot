@@ -58,6 +58,11 @@ class TestParticleBackgrounds(unittest.TestCase):
                 regular_change = np.abs(next_frame - start).mean()
                 self.assertLessEqual(seam_change, max(0.25, regular_change * 3))
 
+    def test_given_vocal_pages_theme_then_resolver_returns_the_loop(self):
+        background, is_video = resolve_standard_background(Path("image.png"), "vocal_pages")
+        self.assertTrue(is_video)
+        self.assertEqual(background.name, "vocal_pages.mp4")
+
     def test_given_custom_image_without_theme_then_resolver_keeps_image(self):
         image = Path("custom.webp")
         self.assertEqual(resolve_standard_background(image), (image, False))

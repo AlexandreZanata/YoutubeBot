@@ -1,0 +1,17 @@
+Write one complete Brazilian Portuguese YouTube Short for Zaflas Agro about the theme below.
+
+REQUIREMENTS:
+
+- Everything must be 100% in natural Brazilian Portuguese, with correct accents.
+- Length: 90 to 130 words, approximately 35 to 55 seconds at the channel's narration pace.
+- One specific hook in the first sentence. Make the listener stop and want the practical explanation.
+- Give one useful agricultural insight, trade-off or management decision. Do not try to cover the whole long video.
+- Connect the insight to a real farm decision. Be direct, credible and practical.
+- End with a short invitation to watch the complete video on the Zaflas Agro channel.
+- Mention Zaflas Agro naturally once. Do not turn it into an advertisement.
+- No headings, lists, labels, notes, citations, links, metadata or speaker notes.
+- No em dashes or en dashes. Use commas, periods, colons or ordinary hyphens.
+- Do not invent measured results, studies, quotations, statistics, regulations, subsidies or current prices.
+- Output only the narration text that will be read aloud.
+
+THEME:
