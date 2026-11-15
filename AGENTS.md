@@ -14,8 +14,12 @@ English in code, comments, documentation and commits; user-facing UI may use Por
 - `tools/ytbot` keeps channel prompts, deduplication, resumable stage records and sequential
   upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`.
 - Require an explicit channel. Verify its YouTube channel ID before mutating Studio.
-- Schedule only: 00:00/12:00 slots in America/Cuiaba, at least 60 minutes ahead,
-  not made for kids, custom thumbnail and Subscribe + Best for viewer end screen.
+- Schedule only: up to 4 videos/day for fallem prince at 00:00, 06:00, 12:00 and
+  18:00 in America/Cuiaba, at least 60 minutes ahead, not made for kids, custom
+  thumbnail and Subscribe + Best for viewer end screen.
+- The 4/day expansion starts on 2026-11-15. Days that already have 00:00/12:00 keep
+  them; the new videos fill the exact middle slots 06:00/18:00 (2/day), completing
+  4/day. Use `--start-date YYYY-MM-DD` when a batch must start on a specific day.
 - Preserve channel-specific title/description/tags rules and media quality.
 - Never blindly retry an uncertain upload or start the same service operation twice.
 

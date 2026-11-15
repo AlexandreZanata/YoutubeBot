@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime
 
 from . import catalog, channels, config, flow_profiles, logic, runtime
 
@@ -46,13 +47,14 @@ def command_check(args) -> None:
 def command_run(args) -> None:
     flow_profiles.activate(flow_profiles.name(getattr(args, "flow_profile", None), environment=True))
     channels.apply(args.channel)
+    start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date() if args.start_date else None
     from .batch import run_batch
     from .account_commands import apply_bound_account
     from .accounts_store import AccountStore
     selected = apply_bound_account(args.channel, args.account)
     from .service_jobs import channel_lock
     with AccountStore().profile_lock(selected), channel_lock(args.channel):
-        failures = run_batch(args.count, args.parallel, args.upload_cdp or None)
+        failures = run_batch(args.count, args.parallel, args.upload_cdp or None, start_date)
     print("[ytbot] process finished")
     if failures:
         raise SystemExit(1)
@@ -73,6 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True,
                      help="channel profile; ask the user when it is not specified")
     run.add_argument("--count", type=int, default=1)
+    run.add_argument("--start-date", default=None, help="first schedule date (YYYY-MM-DD)")
     run.add_argument("--account", default=None, help="explicit registered browser account (otherwise the channel binding or legacy session)")
     run.add_argument("--parallel", type=int, default=0,
                      help="tabs used for article and audio stages (0 = one per video)")
