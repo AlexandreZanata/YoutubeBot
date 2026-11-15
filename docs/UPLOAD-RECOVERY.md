@@ -81,6 +81,9 @@ caches.
 - Read aloud waits up to 60 seconds for the button. If no captureHistory entry appears in 10
   minutes, it reloads the conversation and retries once; the whole capture is bounded to 30
   minutes. A click that enters playback without a download no longer blocks a tab for an hour.
+- The capture monitor logs the extension badge, session capture count, complete-recording state,
+  newest capture/download id and page Read aloud/audio state only when they change. It acts on
+  the download state, not on a blind sleep.
 - Codex topics are requested in chunks of at most 12, so batches above 12 loop\n  and an empty/invalid Codex thumbnail is retried once automatically.
 - Upload waits are bounded and logged; title, description, thumbnail and end screen are
   verified before scheduling.

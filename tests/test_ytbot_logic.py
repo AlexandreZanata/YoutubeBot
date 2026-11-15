@@ -2,7 +2,7 @@ import unittest
 from datetime import date, datetime
 from unittest.mock import patch
 
-from tools.ytbot import config, logic
+from tools.ytbot import chat, config, logic
 
 
 META = """TITLE OPTIONS:
@@ -86,6 +86,14 @@ class TopicTests(unittest.TestCase):
         catalog = [{"title": "Why We Fall in Love With People Who Are Wrong for Us"}]
         self.assertTrue(logic.similar_topics("Why We Fall in Love With the Wrong Person", catalog))
         self.assertFalse(logic.similar_topics("The Mathematics of Loneliness", catalog))
+
+
+class CaptureStatusTests(unittest.TestCase):
+    def test_missing_extension_worker_is_reported_without_waiting(self):
+        class Context:
+            service_workers = []
+        self.assertEqual(chat._extension_status(Context(), "https://chatgpt.com/x"),
+                         {"worker": False})
 
 
 class DiskSpaceTests(unittest.TestCase):

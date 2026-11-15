@@ -181,18 +181,46 @@ def _click_read_aloud(page, wait_seconds: int = 60) -> bool:
     return False
 
 
+def _extension_status(context, tab_url: str) -> dict:
+    workers = [w for w in context.service_workers if config.EXT_ID in (w.url or "")]
+    if not workers:
+        return {"worker": False}
+    worker = workers[0]
+    try:
+        history = worker.evaluate("chrome.storage.local.get('captureHistory')").get("captureHistory", [])
+        session = worker.evaluate("chrome.storage.session.get({completeRecording: {}, sessionCaptureCount: 0})")
+        badge = worker.evaluate("chrome.action.getBadgeText({})")
+    except Exception as error:
+        return {"worker": True, "error": str(error)[:120]}
+    latest = next((item for item in history if _same_tab(item, tab_url)), None)
+    return {"worker": True, "badge": badge, "count": session.get("sessionCaptureCount", 0),
+            "recording": session.get("completeRecording", {}).get("state", "idle"),
+            "capture": latest}
+
+
 def _capture_once(page, context, run_dir: Path, tab_url: str, start: str,
                   deadline: float) -> Path | None:
-    next_report = time.time() + 60
+    last_status = None
     while time.time() < deadline:
         logic.require_free_space(run_dir, 0.25, "audio capture")
         page.wait_for_timeout(5000)
         found = _audio_entry(context, start, tab_url)
+        status = _extension_status(context, tab_url)
+        page_state = page.evaluate("""() => ({
+            read: document.querySelectorAll('button[aria-label="Read aloud"]').length,
+            stop: document.querySelectorAll('button[aria-label="Stop reading"]').length,
+            audio: document.querySelectorAll('audio').length,
+        })""")
+        capture = status.get("capture") or {}
+        state = (status.get("badge"), status.get("count"), status.get("recording"),
+                 bool(found), capture.get("downloadId") if found else None,
+                 page_state.get("read"), page_state.get("stop"), page_state.get("audio"))
+        if state != last_status:
+            log(f"extension status: badge={status.get('badge')} count={status.get('count')} "
+                f"recording={status.get('recording')} download={capture.get('downloadId')} "
+                f"capture={capture.get('status', 'none')} page={page_state}")
+            last_status = state
         if not found:
-            if time.time() >= next_report:
-                free_gb = shutil.disk_usage(run_dir).free / (1024 ** 3)
-                log(f"audio waiting: {free_gb:.2f} GB free, capture not recorded yet")
-                next_report = time.time() + 60
             continue
         entry, item = found
         log(f"audio {entry.get('status')} / {item.get('state')} / {item.get('fileSize')} bytes")
@@ -200,6 +228,8 @@ def _capture_once(page, context, run_dir: Path, tab_url: str, start: str,
         if destination:
             log(f"audio saved: {destination.name} ({destination.stat().st_size} bytes)")
             return destination
+        if item.get("state") == "interrupted":
+            raise RuntimeError("audio download was interrupted")
     return None
 
 
