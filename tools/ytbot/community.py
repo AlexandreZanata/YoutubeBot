@@ -1,9 +1,10 @@
-"""Check the channel community tab and publish a first question post when empty."""
+"""Publish one question post per calendar day when the Community tab has none for today."""
 
 from __future__ import annotations
 
 import json
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from PIL import Image, ImageOps
@@ -26,6 +27,24 @@ EMPTY_MARKERS = (
     "As postagens aparecem aqui depois de publicadas",
     "Posts appear here after",
 )
+
+RELATIVE_UNITS = {
+    "segundo": 1 / 60, "segundos": 1 / 60,
+    "minuto": 1, "minutos": 1,
+    "hora": 60, "horas": 60,
+    "dia": 1440, "dias": 1440,
+    "semana": 10080, "semanas": 10080,
+    "mês": 43200, "meses": 43200,
+    "mes": 43200,
+    "ano": 525600, "anos": 525600,
+    "second": 1 / 60, "seconds": 1 / 60,
+    "minute": 1, "minutes": 1,
+    "hour": 60, "hours": 60,
+    "day": 1440, "days": 1440,
+    "week": 10080, "weeks": 10080,
+    "month": 43200, "months": 43200,
+    "year": 525600, "years": 525600,
+}
 
 TEXT = {
     "en": (
@@ -67,6 +86,61 @@ def square_image(source: Path, destination: Path, size: int = 1080) -> Path:
         fitted.save(destination, format="PNG", optimize=True)
     destination.chmod(0o600)
     return destination
+
+
+def relative_minutes(label: str) -> int | None:
+    """Convert YouTube's relative post time to minutes, or None when unreadable."""
+    text = " ".join(label.lower().split())
+    if not text:
+        return None
+    if "agora" in text or "just now" in text:
+        return 0
+    words = {word: int(number) for number, word in re.findall(r"(\d+)\s+([a-zà-ÿ]+)", text)}
+    for word, minutes in RELATIVE_UNITS.items():
+        if word in words:
+            return int(words[word] * minutes)
+    if "uma hora" in text or "one hour" in text:
+        return 60
+    if "um minuto" in text or "one minute" in text:
+        return 1
+    if "um dia" in text or "one day" in text:
+        return 1440
+    return None
+
+
+def sort_recent(page) -> None:
+    for label in ("Mais recentes", "Newest"):
+        tab = page.get_by_text(label, exact=True)
+        if tab.count():
+            tab.last.click()
+            page.wait_for_timeout(2000)
+            return
+
+
+def latest_post_label(page) -> str:
+    post = page.locator(POST_SELECTOR).first
+    if not post.count():
+        return ""
+    label = post.locator("#published-time-text")
+    if not label.count():
+        return ""
+    return label.first.inner_text().strip()
+
+
+def posted_today(page, now: datetime | None = None) -> bool:
+    current = now or datetime.now()
+    label = latest_post_label(page)
+    minutes = relative_minutes(label)
+    if minutes is None:
+        path = config.DATA_DIR / "community.json"
+        try:
+            entry = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            entry = {}
+        if entry.get("state") == "posted" and entry.get("at"):
+            return datetime.fromisoformat(entry["at"]).date() == current.date()
+        return False
+    return (current - timedelta(minutes=minutes)).date() == current.date()
 
 
 def has_posts(page) -> bool:
@@ -144,9 +218,12 @@ def ensure_post(context, topics: list[str]) -> dict:
     page = context.new_page()
     try:
         page.goto(community_url(), timeout=90000)
+        sort_recent(page)
         if has_posts(page):
-            log("community already has a post; nothing to do")
-            return {"state": "present"}
+            if posted_today(page):
+                log("community already has a post today; nothing to do")
+                return {"state": "present"}
+            log("community has no post today; publishing a new one")
         topic, thumbnail = _topic_image(topics)
         text = post_text(topic, config.CHANNEL.language if config.CHANNEL else "en")
         _open_create_dialog(page)

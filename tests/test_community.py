@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 from PIL import Image
@@ -28,6 +29,16 @@ class CommunityPostTests(unittest.TestCase):
             with Image.open(destination) as image:
                 self.assertEqual(image.size, (1080, 1080))
                 self.assertEqual(image.mode, "RGB")
+
+    def test_relative_post_time_crosses_midnight(self):
+        now = datetime(2026, 11, 15, 0, 30)
+        for label in ("há 40 minutos", "40 minutes ago"):
+            minutes = community.relative_minutes(label)
+            self.assertEqual(minutes, 40)
+            self.assertNotEqual((now - community.timedelta(minutes=minutes)).date(), now.date())
+        self.assertEqual(community.relative_minutes("há 2 horas"), 120)
+        self.assertEqual(community.relative_minutes("1 day ago"), 1440)
+        self.assertEqual(community.relative_minutes("há 3 dias"), 4320)
 
     def test_post_type_catalog_covers_the_community_options(self):
         self.assertEqual(set(community.POST_TYPES), {

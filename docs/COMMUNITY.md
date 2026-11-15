@@ -1,10 +1,11 @@
 # Community posts
 
-The bot checks the selected channel's Community tab after the asset stage. If the tab has
-no post, it publishes one question post with the topic of the first prepared video, a short
-text and a square crop of that video's thumbnail. If the tab already has a post, it changes
-nothing. An unconfirmed publish is recorded in `.local/ytbot/community.json` and is never
-retried blindly.
+The bot checks the selected channel's Community tab after the asset stage. The rule is one
+post per calendar day, counted after 00:00 in the channel timezone. If the newest post is
+from today, it changes nothing. If the tab is empty or the newest post is from an earlier
+day, it publishes one question post with the topic of the first prepared video, a short text
+and a square crop of that video's thumbnail. An unconfirmed publish is recorded in
+`.local/ytbot/community.json` and is never retried blindly.
 
 ```bash
 python3 -m tools.ytbot community --channel fallem-prince
@@ -27,7 +28,7 @@ The channel must be explicit. The same check runs automatically inside
 | Image poll | Question plus 2 to 4 image answers, captions up to 36 characters | Catalogued; not used by the automatic first post |
 | Quiz | Question, 2 to 4 answers, one correct, answers up to 80 characters (30 with image), optional 500-character explanation | Catalogued; not used by the automatic first post |
 | Mentions | `@handle` inside the message | Catalogued; not used automatically |
-| Scheduled post | Date, time and time zone in the post dialog | Catalogued; the bot publishes immediately when the tab is empty |
+| Scheduled post | Date, time and time zone in the post dialog | Catalogued; the bot publishes immediately when today has no post |
 | Edit or delete | Activity history and each post menu | Not automated; private state is never rewritten silently |
 
 YouTube also limits how many posts a channel can create in 24 hours. The bot never retries
