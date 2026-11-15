@@ -20,7 +20,8 @@ algorithms are preserved; new account/adapter modules compose them.
 - `tools/ytbot/social/`: private per-network promotion profiles, visible login and account
   recognition; X starts the module. See [social](SOCIAL.md) and the
   [promotion focus](PROMOTION.md). The agent runbook for research, audit and the 30-day
-  agenda is [PROMOTION-AGENDA.md](PROMOTION-AGENDA.md).
+  agenda is [PROMOTION-AGENDA.md](PROMOTION-AGENDA.md); bounded X publishing is
+  [SOCIAL-POSTING.md](SOCIAL-POSTING.md).
 - `tools/ytbot/account.py`: account switching plus exact intended-channel identity check.
 - `browser_install.py`, `onboarding.py`, `scripts/install-linux.sh`: repeatable private
   browser/dependency installation, automatic extension loading and account setup launcher.

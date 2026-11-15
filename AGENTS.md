@@ -82,7 +82,9 @@ two-factor or challenges, and never commit cookies, tokens, screenshots with acc
 private paths. `social status` saves only the handle, display name and verification time. Do
 not publish or change a profile until the owner gives explicit copy and action instructions.
 See [social](docs/SOCIAL.md), [promotion focus](docs/PROMOTION.md) and the
-[agenda runbook](docs/PROMOTION-AGENDA.md).
+[agenda runbook](docs/PROMOTION-AGENDA.md). X publishing is limited to one approved agenda
+item, text or one reviewed image, with UTM and the private idempotency journal. Never retry
+an item marked started or unconfirmed. See [X publishing](docs/SOCIAL-POSTING.md).
 
 ## Community
 
