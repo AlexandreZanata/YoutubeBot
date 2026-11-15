@@ -142,6 +142,18 @@ journal; never retry a started or unconfirmed reply. The target is ten contextua
 each original post published; track it with `social quota` and report gaps instead of forcing
 irrelevant comments. See [discovery](docs/SOCIAL-DISCOVERY.md).
 
+## Intelligent distribution
+
+"Distribuição inteligente" or "distribui" is the mode that chooses the channels by itself.
+Audit the future scheduled uploads of every registered channel, then give each new video to
+the channel with the fewest scheduled ones, water-filling until the requested count is
+allocated. Channels with a large queue may receive zero. Never ask which channel to use.
+
+Run it with `python3 -m tools.ytbot distribute --count N` (add `--dry-run` to only print the
+plan). Each channel keeps its own prompts, language, article length, background, thumbnail
+style, upload profile, slot hours and `interval_days`; the distribution only decides the
+quantity. See [distribution](docs/DISTRIBUTE.md).
+
 ## Community
 
 After the asset stage of every batch, check the selected channel's Community tab. The rule

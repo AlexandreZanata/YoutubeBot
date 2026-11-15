@@ -19,6 +19,7 @@ class Channel:
     max_article_chars: int = 0
     narration_volume: float = 2.0
     slots: tuple[int, ...] = (0, 12)
+    interval_days: int = 1
 
 
 CHANNELS = {
@@ -82,6 +83,7 @@ CHANNELS = {
         ),
         max_article_chars=74000,
         slots=(0,),
+        interval_days=2,
     ),
     "whispers-from-heaven": Channel(
         slug="whispers-from-heaven",

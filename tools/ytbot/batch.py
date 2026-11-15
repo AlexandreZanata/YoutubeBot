@@ -110,7 +110,8 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
         start = datetime.combine(start_date, datetime.min.time()) if start_date else None
         if start and start < datetime.now():
             start = None
-        slots = logic.next_slots(len(topics), occupied, start=start)
+        slots = logic.next_slots(len(topics), occupied, start=start,
+                                 interval_days=config.CHANNEL.interval_days)
         config.RUNS.mkdir(parents=True, exist_ok=True)
         free_gb = logic.require_free_space(config.RUNS, max(2.0, len(topics) * 0.32), "batch")
         log(f"free disk: {free_gb:.2f} GB")

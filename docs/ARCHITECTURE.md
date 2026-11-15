@@ -19,6 +19,8 @@ algorithms are preserved; new account/adapter modules compose them.
   [community](COMMUNITY.md).
 - `tools/ytbot/shorts.py`: vertical Shorts pipeline for Zaflas with short scripts, portrait
   render, upload-only account and 09:00/18:00 scheduling. See [Shorts](SHORTS.md).
+- `tools/ytbot/distribute.py`: audits the future scheduled uploads per channel and spreads a
+  block of new videos toward the emptiest channels. See [distribution](DISTRIBUTE.md).
 - `tools/ytbot/commercial/`: private affiliate sessions, starting with Mercado Livre.
   See [commercial](COMMERCIAL.md).
 - `tools/ytbot/social/`: private per-network promotion profiles, visible login and hidden
