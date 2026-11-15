@@ -8,8 +8,6 @@ import shutil
 import time
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
-
 from . import config, logic, runtime, upload_dialog
 
 
@@ -156,10 +154,18 @@ def schedule_existing(context, run_dir: Path, result: dict, slot) -> dict:
         title = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8")).get("title", "")
     except (OSError, ValueError):
         pass
+    if upload_dialog.scheduled_at(context, result["videoId"], slot):
+        result["scheduled"] = True
+        result["slot"] = logic.slot_label(slot)
+        write_result(run_dir, result)
+        log(f"scheduled {result['videoId']} at {result['slot']}")
+        return result
     for attempt in range(2):
         page = open_upload_dialog(context, result["videoId"], title)
         try:
             upload_dialog.schedule_in_dialog(page, slot)
+        except Exception as error:
+            log(f"schedule attempt {attempt + 1} failed: {error}")
         finally:
             page.close()
         if upload_dialog.scheduled_at(context, result["videoId"], slot):
@@ -187,12 +193,3 @@ def upload_and_schedule_with_context(context, run_dir: Path, meta: dict, slot) -
     result["endScreen"] = True
     write_result(run_dir, result)
     return schedule_existing(context, run_dir, result, slot)
-
-
-def upload_and_schedule(run_dir: Path, meta: dict, slot) -> dict:
-    with sync_playwright() as playwright:
-        context = runtime.launch_upload_context(playwright)
-        try:
-            return upload_and_schedule_with_context(context, run_dir, meta, slot)
-        finally:
-            context.close()
