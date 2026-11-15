@@ -47,6 +47,7 @@ def command_check(args) -> None:
 def command_run(args) -> None:
     flow_profiles.activate(flow_profiles.name(getattr(args, "flow_profile", None), environment=True))
     channels.apply(args.channel)
+    start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date() if args.start_date else None
     from .batch import run_batch
     from .account_commands import apply_bound_account
     from .accounts_store import AccountStore
