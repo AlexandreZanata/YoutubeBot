@@ -38,32 +38,67 @@ def _show_visibility(page) -> None:
         page.wait_for_timeout(2500)
 
 
+def log(message: str) -> None:
+    print(f"[schedule] {message}", flush=True)
+
+
+def _calendar_date(page, slot) -> bool:
+    month = logic.format_pt_date(slot.date()).split(" de ")[1][:3].upper()
+    for section in page.locator(".calendar-month").all():
+        text = section.inner_text().upper()
+        if month not in text or str(slot.year) not in text:
+            continue
+        day = section.get_by_text(str(slot.day), exact=True)
+        if day.count():
+            day.first.evaluate("el=>el.click()")
+            return True
+    return False
+
+
+def _set_date(page, slot) -> None:
+    if page.locator("ytcp-date-picker input").count():
+        field = page.locator("ytcp-date-picker input").first
+        field.fill(logic.format_pt_date(slot.date()))
+        field.press("Enter")
+    else:
+        page.evaluate("()=>{const b=document.querySelector('#datepicker-trigger'); if(b)b.click()}")
+        page.wait_for_timeout(1500)
+        if not _calendar_date(page, slot):
+            raise RuntimeError("could not select the schedule date")
+    page.wait_for_timeout(1000)
+    time_input = page.locator("#time-of-day-container input")
+    if time_input.count():
+        time_input.first.fill(slot.strftime("%H:%M"))
+        time_input.first.press("Enter")
+        page.wait_for_timeout(1000)
+
+
 def schedule_in_dialog(page, slot) -> None:
+    log("answering audience")
     answer_audience(page)
     _show_visibility(page)
-    deadline = time.time() + 1800
+    if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
+        log("schedule dialog is not open")
+        return
+    log("waiting for checks")
+    deadline = time.time() + 300
     while time.time() < deadline:
         body = page.locator("body").inner_text()
         state = page.evaluate(
             "()=>{const b=document.querySelector('#done-button'); return b?{text:(b.innerText||'').trim(),disabled:b.getAttribute('aria-disabled')}:null}")
         if state and state.get("disabled") != "true" and ("Verificações concluídas" in body or "Checks complete" in body):
             break
+        if not page.locator("#step-badge-3").count() and not page.locator("#datepicker-trigger").count():
+            log("dialog closed during checks")
+            return
         page.wait_for_timeout(5000)
     else:
         raise RuntimeError("video checks did not finish")
+    log("setting schedule date")
     if not page.locator("#datepicker-trigger").is_visible():
         page.evaluate("()=>{const b=document.querySelector('#second-container-expand-button'); if(b)b.click()}")
         page.wait_for_timeout(1500)
-    page.evaluate("()=>{const b=document.querySelector('#datepicker-trigger'); if(b)b.click()}")
-    page.wait_for_timeout(1200)
-    date_input = page.locator("ytcp-date-picker input")
-    date_input.first.fill(logic.format_pt_date(slot.date()))
-    date_input.first.press("Enter")
-    page.wait_for_timeout(1000)
-    time_input = page.locator("#time-of-day-container input")
-    time_input.first.fill(slot.strftime("%H:%M"))
-    time_input.first.press("Enter")
-    page.wait_for_timeout(1200)
+    _set_date(page, slot)
     model = page.evaluate(
         "()=>document.querySelector('#publish-from-private-non-sponsor-selector')?.getAttribute('model')")
     if not model:
@@ -72,14 +107,15 @@ def schedule_in_dialog(page, slot) -> None:
     expected = {"year": slot.year, "month": slot.month - 1, "day": slot.day}
     if parsed.get("date") != expected or parsed.get("selectedTimeOfDayValue") != slot.hour * 3600:
         raise RuntimeError(f"schedule model mismatch: {model}")
-    deadline = time.time() + 1800
+    log("clicking schedule")
+    deadline = time.time() + 180
+    words = ("Programar", "Schedule", "Salvar", "Save", "Concluir", "Done", "Publish")
     while time.time() < deadline:
         state = page.evaluate(
             "()=>{const b=document.querySelector('#done-button'); return b?{text:(b.innerText||'').trim(),disabled:b.getAttribute('aria-disabled')}:null}")
-        if state and state.get("disabled") != "true" and any(
-                word in state.get("text", "") for word in ("Programar", "Schedule", "Salvar", "Save")):
+        if state and state.get("disabled") != "true" and any(word in state.get("text", "") for word in words):
             break
-        page.wait_for_timeout(5000)
+        page.wait_for_timeout(3000)
     else:
         raise RuntimeError("schedule button did not become ready")
     page.evaluate("()=>{const b=document.querySelector('#done-button'); if(b)b.click()}")
@@ -87,22 +123,35 @@ def schedule_in_dialog(page, slot) -> None:
 
 
 def scheduled_at(context, video_id: str, slot) -> bool:
-    page = context.new_page()
-    try:
-        page.goto(config.STUDIO_EDIT.format(video_id=video_id), timeout=90000)
-        page.wait_for_timeout(8000)
-        page.mouse.wheel(0, 4000)
-        page.wait_for_timeout(1500)
-        if page.evaluate("()=>document.querySelector('#visibility-text')?.innerText") != "Programado":
-            return False
-        page.get_by_role("button", name="Editar status de visibilidade").click()
-        page.wait_for_timeout(2000)
-        model = json.loads(page.evaluate(
-            "()=>document.querySelector('#publish-from-private-non-sponsor-selector')?.getAttribute('model')"))
-        expected = {"year": slot.year, "month": slot.month - 1, "day": slot.day}
-        return model.get("date") == expected and model.get("selectedTimeOfDayValue") == slot.hour * 3600
-    finally:
-        page.close()
+    for attempt in range(3):
+        page = context.new_page()
+        matched = False
+        try:
+            page.goto(config.STUDIO_EDIT.format(video_id=video_id), timeout=90000)
+            page.wait_for_timeout(8000)
+            page.mouse.wheel(0, 4000)
+            page.wait_for_timeout(1200)
+            if page.evaluate("()=>document.querySelector('#visibility-text')?.innerText") == "Programado":
+                button = page.get_by_role("button", name="Editar status de visibilidade")
+                if button.count():
+                    button.click()
+                    page.wait_for_timeout(1500)
+                    model = page.evaluate(
+                        "()=>document.querySelector('#publish-from-private-non-sponsor-selector')?.getAttribute('model')")
+                    if model:
+                        parsed = json.loads(model)
+                        expected = {"year": slot.year, "month": slot.month - 1, "day": slot.day}
+                        matched = (parsed.get("date") == expected
+                                   and parsed.get("selectedTimeOfDayValue") == slot.hour * 3600)
+        except Exception:
+            pass
+        finally:
+            page.close()
+        if matched:
+            return True
+        if attempt < 2:
+            time.sleep(3)
+    return False
 
 
 def fill_editable(page, index: int, text: str) -> None:
