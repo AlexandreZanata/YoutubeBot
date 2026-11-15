@@ -15,7 +15,7 @@ profile. Each network gets its own display and CDP port.
 
 Discovery is a separate review step. It searches public conversations from the last 7 days,
 filters out politics, violence and engagement bait, and proposes contextual replies. A human
-reads the thread before a reply is written. Aim for five contextual replies per original post,
+reads the thread before a reply is written. Aim for ten contextual replies per original post,
 tracked with `social quota`; report a gap instead of forcing a reply. See
 [discovery](SOCIAL-DISCOVERY.md).
 

@@ -78,7 +78,7 @@ class AgendaTests(unittest.TestCase):
             self.assertEqual(found["state"], "started")
 
     def test_reply_quota_counts_only_posted_replies_for_the_owner_post(self):
-        self.assertEqual(publish.REPLIES_PER_POST, 5)
+        self.assertEqual(publish.REPLIES_PER_POST, 10)
         with tempfile.TemporaryDirectory() as directory:
             store = SocialStore(Path(directory) / "social")
             agenda.save_post(store, "x", "P01", {"state": "posted", "text_sha256": "a"})
