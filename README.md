@@ -44,6 +44,7 @@ YouTube production keeps its existing command and channel-specific behavior:
 python3 -m tools.ytbot run --channel fallem-prince --count 1
 python3 -m tools.ytbot community --channel fallem-prince
 python3 -m tools.ytbot social open --network x
+python3 -m tools.ytbot social open --network instagram
 python3 -m tools.ytbot social status --network x
 python3 -m tools.ytbot social stop --network x
 python3 -m tools.ytbot social agenda --network x

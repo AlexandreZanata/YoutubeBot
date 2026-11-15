@@ -9,7 +9,8 @@ tools/ytbot/social/
   store.py          private per-network folders and account records
   browser.py        visible login or hidden Xvfb Chrome, one profile and CDP port
   commands.py       social open/status/stop/agenda/post CLI
-  x/                X (Twitter) login detection
+  x/                X (Twitter) login detection and publishing
+  instagram/        Instagram login detection
 ```
 
 ```
@@ -17,6 +18,9 @@ tools/ytbot/social/
   x/profile/        persistent Chrome session, never in Git
   x/account.json    0600 record with handle, display name and verification time
   x/browser.pid     0600 process record
+  instagram/profile/        persistent Chrome session, never in Git
+  instagram/account.json    0600 handle and verification record
+  instagram/browser.pid     0600 process record
 ```
 
 The shared YouTube profile is never reused. `social open` shows a visible Chrome window only
@@ -76,6 +80,19 @@ Discovery finds recent public conversations and prepares them for human review. 
 context, may carry one relevant link and are recorded in a separate journal. The target is
 ten contextual replies for each original post, tracked with `social quota`; a gap is reported,
 never filled with unrelated comments. See [discovery and contextual replies](SOCIAL-DISCOVERY.md).
+
+## Connect Instagram
+
+```bash
+python3 -m tools.ytbot social open --network instagram
+python3 -m tools.ytbot social status --network instagram
+python3 -m tools.ytbot social stop --network instagram
+```
+
+Instagram starts with session and account recognition only. The visible window is used for
+login and challenges; status and stop use hidden Xvfb display `:91` and CDP port `9323`.
+Publishing and discovery for Instagram are not implemented yet. See
+[Instagram notes](../tools/ytbot/social/instagram/README.md).
 
 ## Network folders
 
