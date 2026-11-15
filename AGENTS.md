@@ -110,6 +110,14 @@ post, do nothing; otherwise publish one question post with the first topic, a sh
 a square crop of that video's thumbnail. Never retry an unconfirmed publish blindly. See
 [community](docs/COMMUNITY.md).
 
+## Generation and upload profiles
+
+Generation always uses the main profile with the ChatGPT login and audio-capture extension.
+Additional profiles are upload-only: they require the YouTube Studio login and channel
+binding, not ChatGPT or the capture extension. Use `--account legacy --upload-account <id>`
+to keep generation in the main profile and send only catalog, Community, upload and schedule
+work to the upload profile. Verify the channel identity in the upload profile before use.
+
 ## Upload failure handling
 
 Every upload wait is bounded and logged. `upload_guard` blocks before Studio when the

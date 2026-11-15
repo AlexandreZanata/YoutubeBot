@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 from datetime import datetime
 
@@ -61,14 +62,28 @@ def command_run(args) -> None:
     flow_profiles.activate(flow_profiles.name(getattr(args, "flow_profile", None), environment=True))
     channels.apply(args.channel)
     start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date() if args.start_date else None
+    if args.upload_account and args.upload_cdp:
+        raise SystemExit("use --upload-account or --upload-cdp, not both")
     from .batch import run_batch
     from .account_commands import apply_bound_account
     from .accounts_store import AccountStore
-    selected = apply_bound_account(args.channel, args.account)
     from .service_jobs import channel_lock
-    with AccountStore().profile_lock(selected), channel_lock(args.channel):
+    store = AccountStore()
+    upload_cdp = args.upload_cdp or 0
+    if args.upload_account:
+        upload = store.account(args.upload_account)
+        upload_cdp = upload["cdp_port"]
+        store.activate(args.upload_account)
+        runtime.start_hidden_chrome()
+    selected = apply_bound_account(args.channel, args.account)
+    runtime.start_hidden_chrome()
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(store.profile_lock(selected))
+        if args.upload_account and args.upload_account != selected:
+            stack.enter_context(store.profile_lock(args.upload_account))
+        stack.enter_context(channel_lock(args.channel))
         try:
-            failures = run_batch(args.count, args.parallel, args.upload_cdp or None, start_date)
+            failures = run_batch(args.count, args.parallel, upload_cdp or None, start_date)
         except RuntimeError as error:
             print(f"[ytbot] {error}")
             raise SystemExit(1)
@@ -101,6 +116,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--parallel", type=int, default=0,
                      help="tabs used for article and audio stages (0 = one per video)")
     run.add_argument("--upload-cdp", type=int, default=0)
+    run.add_argument("--upload-account", default=None,
+                     help="separate upload-only account/profile; generation stays in --account")
     run.add_argument("--flow-profile", choices=flow_profiles.NAMES, default=None,
                      help="ASR/render execution profile (or YTBOT_FLOW_PROFILE; default standard)")
     run.set_defaults(func=command_run)

@@ -36,6 +36,26 @@ Per-channel prompts/media settings/data stay in their existing locations; switch
 account does not rewrite titles, channel IDs, narration, video quality or schedules.
 The UI reads original run metadata and shows title, state, slot and video ID.
 
+## Generation and upload-only profiles
+
+Generation always uses the main profile with the ChatGPT login and audio-capture
+extension. A second profile can be **upload-only**: it needs only the YouTube Studio
+login and the channel binding. Do not log ChatGPT or install the capture extension there.
+
+```bash
+python3 -m tools.ytbot run --channel whispers-from-heaven --count 12 \
+  --account legacy --upload-account youtube-2
+```
+
+`--upload-account` starts the upload profile on its registered CDP port. The asset,
+article, audio, thumbnail and render stages stay in `--account`; catalog checks, Community,
+upload and scheduling use `--upload-account`. The channel identity is verified in the
+upload profile before any video is sent.
+
+An upload-only check can report `chatgpt_authenticated: false` and
+`extension_ready: false`; that is expected. `channel_verified: true` is the required
+condition for that profile.
+
 ## Optional API connection
 
 Google OAuth is optional for account/channel discovery, not the existing browser uploader.
