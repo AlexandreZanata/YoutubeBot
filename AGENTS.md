@@ -63,3 +63,15 @@ engravings. Always attach the two sanitized style references in
 `assets/styles/fallem_prince/`; adapt the subject and metaphor to the article. Preserve
 etched midtones and full-scene depth. The earlier large white void/two-color poster
 interpretation is superseded.
+
+## Upload failure handling
+
+Every upload wait is bounded and logged. `upload_guard` blocks before Studio when the
+video, metadata title/description or a valid thumbnail is missing. After upload,
+`video_details` applies title, description and thumbnail on the edit page, waits for the
+`studiothumbnail` 200 and verifies the title/description before checks and the end screen.
+
+Never re-upload a video that already has an `upload.json` video ID: schedule the existing
+draft. If checks do not finish, leave the draft, record the video ID and slot, and report;
+never retry an uncertain upload or wait 30 minutes silently. Use
+[Upload recovery](docs/UPLOAD-RECOVERY.md) for the full catalog and manual fallbacks.

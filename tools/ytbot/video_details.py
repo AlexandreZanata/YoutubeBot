@@ -1,4 +1,4 @@
-"""Apply title, description, tags and thumbnail on a video edit page."""
+"""Apply title, description and thumbnail on a video edit page."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from . import upload_dialog
+from .upload_guard import UploadBlocked
 
 
 def log(message: str) -> None:
@@ -18,16 +19,14 @@ def apply_details(page, run_dir: Path, meta: dict) -> None:
     thumbnail = run_dir / "thumbnail.png"
     field = page.locator('input[type=file][accept*="image"]')
     if thumbnail.is_file() and field.count():
-        with page.expect_response(
-                lambda response: "studiothumbnail" in response.url and response.status == 200,
-                timeout=60000):
-            field.last.set_input_files(str(thumbnail))
+        try:
+            with page.expect_response(
+                    lambda response: "studiothumbnail" in response.url and response.status == 200,
+                    timeout=60000):
+                field.last.set_input_files(str(thumbnail))
+        except Exception as error:
+            raise UploadBlocked("thumbnail upload did not complete; retry the details step") from error
         page.wait_for_timeout(2000)
-    tags = page.locator('input[aria-label="Tags"]')
-    if tags.count():
-        tags.first.fill(meta.get("tags", ""))
-        tags.first.press("Enter")
-        page.wait_for_timeout(500)
     save = page.locator("#save")
     if save.count() and save.get_attribute("aria-disabled") != "true":
         save.click()
@@ -36,4 +35,12 @@ def apply_details(page, run_dir: Path, meta: dict) -> None:
             if page.evaluate("()=>document.querySelector('#save')?.getAttribute('aria-disabled')") == "true":
                 break
             page.wait_for_timeout(2000)
+        else:
+            raise UploadBlocked("details save did not finish; retry the details step")
+    page.reload()
+    page.wait_for_timeout(9000)
+    title = page.evaluate("()=>document.querySelectorAll('#textbox')[0]?.innerText || ''")
+    description = page.evaluate("()=>document.querySelectorAll('#textbox')[1]?.innerText || ''")
+    if title.strip() != meta["title"].strip() or not description.strip():
+        raise UploadBlocked("title or description did not persist; retry the details step")
     log("details saved")
