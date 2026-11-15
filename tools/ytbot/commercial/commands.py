@@ -8,6 +8,7 @@ from .. import config
 from ..social import browser
 from ..social.store import SocialStore
 from .mercadolivre import account as mercadolivre
+from .mercadolivre import products
 
 NETWORKS = ("mercadolivre",)
 
@@ -57,6 +58,40 @@ def command_status(args) -> None:
     print(json.dumps(store.public_status(args.network), ensure_ascii=False))
 
 
+def command_products(args) -> None:
+    from playwright.sync_api import sync_playwright
+
+    try:
+        store = _store()
+        network = _network(args.network)
+        browser.ensure_background(store, args.network, network.LOGIN_URL, network.CDP_PORT,
+                                  network.BACKGROUND_DISPLAY)
+        with sync_playwright() as playwright:
+            client = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{network.CDP_PORT}")
+            context = client.contexts[0]
+            try:
+                context.grant_permissions(["clipboard-read", "clipboard-write"],
+                                         origin="https://www.mercadolivre.com.br")
+            except Exception:
+                pass
+            page = context.new_page()
+            try:
+                state = network.inspect(page)
+                if state["state"] != "logged-in":
+                    raise RuntimeError(f"{args.network} is {state['state']}; finish login first")
+                rows = products.search(page, args.query, limit=args.limit,
+                                       share=not args.no_share)
+            finally:
+                page.close()
+        path = store.network(args.network) / "products.json"
+        products.save(path, args.query, rows)
+        print(json.dumps({"query": args.query, "count": len(rows),
+                          "products_file": str(path), "products": rows},
+                         ensure_ascii=False))
+    except Exception as error:
+        raise SystemExit(f"[commercial] {error}")
+
+
 def command_stop(args) -> None:
     store = _store()
     _network(args.network)
@@ -72,6 +107,13 @@ def add_parser(sub) -> None:
     status_parser = actions.add_parser("status", help="detect and save the affiliate session")
     status_parser.add_argument("--network", choices=NETWORKS, required=True)
     status_parser.set_defaults(func=command_status)
+    products_parser = actions.add_parser("products", help="search affiliate products and copy links")
+    products_parser.add_argument("--network", choices=NETWORKS, required=True)
+    products_parser.add_argument("--query", required=True)
+    products_parser.add_argument("--limit", type=int, default=5)
+    products_parser.add_argument("--no-share", action="store_true",
+                                 help="list products without opening the share dialog")
+    products_parser.set_defaults(func=command_products)
     stop_parser = actions.add_parser("stop", help="stop the hidden affiliate browser")
     stop_parser.add_argument("--network", choices=NETWORKS, required=True)
     stop_parser.set_defaults(func=command_stop)
