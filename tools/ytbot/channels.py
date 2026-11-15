@@ -58,7 +58,7 @@ CHANNELS = {
         language="en",
         min_article_chars=13000,
         article_retry=(
-            "Target narration length: 2,600 to 3,200 words, about 17 to 20 "
+            "Target narration length: 2,400 to 2,800 words, about 15 to 17 "
             "minutes at a calm pace."
         ),
     ),
