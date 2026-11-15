@@ -35,6 +35,7 @@ CHANNELS = {
             "about 30 minutes at the channel's narration pace. Preserve the "
             "fixed Zaflas Agro opening identification and final sign-off."
         ),
+        slots=(12,),
     ),
     "fallem-prince": Channel(
         slug="fallem-prince",
