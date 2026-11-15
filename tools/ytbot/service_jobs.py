@@ -12,7 +12,7 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from . import channels, config
+from . import channels, config, flow_profiles
 from .accounts_store import AccountStore, private_directory, read_private, write_private
 
 STATES = {"accepted", "running", "completed", "failed", "uncertain"}
@@ -66,6 +66,8 @@ def public(record: dict) -> dict:
         "account": request["account"],
         "count": request["count"],
         "mode": request.get("mode", "schedule"),
+        "flow_profile": request.get("flow_profile", "standard"),
+        "flow_selection": record.get("flow_selection", flow_profiles.resolve("standard").record()),
         "created_at": record["created_at"],
         "updated_at": record["updated_at"],
         "summary": str(record.get("summary", ""))[:1000],
@@ -290,11 +292,13 @@ def submit(
     *,
     mode="schedule",
     approved_generate=False,
+    flow_profile="standard",
     launcher=launch_actor,
     store: AccountStore | None = None,
     unit_probe=unit_active,
 ) -> dict:
     operation_id = canonical_id(operation_id)
+    flow_profile = flow_profiles.name(flow_profile)
     channels.get(channel)
     store = store or AccountStore()
     store.account(account)
@@ -310,6 +314,9 @@ def submit(
     }
     if mode == "generate":
         request.update(mode="generate", approved_schedule=False, approved_generate=True)
+    # Omission and explicit standard keep the pre-profile idempotency fingerprint.
+    if flow_profile != "standard":
+        request["flow_profile"] = flow_profile
     fingerprint = hashlib.sha256(
         json.dumps(request, sort_keys=True).encode()
     ).hexdigest()
@@ -318,6 +325,7 @@ def submit(
         "schema": 1,
         "operation_id": operation_id,
         "request": request,
+        "flow_selection": flow_profiles.resolve(flow_profile).record(),
         "fingerprint": fingerprint,
         "state": "accepted",
         "created_at": int(time.time()),
@@ -438,6 +446,7 @@ def execute(operation_id: str) -> None:
             updated_at=int(time.time()),
             summary="Video batch is running.",
         )
+        record["flow_selection"] = flow_profiles.activate_request(record["request"], record.get("flow_selection"))
         write_private(path, record)
     log_descriptor = os.open(
         directory / (operation_id + ".log"),

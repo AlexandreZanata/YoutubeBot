@@ -1,0 +1,66 @@
+{
+  "base_packages": {
+    "intel-media-va-driver": [
+      "24.1.0+dfsg1-1ubuntu0.2",
+      "8031503e41265aff7c4cf16071eba5dca82c90335cc1913139a7685f479eae20"
+    ],
+    "libigdgmm12": [
+      "22.3.17+ds1-1ubuntu1",
+      "ede6847818c659ecbbf5263fcc3363a8fa72749f9f8ab3194a1d88d4dff71c44"
+    ],
+    "libmfx1": [
+      "22.5.4-1",
+      "ba6b1bf484d70fe59b6832f7bd7c8a16d5783cd324748bd64e4fc8697ef4d1cd"
+    ],
+    "nasm": [
+      "2.16.01-1build1",
+      "22eede0f2dd62343b0298182f62f7485704fe02f166395b02c92a8883377e0b3"
+    ]
+  },
+  "opencl_packages": {
+    "intel-opencl-icd": [
+      "23.43.27642.40-1ubuntu3",
+      "5b95f0d634fd8ee09610f1f7e2d173474ad06ba9d51de625f064621a6233b8cb"
+    ],
+    "libigc1": [
+      "1.0.15468.25-2ubuntu0.1",
+      "5727c98f48b4516233c99fc0df209a4ed06ef636028df75299c626e9f95c31bb"
+    ],
+    "libigdfcl1": [
+      "1.0.15468.25-2ubuntu0.1",
+      "1b17e07265186cf72246ac36b2c645de19931c5234d8d5144eb3098588893730"
+    ],
+    "libllvm14t64": [
+      "1:14.0.6-19build4",
+      "610cf473a9d76a3cb5fe4d6579ba3de0812690e53d41315aba0c9b1a9a94c782"
+    ],
+    "libllvmspirvlib14": [
+      "14.0.8-1~ubuntu0.24.04.1",
+      "9b0e9780a05e5630c9d76052ab8d83d8cecf996c01787673a353b1518d678828"
+    ],
+    "libopencl-clang14": [
+      "14.0.0-4build2",
+      "9227e163b7f4a25400e16abaf6f38c2c3196b0fdb0e389eda84b45450be95dda"
+    ],
+    "libclang-cpp14t64": [
+      "1:14.0.6-19build4",
+      "bc7b3b3dbdc7d826857a03b15e3c937471779d7d41e1c40fd7de514b27d89735"
+    ]
+  },
+  "vmaf_revision": "17a67b238ce0539bdeafdc95961abac64fa16ea8",
+  "build_packages": {
+    "meson": "1.6.0",
+    "ninja": "1.11.1.3"
+  },
+  "openvino_packages": {
+    "openvino-genai": "2026.4.0.0",
+    "openvino": "2026.4.0",
+    "openvino-tokenizers": "2026.4.0.0",
+    "numpy": "2.5.4",
+    "openvino-telemetry": "2025.2.0"
+  },
+  "openvino_model": {
+    "repo": "OpenVINO/whisper-large-v3-turbo-int8-ov",
+    "revision": "b568445dd5dc8c695bde596f8acbb4694fd6ba64"
+  }
+}

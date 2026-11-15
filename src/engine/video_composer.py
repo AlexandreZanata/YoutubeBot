@@ -63,6 +63,23 @@ def build_single_pass_command(
     return cmd
 
 
+def execute_ffmpeg(command, progress_callback=None, total_duration=0.0, *, env=None):
+    """Run an internally constructed command and report its actual encoder result."""
+    command = list(command)
+    options = {"env": env} if env is not None else {}
+    if progress_callback:
+        command[-1:-1] = ["-progress", "pipe:1", "-nostats"]
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **options)
+        for line in proc.stdout:
+            sec = parse_out_time_sec(line.strip())
+            if sec >= 0 and total_duration > 0:
+                progress_callback(min(99.0, (sec / total_duration) * 100.0), sec)
+        _, errors = proc.communicate()
+        return proc.returncode == 0, errors
+    result = subprocess.run(command, capture_output=True, text=True, **options)
+    return result.returncode == 0, result.stderr
+
+
 def render_single_pass_video(
     image_path: Path,
     narr_path: Path,
@@ -84,20 +101,8 @@ def render_single_pass_video(
         narr_vol, bgm_vol, width, height, fps, duration=total_duration,
         background_is_video=background_is_video,
     )
-    if progress_callback:
-        cmd[-1:-1] = ["-progress", "pipe:1", "-nostats"]
-
     def execute(command):
-        if progress_callback:
-            proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            for line in proc.stdout:
-                sec = parse_out_time_sec(line.strip())
-                if sec >= 0 and total_duration > 0:
-                    progress_callback(min(99.0, (sec / total_duration) * 100.0), sec)
-            _, errors = proc.communicate()
-            return proc.returncode == 0, errors
-        result = subprocess.run(command, capture_output=True, text=True)
-        return result.returncode == 0, result.stderr
+        return execute_ffmpeg(command, progress_callback, total_duration)
 
     ok, errors = execute(cmd)
     unavailable = ("cannot load libcuda", "no nvenc capable devices", "unsupported device",

@@ -184,3 +184,12 @@ python3 -m tools.ytbot run --channel fallem-prince --count 4 --parallel 4 --uplo
   profile because YouTube requires a real browser session for large files.
 - The previously published proof video was an exception from before the
   scheduling rule. Every new video follows the scheduled workflow.
+
+## Optional ASR/render execution profile
+
+Future owner-authorized runs can select `--flow-profile fast`, or use
+`YTBOT_FLOW_PROFILE=fast`; `--flow-profile standard` reverts the choice. Standard remains
+the default. Fast currently falls back to standard pending complete qualification.
+These execution settings are independent of channel/browser profiles and do not change
+publication permissions. See [performance profiles](../../docs/PERFORMANCE-PROFILES.md)
+for measured results and private, browser-free benchmarks of existing audio/video files.
