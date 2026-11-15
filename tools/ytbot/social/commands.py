@@ -36,8 +36,8 @@ def command_status(args) -> None:
 
     store = SocialStore()
     network = _network(args.network)
-    if not browser.cdp_alive(network.CDP_PORT):
-        browser.open_visible(store, args.network, network.LOGIN_URL, network.CDP_PORT)
+    browser.ensure_background(store, args.network, network.LOGIN_URL, network.CDP_PORT,
+                              network.BACKGROUND_DISPLAY)
     with sync_playwright() as playwright:
         client = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{network.CDP_PORT}")
         context = client.contexts[0]
@@ -53,6 +53,12 @@ def command_status(args) -> None:
     else:
         print(f"[social] {args.network} state: {result['state']}")
     print(json.dumps(store.public_status(args.network), ensure_ascii=False))
+
+
+def command_stop(args) -> None:
+    store = SocialStore()
+    _network(args.network)
+    browser.stop(store, args.network)
 
 
 def command_agenda(args) -> None:
@@ -82,8 +88,8 @@ def _post(args) -> None:
     network = _network(args.network)
     data = agenda_module.load_agenda(Path(args.file))
     item = agenda_module.item_by_id(data, args.id)
-    if not browser.cdp_alive(network.CDP_PORT):
-        browser.open_visible(store, args.network, network.LOGIN_URL, network.CDP_PORT)
+    browser.ensure_background(store, args.network, network.LOGIN_URL, network.CDP_PORT,
+                              network.BACKGROUND_DISPLAY)
     with sync_playwright() as playwright:
         client = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{network.CDP_PORT}")
         context = client.contexts[0]
@@ -107,6 +113,9 @@ def add_parser(sub) -> None:
     status_parser = actions.add_parser("status", help="detect and save the logged-in account")
     status_parser.add_argument("--network", choices=NETWORKS, required=True)
     status_parser.set_defaults(func=command_status)
+    stop_parser = actions.add_parser("stop", help="stop the hidden browser for a network")
+    stop_parser.add_argument("--network", choices=NETWORKS, required=True)
+    stop_parser.set_defaults(func=command_stop)
     agenda_parser = actions.add_parser("agenda", help="list the private promotion agenda")
     agenda_parser.add_argument("--network", choices=NETWORKS, required=True)
     agenda_parser.add_argument("--file", default=str(DEFAULT_AGENDA))

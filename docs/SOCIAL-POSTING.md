@@ -29,7 +29,7 @@ Only this runbook and the code are versioned.
       "date": "2026-11-16",
       "product": "Abastevo",
       "format": "text",
-      "text": "O litro mais barato ... Veja a calculadora: {url}",
+      "text": "O litro mais barato nem sempre é o que economiza mais. Depende do consumo do seu carro. Coloca os seus números na calculadora e compara: {url}",
       "destination": "https://abastevo.com.br/ferramentas/etanol-ou-gasolina/",
       "campaign": "abastevo_utilidade_202611",
       "content": "p01_text",
@@ -74,6 +74,23 @@ fake calculator screen would damage trust. The post therefore uses the real link
 builds from the Abastevo page. A real screenshot is allowed in a future image item only after
 review, with no private data and with alt text.
 
+The private agenda now carries a more conversational P01 revision. The live post still has the
+first wording because X editing requires a paid Plus/Premium entitlement. The account showed
+the upgrade prompt instead of an editor.
+
+## Editing a published post
+
+Do not silently delete and repost when a copy revision is needed.
+
+- X editing requires the account entitlement. If the Editar menu shows an upgrade prompt, the
+  bot cannot edit.
+- Update the private agenda copy first.
+- Ask the owner before deleting a published post. Deletion is irreversible and removes the
+  existing link.
+- If the owner approves a replacement, delete the post in X, update the private journal entry
+  explicitly, then publish the revised item as a new post.
+- Never bypass the journal to force a repost.
+
 ## Image policy
 
 Use an image only when it adds evidence or a concrete visual step:
@@ -93,8 +110,9 @@ decision and must be reviewed before it is attached.
 ## Commands
 
 ```bash
-python3 -m tools.ytbot social open --network x
-python3 -m tools.ytbot social status --network x
+python3 -m tools.ytbot social open --network x      # visible login only
+python3 -m tools.ytbot social status --network x    # hidden
+python3 -m tools.ytbot social stop --network x
 python3 -m tools.ytbot social agenda --network x
 python3 -m tools.ytbot social post --network x --id P01 --dry-run
 python3 -m tools.ytbot social post --network x --id P01
@@ -111,23 +129,27 @@ clicking. It does not write the journal.
    as 23 characters.
 4. Refuse a duplicate id or a text hash already present in the journal.
 5. Validate the optional image path, type and size.
-6. Confirm the browser is logged in. If not, stop and ask the owner to finish login.
-7. Open `https://x.com/compose/post` and target the visible composer dialog.
-8. Fill `data-testid="tweetTextarea_0"`.
-9. Attach `input[data-testid="fileInput"]` and wait for the attachment preview when an image
-   is present.
-10. Wait for `data-testid="tweetButton"` to become enabled.
-11. Write `state: started` with the text hash before clicking.
-12. Click Post once.
-13. Confirm the toast or the closed composer.
-14. Read the status URL from the toast link when available.
-15. Write `state: posted` or `state: unconfirmed`; never retry automatically.
+6. Ensure the hidden Xvfb browser on display `:90`; if a visible bot window is open, stop it
+   and relaunch the same private profile in the background.
+7. Confirm the browser is logged in. If not, stop and ask the owner to finish login.
+8. Open `https://x.com/compose/post` and target the visible composer dialog.
+9. Fill `data-testid="tweetTextarea_0"`.
+10. Attach `input[data-testid="fileInput"]` and wait for the attachment preview when an image
+    is present.
+11. Wait for `data-testid="tweetButton"` to become enabled.
+12. Write `state: started` with the text hash before clicking.
+13. Click Post once.
+14. Confirm the toast or the closed composer.
+15. Read the status URL from the toast link when available.
+16. Write `state: posted` or `state: unconfirmed`; never retry automatically.
 
 ## Error handling
 
 | Situation | Bot action |
 | --- | --- |
-| Browser closed | Open the visible browser and retry the command |
+| Browser closed | Start the hidden Xvfb browser automatically |
+| Visible login window open | Stop it, then relaunch the same profile in the background |
+| Xvfb display busy | Use the next free display and update the network constant |
 | Login required or challenge | Stop; the owner finishes it in the visible window and reruns |
 | Agenda missing or invalid | Stop; fix the private JSON or its schema |
 | Item not approved | Stop; review and set `status: approved` |

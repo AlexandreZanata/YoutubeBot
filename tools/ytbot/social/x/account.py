@@ -6,6 +6,7 @@ import re
 
 LOGIN_URL = "https://x.com/home"
 CDP_PORT = 9322
+BACKGROUND_DISPLAY = ":90"
 
 HANDLE = re.compile(r"@([A-Za-z0-9_]{1,15})\b")
 TRAILING_HANDLE = re.compile(r"^[A-Za-z0-9_]{1,15}$")

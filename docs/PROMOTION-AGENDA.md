@@ -91,8 +91,12 @@ Audit checklist:
 Audit the language:
 
 - Brazilian Portuguese, natural and specific.
-- Short sentences, active voice, one idea per paragraph.
+- Write like a person talking to a friend, not like a press release or a language model.
+- Short sentences, active voice, one idea per paragraph. Vary the rhythm.
 - Explain jargon before using it.
+- Cut "É importante destacar", "Neste contexto", "Além disso", "Vale ressaltar", "Descubra",
+  forced triads and generic closing lines.
+- Read the copy aloud. If it sounds polished in a generic way, rewrite it.
 - No "você sabia", "revolucionário", "disruptivo", "segredo", "hack" or "última chance".
 - No em dash in published copy. Use commas, periods or parentheses.
 - No engagement bait, no "comente SIM", no "siga para mais", no "marque 3 amigos".

@@ -45,6 +45,7 @@ python3 -m tools.ytbot run --channel fallem-prince --count 1
 python3 -m tools.ytbot community --channel fallem-prince
 python3 -m tools.ytbot social open --network x
 python3 -m tools.ytbot social status --network x
+python3 -m tools.ytbot social stop --network x
 python3 -m tools.ytbot social agenda --network x
 python3 -m tools.ytbot social post --network x --id P01 --dry-run
 python3 -m tools.ytbot catalog --channel whispers-from-heaven
