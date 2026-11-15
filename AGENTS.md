@@ -81,7 +81,8 @@ an explicit network. X sign-in is manual in the visible browser; never automate 
 two-factor or challenges, and never commit cookies, tokens, screenshots with account data or
 private paths. `social status` saves only the handle, display name and verification time. Do
 not publish or change a profile until the owner gives explicit copy and action instructions.
-See [social](docs/SOCIAL.md) and [promotion focus](docs/PROMOTION.md).
+See [social](docs/SOCIAL.md), [promotion focus](docs/PROMOTION.md) and the
+[agenda runbook](docs/PROMOTION-AGENDA.md).
 
 ## Community
 

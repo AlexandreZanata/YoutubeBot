@@ -81,5 +81,6 @@ for at least two weeks before judging a format. Do not optimize for impressions 
   no artificial amplification, bulk unsolicited contact or engagement trading.
 
 The next step is a research and curation pass that turns these anchors into audience maps,
-content pillars, a 30-day calendar, article briefs and ready-to-edit Portuguese posts. No
-publishing happens until the owner reviews the copy.
+content pillars, a 30-day calendar, article briefs and ready-to-edit Portuguese posts. The
+repeatable process for that pass is the [agenda runbook](PROMOTION-AGENDA.md). No publishing
+happens until the owner reviews the copy.
