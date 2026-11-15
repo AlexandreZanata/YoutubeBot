@@ -53,3 +53,15 @@ retry the Codex thumbnail.
 - The description carries the hashtags and `TAGS:` line; the SEO tags field may need a
   separate manual pass.
 - Keep media, references and private logs out of Git.
+
+## Performance and reliability changes
+
+- Articles and Read aloud use one tab per video; `--parallel N` caps the tabs.
+- Codex topics are requested in chunks of at most 12, so batches above 12 loop.
+- Upload waits are bounded and logged; title, description, thumbnail and end screen are
+  verified before scheduling.
+- Scheduling confirms the slot first, opens the Programar block, supports the calendar,
+  and retries the end screen verification; checks are bounded.
+- Fallem prince uses up to four daily slots from 2026-11-15 (00:00, 06:00, 12:00,
+  18:00); dated batches use `--start-date YYYY-MM-DD`.
+- Every fix follows the branch/PR/CI rule and is documented here or in the README.

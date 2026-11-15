@@ -79,3 +79,10 @@ Never re-upload a video that already has an `upload.json` video ID: schedule the
 draft. If checks do not finish, leave the draft, record the video ID and slot, and report;
 never retry an uncertain upload or wait 30 minutes silently. Use
 [Upload recovery](docs/UPLOAD-RECOVERY.md) for the full catalog and manual fallbacks.
+
+## Performance and reliability changes
+
+Every performance or reliability fix must be documented in README,
+`docs/UPLOAD-RECOVERY.md` or the relevant contract, covered by `npm run verify`, and
+pushed to GitHub through a branch and PR after CI passes. Never keep a silent local
+optimization.
