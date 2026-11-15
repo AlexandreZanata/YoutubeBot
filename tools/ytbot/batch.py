@@ -112,6 +112,9 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
         if start and start < datetime.now():
             start = None
         slots = logic.next_slots(len(topics), occupied, start=start)
+        config.RUNS.mkdir(parents=True, exist_ok=True)
+        free_gb = logic.require_free_space(config.RUNS, max(2.0, len(topics) * 0.32), "batch")
+        log(f"free disk: {free_gb:.2f} GB")
         for index, topic in enumerate(topics):
             logic.set_run_field(logic.run_path(topic),
                                 thumbnail_style=logic.thumbnail_style(index))

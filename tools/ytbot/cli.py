@@ -67,7 +67,11 @@ def command_run(args) -> None:
     selected = apply_bound_account(args.channel, args.account)
     from .service_jobs import channel_lock
     with AccountStore().profile_lock(selected), channel_lock(args.channel):
-        failures = run_batch(args.count, args.parallel, args.upload_cdp or None, start_date)
+        try:
+            failures = run_batch(args.count, args.parallel, args.upload_cdp or None, start_date)
+        except RuntimeError as error:
+            print(f"[ytbot] {error}")
+            raise SystemExit(1)
     print("[ytbot] process finished")
     if failures:
         raise SystemExit(1)

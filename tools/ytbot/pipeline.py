@@ -62,6 +62,7 @@ def _article_audio(context, topic: str, run_dir: Path) -> None:
             logic.set_run_field(run_dir, conversation=page.url)
             logic.record_event(run_dir, "article", "ok", f"{(run_dir / 'article.txt').stat().st_size} bytes")
         if need_audio:
+            logic.require_free_space(run_dir, 0.8, "audio stage")
             chat.capture_audio(page, context, run_dir)
             logic.record_event(run_dir, "audio", "ok")
     finally:
@@ -80,6 +81,7 @@ def _extra_assets(context, topic: str, run_dir: Path) -> None:
         assets.generate_thumbnail(context, run_dir, style)
         logic.record_event(run_dir, "thumbnail", "ok")
     if not (run_dir / "video.mp4").is_file():
+        logic.require_free_space(run_dir, 0.8, "render stage")
         fitted = audio_tools.fit_narration(run_dir)
         logic.record_event(run_dir, "duration", "ok", fitted.name)
         render.render_video(run_dir)

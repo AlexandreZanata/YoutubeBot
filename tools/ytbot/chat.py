@@ -171,6 +171,7 @@ def _save_audio(entry, item, run_dir: Path) -> Path | None:
 
 
 def capture_audio(page, context, run_dir: Path, timeout: int = 3600) -> Path:
+    logic.require_free_space(run_dir, 0.5, "audio capture")
     start = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     tab_url = page.url
     clicked = page.evaluate(
@@ -181,10 +182,16 @@ def capture_audio(page, context, run_dir: Path, timeout: int = 3600) -> Path:
     if clicked == "none":
         raise RuntimeError("Read aloud button was not available")
     deadline = time.time() + timeout
+    next_report = time.time() + 60
     while time.time() < deadline:
+        logic.require_free_space(run_dir, 0.25, "audio capture")
         page.wait_for_timeout(5000)
         found = _audio_entry(context, start, tab_url)
         if not found:
+            if time.time() >= next_report:
+                free_gb = shutil.disk_usage(run_dir).free / (1024 ** 3)
+                log(f"audio waiting: {free_gb:.2f} GB free, capture not recorded yet")
+                next_report = time.time() + 60
             continue
         entry, item = found
         log(f"audio {entry.get('status')} / {item.get('state')} / {item.get('fileSize')} bytes")
