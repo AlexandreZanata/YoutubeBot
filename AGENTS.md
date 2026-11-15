@@ -13,6 +13,9 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   Only Zaflas uses Brazilian Portuguese. Operator/browser interface language never changes content language.
 - `tools/ytbot` keeps channel prompts, deduplication, resumable stage records and sequential
   upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`.
+  Whispers uses 2,400 to 2,800 words (15 to 17 minutes), Sacred Brown Engraving thumbnails,
+  brown stippling background and the metadata/tag patterns in
+  [its channel profile](docs/channels/whispers-from-heaven.md).
 - Require an explicit channel. Verify its YouTube channel ID before mutating Studio.
 - Schedule only: up to 4 videos/day for fallem prince at 00:00, 06:00, 12:00 and
   18:00 in America/Cuiaba, at least 60 minutes ahead, not made for kids, custom

@@ -11,7 +11,7 @@ publishes immediately and never opens windows in the main desktop workspace.
 | Profile | Channel | Style |
 |---------|---------|-------|
 | `fallem-prince` | fallem prince | English psychology/philosophy essays, 35–80 min, dark monochrome narrative-engraving thumbnails. |
-| `whispers-from-heaven` | Whispers From Heaven | English Christian biblical story narrations, 14–22 min, Sacred Brown Engraving thumbnails. |
+| `whispers-from-heaven` | Whispers From Heaven | English Christian biblical story narrations, 12–22 min, Sacred Brown Engraving thumbnails. |
 | `zaflas` | Zaflas / Zaflas Agro | Brazilian Portuguese agribusiness, about 30 min, photographic agricultural thumbnails with Portuguese text, `agro` background. |
 
 The [Zaflas profile notes](prompts/zaflas_agro/README.md) record the public-video
@@ -168,6 +168,8 @@ capture is visible instead of silent.
   [community](../../docs/COMMUNITY.md).
 - **Rendering** is serialized by a process lock because transcription and NVENC
   share the GPU. **Uploads and scheduling** stay sequential.
+
+See the [Whispers From Heaven profile](../../docs/channels/whispers-from-heaven.md) for the analyzed duration, thumbnail palette and metadata patterns.
 
 Use `--parallel N` to override the tab count (`0` means one tab per video).
 With 5 requested videos the bot opens 5 tabs.
