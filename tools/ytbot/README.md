@@ -156,7 +156,9 @@ The default shape is one tab per video:
   target.
 - **Read aloud** is clicked in every tab as soon as its article is ready. The
   extension stores the source tab URL in `captureHistory`, so the bot copies
-  each download into the matching run (`narration.aac`/`.webm`).
+  each download into the matching run (`narration.aac`/`.webm`). The button wait is 60
+  seconds; no capture entry after 10 minutes triggers one reload/retry, and the whole
+  capture is bounded to 30 minutes.
 - **Metadata and thumbnail** run in parallel per video. Fallem prince alternates dense and
   classic thumbnail prompts, six of each in a twelve-video batch.
 - **Community** is checked after the assets: an empty tab receives one question post with

@@ -170,18 +170,19 @@ def _save_audio(entry, item, run_dir: Path) -> Path | None:
     return destination
 
 
-def capture_audio(page, context, run_dir: Path, timeout: int = 3600) -> Path:
-    logic.require_free_space(run_dir, 0.5, "audio capture")
-    start = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
-    tab_url = page.url
-    clicked = page.evaluate(
-        "()=>{const b=[...document.querySelectorAll('button[aria-label=\"Read aloud\"]')];"
-        "if(!b.length)return 'none'; b[b.length-1].click(); return 'clicked'}"
-    )
-    log(f"read aloud: {clicked} ({tab_url})")
-    if clicked == "none":
-        raise RuntimeError("Read aloud button was not available")
-    deadline = time.time() + timeout
+def _click_read_aloud(page, wait_seconds: int = 60) -> bool:
+    deadline = time.time() + wait_seconds
+    while time.time() < deadline:
+        buttons = page.locator('button[aria-label="Read aloud"]')
+        if buttons.count():
+            buttons.last.click()
+            return True
+        page.wait_for_timeout(2000)
+    return False
+
+
+def _capture_once(page, context, run_dir: Path, tab_url: str, start: str,
+                  deadline: float) -> Path | None:
     next_report = time.time() + 60
     while time.time() < deadline:
         logic.require_free_space(run_dir, 0.25, "audio capture")
@@ -199,7 +200,33 @@ def capture_audio(page, context, run_dir: Path, timeout: int = 3600) -> Path:
         if destination:
             log(f"audio saved: {destination.name} ({destination.stat().st_size} bytes)")
             return destination
-    raise TimeoutError("audio capture timed out")
+    return None
+
+
+def capture_audio(page, context, run_dir: Path, timeout: int = 1800) -> Path:
+    logic.require_free_space(run_dir, 0.5, "audio capture")
+    overall = time.time() + timeout
+    for attempt in range(2):
+        if not _click_read_aloud(page):
+            if attempt:
+                raise RuntimeError("Read aloud button was not available after waiting")
+            log("Read aloud button was not available; reloading the conversation")
+        else:
+            start = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+            tab_url = page.url
+            log(f"read aloud: clicked ({tab_url})")
+            start_deadline = min(overall, time.time() + 600)
+            destination = _capture_once(page, context, run_dir, tab_url, start, start_deadline)
+            if destination:
+                return destination
+            if attempt:
+                break
+            log("no capture after 10 minutes; reloading and retrying Read aloud once")
+        if time.time() >= overall:
+            break
+        page.reload(wait_until="domcontentloaded", timeout=90000)
+        page.wait_for_timeout(8000)
+    raise TimeoutError("audio capture timed out after bounded Read aloud retries")
 
 
 def generate_topics(context, count: int, existing: list[str]) -> list[str]:
