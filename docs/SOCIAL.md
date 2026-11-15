@@ -54,6 +54,12 @@ The status command attaches to the same browser context and runs the recognition
 Any other result is `unknown` and is not saved. The bot does not click through login,
 two-factor or challenge screens. Rerun `status` after finishing them in the visible window.
 
+## Publishing
+
+The X publisher is intentionally bounded to one approved agenda item, text or one reviewed
+image. It uses a private journal to prevent duplicates and never retries an uncertain post.
+See [X publishing](SOCIAL-POSTING.md).
+
 ## Network folders
 
 Add the next network as a sibling package, for example `social/instagram/`, with its own

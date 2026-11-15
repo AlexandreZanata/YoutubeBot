@@ -1,0 +1,151 @@
+# X publishing
+
+The X publisher posts one reviewed item from the private promotion agenda. It is deliberately
+small: text or one image, one account, one post at a time, no threads, polls, replies,
+scheduling, follows or engagement automation.
+
+## Inputs
+
+| Path | Purpose | Git |
+| --- | --- | --- |
+| `.local/promotion/agenda.json` | 30-day agenda imported from the research cycle | ignored |
+| `.local/social/x/posts.json` | idempotency journal, states and post URLs | ignored |
+| `.local/social/x/profile` | Chrome session | ignored |
+| `.local/social/x/account.json` | handle, display name and verification time | ignored |
+
+The agenda is private because it contains unreviewed copy, sources and campaign decisions.
+Only this runbook and the code are versioned.
+
+## Agenda schema
+
+```json
+{
+  "schema": 1,
+  "cycle": "2026-11",
+  "timezone": "America/Cuiaba",
+  "items": [
+    {
+      "id": "P01",
+      "date": "2026-11-16",
+      "product": "Abastevo",
+      "format": "text",
+      "text": "O litro mais barato ... Veja a calculadora: {url}",
+      "destination": "https://abastevo.com.br/ferramentas/etanol-ou-gasolina/",
+      "campaign": "abastevo_utilidade_202611",
+      "content": "p01_text",
+      "audience": "Motorista de carro flex",
+      "objective": "Entender custo por quilometro",
+      "cta": "Veja a calculadora",
+      "metric": "Calculo concluido",
+      "conversation": "Ler uma duvida sobre consumo",
+      "image": null,
+      "alt_text": "",
+      "status": "approved"
+    }
+  ]
+}
+```
+
+Rules enforced by `load_agenda`:
+
+- `schema` must be `1` and every id must be unique.
+- `format` must be `text`, `image`, `thread`, `poll` or `video`.
+- `status` must be `draft`, `reviewed` or `approved`. Only `approved` can be posted.
+- Text and image items must contain the `{url}` placeholder.
+- `destination` must be HTTP or HTTPS.
+- The publisher currently accepts only `text` and `image`. Threads, polls and videos are
+  rejected with a clear error instead of being flattened into a single post.
+
+The tracked URL keeps existing query parameters, for example SorriFit `?idioma=pt`, and adds
+`utm_source=x`, `utm_medium=organic_social`, `utm_campaign` and `utm_content`.
+
+## First post
+
+The first item, P01, was published on 15/11/2026:
+
+- URL: <https://x.com/AlexandreZanat/status/2121920819635130591>
+- Format: text
+- Image: none
+- Destination: Abastevo ethanol/gasoline calculator with UTM
+- Journal: `posted`
+
+The agenda marks P01 as text. A generic image would repeat the sentence, and a generated
+fake calculator screen would damage trust. The post therefore uses the real link card that X
+builds from the Abastevo page. A real screenshot is allowed in a future image item only after
+review, with no private data and with alt text.
+
+## Image policy
+
+Use an image only when it adds evidence or a concrete visual step:
+
+- Prefer a real, reviewed screenshot of the product.
+- Do not invent UI, charts, testimonials or numbers.
+- Do not show personal data, precise location, CNPJ, health data or credentials.
+- PNG, JPG or WEBP, at most 5 MB, under `.local/`.
+- Add alt text when the platform exposes the field.
+- If the agenda item is `text`, do not attach an image just to fill space.
+- If the agenda item is `image` and the file is missing, stop; do not publish a text-only
+  substitute without changing the agenda and reviewing it.
+
+The publisher does not call an image model. A generated illustration is a separate editorial
+decision and must be reviewed before it is attached.
+
+## Commands
+
+```bash
+python3 -m tools.ytbot social open --network x
+python3 -m tools.ytbot social status --network x
+python3 -m tools.ytbot social agenda --network x
+python3 -m tools.ytbot social post --network x --id P01 --dry-run
+python3 -m tools.ytbot social post --network x --id P01
+```
+
+`--dry-run` fills the visible composer, waits for the Post button, then closes without
+clicking. It does not write the journal.
+
+## Publish path
+
+1. Load the agenda and find the exact id.
+2. Reject draft or reviewed items.
+3. Render the text with the tracked URL and check the X weighted length, with each URL counted
+   as 23 characters.
+4. Refuse a duplicate id or a text hash already present in the journal.
+5. Validate the optional image path, type and size.
+6. Confirm the browser is logged in. If not, stop and ask the owner to finish login.
+7. Open `https://x.com/compose/post` and target the visible composer dialog.
+8. Fill `data-testid="tweetTextarea_0"`.
+9. Attach `input[data-testid="fileInput"]` and wait for the attachment preview when an image
+   is present.
+10. Wait for `data-testid="tweetButton"` to become enabled.
+11. Write `state: started` with the text hash before clicking.
+12. Click Post once.
+13. Confirm the toast or the closed composer.
+14. Read the status URL from the toast link when available.
+15. Write `state: posted` or `state: unconfirmed`; never retry automatically.
+
+## Error handling
+
+| Situation | Bot action |
+| --- | --- |
+| Browser closed | Open the visible browser and retry the command |
+| Login required or challenge | Stop; the owner finishes it in the visible window and reruns |
+| Agenda missing or invalid | Stop; fix the private JSON or its schema |
+| Item not approved | Stop; review and set `status: approved` |
+| Item already started, posted or unconfirmed | Stop; inspect the journal and the profile |
+| Same text hash under another id | Stop; possible duplicate |
+| Text over 280 weighted characters | Stop; shorten and review |
+| Image missing, outside `.local`, wrong type or over 5 MB | Stop; fix the file or agenda |
+| Post button does not enable | Stop before clicking; inspect text and link |
+| Failure before the click | Safe to retry after checking the composer and journal |
+| Failure after the click, no toast | Mark `unconfirmed`; inspect the profile manually; never retry |
+| Rate limit or platform warning | Stop; wait for the platform window; do not loop |
+| Account mismatch | Stop; the visible profile is not the expected account |
+
+The journal is the source of truth. A `started` or `unconfirmed` record blocks another publish
+until a human checks the profile and edits the private state deliberately.
+
+## Scope
+
+Implemented: text, one image, UTM, dry run, idempotency, login check, confirmation and error
+fences. Not implemented: threads, polls, video, replies, quotes, scheduling, analytics
+collection and multi-account posting. Those require separate review and tests.
