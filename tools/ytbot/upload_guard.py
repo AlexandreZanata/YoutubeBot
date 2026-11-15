@@ -60,6 +60,11 @@ def wait_upload(page, timeout: int = 900) -> None:
 
 
 def verify_end_screen(page) -> None:
+    try:
+        page.get_by_text("Tela final", exact=True).last.click()
+        page.wait_for_timeout(3000)
+    except Exception:
+        pass
     body = page.locator("body").inner_text()
     if "Melhor para o espectador" not in body or "Inscrever-se" not in body:
         raise UploadBlocked("end screen missing Best for viewer or Subscribe; retry the end screen")
