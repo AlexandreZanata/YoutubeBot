@@ -72,12 +72,23 @@ def runs(channel: str, limit: int = 20) -> list[dict]:
             else []
         )
         states = [v.get("status", "") for v in events if isinstance(v, dict)]
+        render = (
+            stages.get("render")
+            if isinstance(stages, dict)
+            else next(
+                (event for event in reversed(events)
+                 if isinstance(event, dict) and event.get("stage") == "render"),
+                None,
+            )
+        )
+        rendered = isinstance(render, dict) and render.get("status") == "ok"
         state = (
             "scheduled"
             if upload.get("scheduled")
             else "error"
             if "error" in states
-            else "ready" if "render" in stages and (path.parent / "video.mp4").is_file()
+            else "ready" if rendered and (path.parent / "video.mp4").is_file()
+            and not (path.parent / "video.mp4").is_symlink()
             else "in_progress"
         )
         artifacts = [
