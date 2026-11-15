@@ -16,6 +16,7 @@ class Channel:
     language: str
     min_article_chars: int
     article_retry: str
+    max_article_chars: int = 0
     narration_volume: float = 2.0
     slots: tuple[int, ...] = (0, 12)
 
@@ -29,12 +30,13 @@ CHANNELS = {
         prompts="zaflas_agro",
         background="agro",
         language="pt-BR",
-        min_article_chars=40000,
+        min_article_chars=26000,
         article_retry=(
-            "Target narration length: 6,000 to 7,200 Brazilian Portuguese words, "
-            "about 30 minutes at the channel's narration pace. Preserve the "
+            "Target narration length: 4,000 to 4,800 Brazilian Portuguese words, "
+            "about 25 to 35 minutes at the channel's current narration pace. Preserve the "
             "fixed Zaflas Agro opening identification and final sign-off."
         ),
+        max_article_chars=34000,
         slots=(12,),
     ),
     "fallem-prince": Channel(

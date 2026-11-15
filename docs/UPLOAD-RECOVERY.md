@@ -78,6 +78,9 @@ caches.
 
 - Articles and Read aloud use one tab per video; `--parallel N` caps the tabs.
 - Batch, audio, render and capture check free disk before writing; uploads use hard links.
+- Zaflas articles outside 26,000 to 34,000 characters are rewritten once; a still-long
+  article fails before audio/render. This targets 4,000 to 4,800 words and prevents the
+  observed 70 to 77 minute videos.
 - Thumbnail style alternation is fallem-only. Other channels always use their single
   `thumbnail.txt`; a stale classic style falls back to dense.
 - Codex metadata hashtags are trimmed before validation, so a leading space does not fail a

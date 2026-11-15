@@ -30,7 +30,8 @@ def article_stage(context, topic: str) -> Path:
     (run_dir / "topic.txt").write_text(topic, encoding="utf-8")
     logic.set_run_field(run_dir, topic=topic)
     article = run_dir / "article.txt"
-    if article.is_file() and article.stat().st_size >= config.MIN_ARTICLE_CHARS:
+    if (article.is_file() and article.stat().st_size >= config.MIN_ARTICLE_CHARS
+            and (not config.MAX_ARTICLE_CHARS or article.stat().st_size <= config.MAX_ARTICLE_CHARS)):
         return run_dir
     page = context.new_page()
     try:
@@ -49,6 +50,10 @@ def article_stage(context, topic: str) -> Path:
 def _article_audio(context, topic: str, run_dir: Path) -> None:
     narration = next((run_dir / f"narration{ext}" for ext in (".aac", ".webm") if (run_dir / f"narration{ext}").is_file()), None)
     need_article = not (run_dir / "article.txt").is_file()
+    if (not need_article and config.MAX_ARTICLE_CHARS
+            and (run_dir / "article.txt").stat().st_size > config.MAX_ARTICLE_CHARS):
+        (run_dir / "article.txt").rename(run_dir / "article.too-long.txt")
+        need_article = True
     need_audio = narration is None
     if not need_article and not need_audio:
         return

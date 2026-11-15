@@ -35,11 +35,18 @@ sample.
 - Average: **30:16**
 - Median: **29:54**
 - Latest 30 long-form videos average: **29:41**
-- Production target: **6,000 to 7,200 words**, normally **25 to 35 minutes**, with about
-  **30 minutes** as the regular shape.
+- Production target: **4,000 to 4,800 words**, normally **25 to 35 minutes**, with about
+  **30 minutes** as the regular shape. This was recalibrated after the current narration
+  voice produced 70 to 77 minutes from roughly 10,000-word articles.
 
 The channel header shows 86 videos because it includes Shorts and other content outside the
 Videos tab. Do not use that number as the long-form sample size.
+
+The Zaflas article generation now has a **26,000 to 34,000-character** window (about 4,000
+to 4,800 words). A 15/11 batch generated articles around 10,000 words and videos around 70
+to 77 minutes, far outside the channel's normal 23 to 43 minute range. If an article
+exceeds 34,000 characters, the bot asks ChatGPT for one bounded rewrite; a still-oversized
+result fails the asset instead of rendering another long video.
 
 ## Title patterns
 
@@ -64,7 +71,7 @@ canonical source. The main rules:
 - Address Brazilian farmers, rural managers, agronomists and agricultural professionals.
 - Use an authoritative, accessible and thoughtful technical voice.
 - Explain technology, agronomy, management, costs, risks and productivity together.
-- Target 6,000 to 7,200 words, normally 25 to 35 minutes.
+- Target 4,000 to 4,800 words, normally 25 to 35 minutes.
 - Open with a single question that expresses the episode topic.
 - Use the fixed identification once:
   `Você está ouvindo Zaflas Agro, conhecimento para quem faz o campo acontecer.`
