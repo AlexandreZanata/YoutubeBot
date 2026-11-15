@@ -1,5 +1,8 @@
 # Zaflas Agro profile
 
+See [the analyzed channel profile](../../../docs/channels/zaflas.md) for thumbnails,
+metadata and account status.
+
 CLI profile: `zaflas`. Narration, topics, titles, descriptions, thumbnail text and
 tags are in Brazilian Portuguese. Prompt instructions remain in English.
 The public channel display name is **Zaflas**, handle `@zaflas`, channel ID

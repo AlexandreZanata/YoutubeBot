@@ -15,7 +15,10 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`.
   Whispers uses 2,400 to 2,800 words (15 to 17 minutes), Sacred Brown Engraving thumbnails,
   brown stippling background and the metadata/tag patterns in
-  [its channel profile](docs/channels/whispers-from-heaven.md).
+  [its channel profile](docs/channels/whispers-from-heaven.md). Zaflas uses Brazilian
+  Portuguese, 6,000 to 7,200 words (25 to 35 minutes), photorealistic agribusiness
+  thumbnails, the fixed site/social description prefix and
+  [its channel profile](docs/channels/zaflas.md).
 - Require an explicit channel. Verify its YouTube channel ID before mutating Studio.
 - Schedule only: up to 4 videos/day for fallem prince at 00:00, 06:00, 12:00 and
   18:00 in America/Cuiaba, at least 60 minutes ahead, not made for kids, custom

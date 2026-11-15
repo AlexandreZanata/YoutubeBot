@@ -12,7 +12,7 @@ publishes immediately and never opens windows in the main desktop workspace.
 |---------|---------|-------|
 | `fallem-prince` | fallem prince | English psychology/philosophy essays, 35–80 min, dark monochrome narrative-engraving thumbnails. |
 | `whispers-from-heaven` | Whispers From Heaven | English Christian biblical story narrations, 12–22 min, Sacred Brown Engraving thumbnails. |
-| `zaflas` | Zaflas / Zaflas Agro | Brazilian Portuguese agribusiness, about 30 min, photographic agricultural thumbnails with Portuguese text, `agro` background. |
+| `zaflas` | Zaflas / Zaflas Agro | Brazilian Portuguese agribusiness, about 30 min, photographic agricultural thumbnails with Portuguese text, `agro` background. See [the Zaflas profile](../../docs/channels/zaflas.md). |
 
 The [Zaflas profile notes](prompts/zaflas_agro/README.md) record the public-video
 duration sample, description format, fixed narration opening/sign-off, supplied
