@@ -100,9 +100,8 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
         browser, context = runtime.connect_hidden(playwright)
         runtime.configure_downloads(browser)
         runtime.configure_extension(context)
-        account.ensure_channel(context)
-        _refresh_catalog(context)
         upload_context = _upload_context(playwright, context, upload_cdp)
+        _refresh_catalog(upload_context)
         studio_payload = catalog.fetch_creator_videos(upload_context)
         local_occupied, local_titles = _local_state()
         scheduled_titles = [item.get("title", "") for item in catalog.studio_videos(studio_payload)] + local_titles
@@ -124,7 +123,7 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
         asset_failures = _asset_phase(context, topics, workers)
         failures += asset_failures
         try:
-            community.ensure_post(context, topics)
+            community.ensure_post(upload_context, topics)
         except Exception as error:
             log(f"community post warning: {error}")
         failed_topics = {topic for topic, _error in asset_failures}
