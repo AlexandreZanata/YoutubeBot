@@ -41,6 +41,12 @@ sample.
 The channel header shows 86 videos because it includes Shorts and other content outside the
 Videos tab. Do not use that number as the long-form sample size.
 
+The Zaflas article generation now has a hard **50,000-character** ceiling. A 15/11 batch
+generated articles around 10,000 words and videos around 70 to 77 minutes, far outside the
+channel's normal 23 to 43 minute range. If an article exceeds the ceiling, the bot asks
+ChatGPT for one bounded rewrite; a still-oversized result fails the asset instead of
+rendering another two-hour video.
+
 ## Title patterns
 
 The catalog uses practical questions about costs, trade-offs, technology and farm decisions:

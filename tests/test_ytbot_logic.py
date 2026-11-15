@@ -91,6 +91,7 @@ class TopicTests(unittest.TestCase):
 class ChannelProfileTests(unittest.TestCase):
     def test_zaflas_has_one_noon_slot_per_day(self):
         self.assertEqual(channels.get("zaflas").slots, (12,))
+        self.assertEqual(channels.get("zaflas").max_article_chars, 50000)
 
     def test_fallem_keeps_four_daily_slots(self):
         self.assertEqual(channels.get("fallem-prince").slots, (0, 6, 12, 18))

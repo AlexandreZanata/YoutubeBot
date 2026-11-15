@@ -133,6 +133,19 @@ def generate_article(page, topic: str, run_dir: Path, extra_header: str = "") ->
     text = clean_article(copy_last(page))
     if len(text) < 2000:
         raise RuntimeError(f"article is too short ({len(text)} chars)")
+    if config.MAX_ARTICLE_CHARS and len(text) > config.MAX_ARTICLE_CHARS:
+        log(f"article too long: {len(text)} chars; requesting a bounded rewrite")
+        rewrite = ("Rewrite the complete narration above to the requested length. Preserve the "
+                   "fixed opening identification, final sign-off, facts, structure and language. "
+                   "Do not add sections. Output only the final narration.\n" + config.ARTICLE_RETRY)
+        send_text(page, rewrite)
+        wait_for_assistant(page)
+        text = clean_article(copy_last(page))
+        if len(text) > config.MAX_ARTICLE_CHARS:
+            raise RuntimeError(
+                f"article is still too long after rewrite ({len(text)} chars, "
+                f"limit {config.MAX_ARTICLE_CHARS})")
+        log(f"article rewritten: {len(text)} chars")
     (run_dir / "article.md").write_text(text, encoding="utf-8")
     (run_dir / "article.txt").write_text(text, encoding="utf-8")
     log(f"article saved: {len(text)} chars")

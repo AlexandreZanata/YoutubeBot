@@ -20,6 +20,7 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   thumbnails, the fixed site/social description prefix and
   [its channel profile](docs/channels/zaflas.md). Zaflas publishes one video per day at
   12:00 America/Cuiaba. Its dedicated profile is upload-only; generation stays in legacy.
+  Zaflas articles have a 50,000-character ceiling with one bounded rewrite.
 - Require an explicit channel. Verify its YouTube channel ID before mutating Studio.
 - Schedule only: up to 4 videos/day for fallem prince at 00:00, 06:00, 12:00 and
   18:00 in America/Cuiaba, at least 60 minutes ahead, not made for kids, custom

@@ -16,6 +16,7 @@ class Channel:
     language: str
     min_article_chars: int
     article_retry: str
+    max_article_chars: int = 0
     narration_volume: float = 2.0
     slots: tuple[int, ...] = (0, 12)
 
@@ -35,6 +36,7 @@ CHANNELS = {
             "about 30 minutes at the channel's narration pace. Preserve the "
             "fixed Zaflas Agro opening identification and final sign-off."
         ),
+        max_article_chars=50000,
         slots=(12,),
     ),
     "fallem-prince": Channel(

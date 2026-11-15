@@ -47,6 +47,7 @@ MIN_LEAD_MINUTES = 60
 THUMBNAIL_THEME = "fallem_prince"
 NARRATION_VOLUME = 2.0
 MIN_ARTICLE_CHARS = 40000
+MAX_ARTICLE_CHARS = 0
 ARTICLE_RETRY = "Target narration length: at least 6,500 words."
 PRESET = "YouTube Standard (16:9)"
 VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS = 1920, 1080, 30
@@ -55,7 +56,7 @@ QUICK_OUTRO_SECONDS = 5.0
 
 def apply_channel(channel) -> None:
     global CHANNEL, CHANNEL_NAME, CHANNEL_HANDLE, CHANNEL_ID, STUDIO_UPLOAD
-    global PROMPTS, THUMBNAIL_THEME, NARRATION_VOLUME, MIN_ARTICLE_CHARS
+    global PROMPTS, THUMBNAIL_THEME, NARRATION_VOLUME, MIN_ARTICLE_CHARS, MAX_ARTICLE_CHARS
     global ARTICLE_RETRY, SLOT_HOURS, DATA_DIR, RUNS, RECORDS, CATALOG, TOPICS
     CHANNEL = channel
     CHANNEL_NAME = channel.name
@@ -79,6 +80,7 @@ def apply_channel(channel) -> None:
     THUMBNAIL_THEME = channel.background
     NARRATION_VOLUME = channel.narration_volume
     MIN_ARTICLE_CHARS = channel.min_article_chars
+    MAX_ARTICLE_CHARS = channel.max_article_chars
     ARTICLE_RETRY = channel.article_retry
     SLOT_HOURS = channel.slots
 
