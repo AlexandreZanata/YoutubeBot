@@ -39,7 +39,7 @@ retry the Codex thumbnail.
 | Video already scheduled | `scheduled_at` true | Return success; no dialog | None |
 | False confirmation | one `scheduled_at` read fails | Three reads with delays | Do not open the dialog again blindly |
 | End screen missing | Best for viewer/Subscribe absent | `verify_end_screen`; retry `add_end_screen`; a verification warning does not block scheduling | Fix during the final audit |
-| Codex thumbnail empty path | image path empty/invalid | Preserve the fence; retry once intentionally | Block the upload; no ChatGPT fallback |
+| Codex thumbnail empty path | image path empty/invalid | Preserve the fence; automatic retry once | Block the upload; no ChatGPT fallback |
 | Codex login/model unavailable | Codex exits or no image tool | Stop; sign in/configure | Do not switch providers |
 | Read aloud unavailable/audio timeout | article/audio stage error | Record the asset failure; no upload | Rerun the audio stage |
 | Wrong account/channel | channel ID mismatch | `ensure_channel` stops | Sign in/select the channel |
@@ -59,7 +59,7 @@ retry the Codex thumbnail.
 ## Performance and reliability changes
 
 - Articles and Read aloud use one tab per video; `--parallel N` caps the tabs.
-- Codex topics are requested in chunks of at most 12, so batches above 12 loop.
+- Codex topics are requested in chunks of at most 12, so batches above 12 loop\n  and an empty/invalid Codex thumbnail is retried once automatically.
 - Upload waits are bounded and logged; title, description, thumbnail and end screen are
   verified before scheduling.
 - Scheduling confirms the slot first, opens the Programar block, supports the calendar,
