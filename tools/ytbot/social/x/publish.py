@@ -119,7 +119,7 @@ def _save_reply(store: SocialStore, network: str, status_id: str, record: dict) 
 
 
 def reply(context, store: SocialStore, network: str, target_url: str, text: str, *,
-          dry_run: bool = False) -> dict:
+          dry_run: bool = False, for_post: str = "") -> dict:
     match = re.search(r"/status/(\d+)", target_url)
     if not match:
         raise RuntimeError("the reply target must be an X status URL")
@@ -148,7 +148,8 @@ def reply(context, store: SocialStore, network: str, target_url: str, text: str,
             return {"state": "dry-run", "target": target_url, "length": length, "text": text}
         _save_reply(store, network, status_id, {
             "state": "started", "target_url": target_url, "target_status_id": status_id,
-            "text_sha256": agenda.text_hash(text), "started_at": datetime.now().isoformat(timespec="seconds"),
+            "for_post": for_post, "text_sha256": agenda.text_hash(text),
+            "started_at": datetime.now().isoformat(timespec="seconds"),
         })
         button.click()
         page.wait_for_timeout(4000)
@@ -157,6 +158,7 @@ def reply(context, store: SocialStore, network: str, target_url: str, text: str,
             "state": "posted" if confirmed else "unconfirmed",
             "target_url": target_url,
             "target_status_id": status_id,
+            "for_post": for_post,
             "text_sha256": agenda.text_hash(text),
             "reply_url": _tweet_url(page),
             "posted_at": datetime.now().isoformat(timespec="seconds"),
@@ -176,6 +178,21 @@ def reply(context, store: SocialStore, network: str, target_url: str, text: str,
         raise
     finally:
         page.close()
+
+
+REPLIES_PER_POST = 5
+
+
+def reply_counts(store: SocialStore, network: str) -> dict:
+    posts = agenda.read_posts(store, network).get("posts", {})
+    replies = _read_replies(store, network).get("replies", {})
+    counts = {identifier: 0 for identifier, record in posts.items()
+              if record.get("state") == "posted" and not identifier.endswith("-old")}
+    for record in replies.values():
+        owner = record.get("for_post")
+        if record.get("state") == "posted" and owner in counts:
+            counts[owner] += 1
+    return counts
 
 
 def _confirmed(page) -> bool:

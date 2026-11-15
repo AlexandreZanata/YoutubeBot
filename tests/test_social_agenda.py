@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tools.ytbot.social import agenda
 from tools.ytbot.social.store import SocialStore
+from tools.ytbot.social.x import publish
 
 
 def item(**overrides):
@@ -75,6 +76,16 @@ class AgendaTests(unittest.TestCase):
             agenda.save_post(store, "x", "P01", {"state": "started", "text_sha256": digest})
             found = agenda.already_posted(store, "x", "P01", digest)
             self.assertEqual(found["state"], "started")
+
+    def test_reply_quota_counts_only_posted_replies_for_the_owner_post(self):
+        self.assertEqual(publish.REPLIES_PER_POST, 5)
+        with tempfile.TemporaryDirectory() as directory:
+            store = SocialStore(Path(directory) / "social")
+            agenda.save_post(store, "x", "P01", {"state": "posted", "text_sha256": "a"})
+            publish._save_reply(store, "x", "111", {"state": "posted", "for_post": "P01"})
+            publish._save_reply(store, "x", "222", {"state": "started", "for_post": "P01"})
+            publish._save_reply(store, "x", "333", {"state": "posted", "for_post": ""})
+            self.assertEqual(publish.reply_counts(store, "x"), {"P01": 1})
 
     def test_same_text_under_another_id_is_blocked(self):
         with tempfile.TemporaryDirectory() as directory:

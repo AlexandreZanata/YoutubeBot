@@ -104,8 +104,22 @@ def command_reply(args) -> None:
             if state["state"] != "logged-in":
                 raise RuntimeError(f"{args.network} is {state['state']}; finish login first")
             result = publish.reply(context, store, args.network, args.url, text,
-                                   dry_run=args.dry_run)
+                                   dry_run=args.dry_run, for_post=args.for_post)
         print(json.dumps(result, ensure_ascii=False))
+    except Exception as error:
+        raise SystemExit(f"[social] {error}")
+
+
+def command_quota(args) -> None:
+    try:
+        store = SocialStore()
+        _network(args.network)
+        counts = publish.reply_counts(store, args.network)
+        if not counts:
+            print("[social] no published posts in the journal")
+            return
+        for identifier, count in sorted(counts.items()):
+            print(f"{identifier}  {count}/{publish.REPLIES_PER_POST}")
     except Exception as error:
         raise SystemExit(f"[social] {error}")
 
@@ -171,6 +185,9 @@ def add_parser(sub) -> None:
     stop_parser = actions.add_parser("stop", help="stop the hidden browser for a network")
     stop_parser.add_argument("--network", choices=NETWORKS, required=True)
     stop_parser.set_defaults(func=command_stop)
+    quota_parser = actions.add_parser("quota", help="show contextual replies per published post")
+    quota_parser.add_argument("--network", choices=NETWORKS, required=True)
+    quota_parser.set_defaults(func=command_quota)
     discover_parser = actions.add_parser("discover", help="search recent posts for contextual replies")
     discover_parser.add_argument("--network", choices=NETWORKS, required=True)
     discover_parser.add_argument("--product", choices=sorted(discovery.PRODUCTS), required=True)
@@ -180,6 +197,8 @@ def add_parser(sub) -> None:
     reply_parser = actions.add_parser("reply", help="reply to one discovery target with context")
     reply_parser.add_argument("--network", choices=NETWORKS, required=True)
     reply_parser.add_argument("--url", required=True)
+    reply_parser.add_argument("--for-post", required=True,
+                              help="own post id this reply supports, for the five-reply quota")
     reply_group = reply_parser.add_mutually_exclusive_group(required=True)
     reply_group.add_argument("--text")
     reply_group.add_argument("--file")

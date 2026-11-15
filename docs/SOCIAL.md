@@ -73,8 +73,9 @@ image. It uses a private journal to prevent duplicates and never retries an unce
 See [X publishing](SOCIAL-POSTING.md).
 
 Discovery finds recent public conversations and prepares them for human review. Replies add
-context, may carry one relevant link and are recorded in a separate journal. See
-[discovery and contextual replies](SOCIAL-DISCOVERY.md).
+context, may carry one relevant link and are recorded in a separate journal. The target is
+five contextual replies for each original post, tracked with `social quota`; a gap is reported,
+never filled with unrelated comments. See [discovery and contextual replies](SOCIAL-DISCOVERY.md).
 
 ## Network folders
 
