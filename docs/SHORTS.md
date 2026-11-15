@@ -22,6 +22,9 @@ when the owner explicitly asks for Shorts.
 
 The long-form Zaflas videos remain one per day at 12:00. Shorts are separate uploads.
 
+Zaflas is the only Portuguese channel. A short script that comes back in English is rejected
+and rewritten once; a second English result fails the asset before audio, render or upload.
+
 ## Command
 
 ```bash

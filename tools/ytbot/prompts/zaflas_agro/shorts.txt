@@ -1,17 +1,18 @@
-Write one complete Brazilian Portuguese YouTube Short for Zaflas Agro about the theme below.
+Escreva um Short completo em português do Brasil para o canal Zaflas Agro sobre o tema abaixo.
 
-REQUIREMENTS:
+REQUISITOS OBRIGATÓRIOS:
 
-- Everything must be 100% in natural Brazilian Portuguese, with correct accents.
-- Length: 90 to 130 words, approximately 35 to 55 seconds at the channel's narration pace.
-- One specific hook in the first sentence. Make the listener stop and want the practical explanation.
-- Give one useful agricultural insight, trade-off or management decision. Do not try to cover the whole long video.
-- Connect the insight to a real farm decision. Be direct, credible and practical.
-- End with a short invitation to watch the complete video on the Zaflas Agro channel.
-- Mention Zaflas Agro naturally once. Do not turn it into an advertisement.
-- No headings, lists, labels, notes, citations, links, metadata or speaker notes.
-- No em dashes or en dashes. Use commas, periods, colons or ordinary hyphens.
-- Do not invent measured results, studies, quotations, statistics, regulations, subsidies or current prices.
-- Output only the narration text that will be read aloud.
+- Escreva 100% em português do Brasil natural, com acentuação e cedilha corretas.
+- Nenhuma palavra, frase ou título em inglês. O canal Zaflas é o único canal em português.
+- Entre 90 e 130 palavras, cerca de 35 a 55 segundos na velocidade de narração do canal.
+- Comece com um gancho concreto na primeira frase, algo que faça o produtor parar e querer ouvir a explicação prática.
+- Traga um insight agronômico útil, com uma decisão, um risco ou uma troca real de manejo.
+- Conecte o insight a uma decisão real de fazenda. Seja direto, técnico e prático.
+- Termine convidando o ouvinte a assistir ao vídeo completo no canal Zaflas Agro.
+- Cite o Zaflas Agro uma vez, de forma natural, sem virar propaganda.
+- Sem títulos, listas, rótulos, notas, citações, links, metadados ou instruções de cena.
+- Não invente resultados medidos, estudos, estatísticas, cotações, normas ou subsídios.
+- Não use travessões.
+- Responda apenas com o texto da narração que será lido em voz alta.
 
-THEME:
+TEMA:

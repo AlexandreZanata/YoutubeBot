@@ -9,8 +9,11 @@ English in code, comments, documentation and commits; user-facing UI may use Por
 
 - Extension capture, filename templates and download behavior stay unchanged.
 - Keep the existing generation modes, narration, voices, subtitles, backgrounds and rendering.
-- Fallem Prince and Whispers From Heaven use English narration, subtitles and metadata.
-  Only Zaflas uses Brazilian Portuguese. The Read aloud voice remains Cove as selected by
+- Every channel is English-only except Zaflas. Infinite Random Worlds, Vocal Pages, Fallem
+  Prince and Whispers From Heaven use English narration, subtitles, metadata and thumbnail
+  text. Zaflas is Brazilian Portuguese in every long video and every Short: script,
+  narration, titles, descriptions, tags and thumbnail text. Reject any English output on
+  Zaflas before audio, render or upload. The Read aloud voice remains Cove as selected by
   the owner. Operator/browser interface language never changes content language.
 - `tools/ytbot` keeps channel prompts, deduplication, resumable stage records and sequential
   upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`

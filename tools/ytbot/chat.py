@@ -253,18 +253,38 @@ def _capture_once(page, context, run_dir: Path, tab_url: str, start: str,
     return None
 
 
+PORTUGUESE_ACCENTS = "ãõçáéíóúâêôà"
+
+
+def is_brazilian_portuguese(text: str) -> bool:
+    """Reject the English output that occasionally slips through the short prompt."""
+    lowered = text.lower()
+    if " the " in lowered or " and " in lowered:
+        return False
+    return sum(lowered.count(char) for char in PORTUGUESE_ACCENTS) >= 3
+
+
 def generate_short(page, topic: str, run_dir: Path) -> str:
     page.goto(config.GPT_URL, timeout=90000)
     page.wait_for_timeout(7000)
     dismiss_notice(page)
     header = config.prompt("shorts.txt")
-    header += ("\n\nMANDATORY NARRATION LANGUAGE: Brazilian Portuguese. "
-               "Write the entire spoken short in this language, regardless of the operator's "
-               "message or the browser interface language. Return only the narration text.")
-    send_text(page, header + "\n\nTheme: " + topic)
+    header += ("\n\nIDIOMA OBRIGATÓRIO: português do Brasil. Escreva todo o texto falado nesse "
+               "idioma, sem nenhuma palavra em inglês, independentemente da interface ou da "
+               "mensagem do operador. Responda apenas com a narração.")
+    send_text(page, header + "\n\nTema: " + topic)
     log(f"short prompt sent: {topic}")
     wait_for_assistant(page)
     text = clean_article(copy_last(page))
+    if not is_brazilian_portuguese(text):
+        log("short came back without Portuguese; requesting a rewrite")
+        send_text(page, "Reescreva o texto inteiro em português do Brasil, sem nenhuma palavra "
+                        "em inglês. Mantenha o mesmo tema e o mesmo tamanho. Responda apenas "
+                        "com a narração.")
+        wait_for_assistant(page)
+        text = clean_article(copy_last(page))
+        if not is_brazilian_portuguese(text):
+            raise RuntimeError("short narration is not in Brazilian Portuguese")
     words = len(text.split())
     if words < 60 or words > 180:
         raise RuntimeError(f"short narration has an unexpected length ({words} words)")

@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from tools.ytbot import shorts
+from tools.ytbot import chat, shorts
 
 
 class ShortsTests(unittest.TestCase):
@@ -21,6 +21,18 @@ class ShortsTests(unittest.TestCase):
 
     def test_twelve_topics_are_available(self):
         self.assertEqual(len(shorts.SHORT_TOPICS), 12)
+
+
+class ShortLanguageTests(unittest.TestCase):
+    def test_english_short_is_rejected(self):
+        english = ("Replacing lime with gypsum can leave your soil acidity untreated. They do "
+                   "different jobs, and the fields show the difference after the first harvest.")
+        self.assertFalse(chat.is_brazilian_portuguese(english))
+
+    def test_portuguese_short_is_accepted(self):
+        text = ("A calagem corrige a acidez do solo, enquanto o gesso fornece cálcio e enxofre. "
+                "Se você não corrige a acidez, a planta não aproveita o adubo que foi aplicado.")
+        self.assertTrue(chat.is_brazilian_portuguese(text))
 
 
 if __name__ == "__main__":
