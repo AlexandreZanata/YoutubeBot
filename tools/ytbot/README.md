@@ -161,9 +161,9 @@ The default shape is one tab per video:
   capture is bounded to 30 minutes. The monitor logs extension badge, session count, recording
 state, newest capture/download and page Read aloud/audio state when they change, so a missing
 capture is visible instead of silent.
-- **Article length** is bounded per channel. Zaflas has a 50,000-character ceiling and one
-  rewrite request if the first narration is too long; this prevents 70-minute videos from a
-  6,000 to 7,200 word target.
+- **Article length** is bounded per channel. Zaflas has a 26,000 to 34,000-character window and one
+  rewrite request if the first narration is too long; this prevents 70-minute videos from
+  the old 6,000 to 7,200 word target.
 - **Metadata and thumbnail** run in parallel per video. Title, description, tags and the
   custom thumbnail are applied and verified on the edit page. Only fallem prince alternates dense
   and classic thumbnail prompts, six of each in a twelve-video batch; Whispers and Zaflas use
