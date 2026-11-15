@@ -72,7 +72,7 @@ def extract_assistant_text(page) -> str:
     return clean_article(_assistant_response(page))
 
 
-def wait_for_assistant(page, timeout: int = 1800) -> None:
+def wait_for_assistant(page, timeout: int = 3600) -> None:
     deadline = time.time() + timeout
     stable = 0
     last_len = 0
