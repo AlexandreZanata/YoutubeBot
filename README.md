@@ -47,6 +47,8 @@ python3 -m tools.ytbot social open --network x
 python3 -m tools.ytbot social status --network x
 python3 -m tools.ytbot social stop --network x
 python3 -m tools.ytbot social agenda --network x
+python3 -m tools.ytbot social discover --network x --product abastevo --days 7
+python3 -m tools.ytbot social reply --network x --url <status-url> --file <reply.txt> --dry-run
 python3 -m tools.ytbot social post --network x --id P01 --dry-run
 python3 -m tools.ytbot catalog --channel whispers-from-heaven
 python3 -m tools.ytbot check "An exact topic" --channel zaflas

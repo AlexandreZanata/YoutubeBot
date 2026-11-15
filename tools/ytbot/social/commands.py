@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .. import config
 from . import agenda as agenda_module
-from . import browser
+from . import browser, discovery
 from .store import SocialStore
 from .x import account as x_account
 from .x import publish
@@ -53,6 +53,61 @@ def command_status(args) -> None:
     else:
         print(f"[social] {args.network} state: {result['state']}")
     print(json.dumps(store.public_status(args.network), ensure_ascii=False))
+
+
+def command_discover(args) -> None:
+    from playwright.sync_api import sync_playwright
+
+    try:
+        store = SocialStore()
+        network = _network(args.network)
+        browser.ensure_background(store, args.network, network.LOGIN_URL, network.CDP_PORT,
+                                  network.BACKGROUND_DISPLAY)
+        with sync_playwright() as playwright:
+            client = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{network.CDP_PORT}")
+            context = client.contexts[0]
+            page = context.new_page()
+            try:
+                state = network.inspect(page)
+                if state["state"] != "logged-in":
+                    raise RuntimeError(f"{args.network} is {state['state']}; finish login first")
+                rows = discovery.curate(page, args.product, days=args.days, limit=args.limit,
+                                        own_handle=state.get("handle", ""))
+            finally:
+                page.close()
+        path = discovery.save_candidates(store, args.network, args.product, rows)
+        print(f"[social] {len(rows)} candidate(s) saved to {path}")
+        for row in rows:
+            print(f"{row['score']:>3}  {row['published_at'][:10]}  @{row['author']:<15}  "
+                  f"{row['url']}  {row['text'][:90].replace(chr(10), ' ')}")
+    except Exception as error:
+        raise SystemExit(f"[social] {error}")
+
+
+def command_reply(args) -> None:
+    from playwright.sync_api import sync_playwright
+
+    try:
+        text = Path(args.file).read_text(encoding="utf-8").strip() if args.file else args.text
+        store = SocialStore()
+        network = _network(args.network)
+        browser.ensure_background(store, args.network, network.LOGIN_URL, network.CDP_PORT,
+                                  network.BACKGROUND_DISPLAY)
+        with sync_playwright() as playwright:
+            client = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{network.CDP_PORT}")
+            context = client.contexts[0]
+            page = context.new_page()
+            try:
+                state = network.inspect(page)
+            finally:
+                page.close()
+            if state["state"] != "logged-in":
+                raise RuntimeError(f"{args.network} is {state['state']}; finish login first")
+            result = publish.reply(context, store, args.network, args.url, text,
+                                   dry_run=args.dry_run)
+        print(json.dumps(result, ensure_ascii=False))
+    except Exception as error:
+        raise SystemExit(f"[social] {error}")
 
 
 def command_stop(args) -> None:
@@ -116,6 +171,20 @@ def add_parser(sub) -> None:
     stop_parser = actions.add_parser("stop", help="stop the hidden browser for a network")
     stop_parser.add_argument("--network", choices=NETWORKS, required=True)
     stop_parser.set_defaults(func=command_stop)
+    discover_parser = actions.add_parser("discover", help="search recent posts for contextual replies")
+    discover_parser.add_argument("--network", choices=NETWORKS, required=True)
+    discover_parser.add_argument("--product", choices=sorted(discovery.PRODUCTS), required=True)
+    discover_parser.add_argument("--days", type=int, default=7)
+    discover_parser.add_argument("--limit", type=int, default=10)
+    discover_parser.set_defaults(func=command_discover)
+    reply_parser = actions.add_parser("reply", help="reply to one discovery target with context")
+    reply_parser.add_argument("--network", choices=NETWORKS, required=True)
+    reply_parser.add_argument("--url", required=True)
+    reply_group = reply_parser.add_mutually_exclusive_group(required=True)
+    reply_group.add_argument("--text")
+    reply_group.add_argument("--file")
+    reply_parser.add_argument("--dry-run", action="store_true")
+    reply_parser.set_defaults(func=command_reply)
     agenda_parser = actions.add_parser("agenda", help="list the private promotion agenda")
     agenda_parser.add_argument("--network", choices=NETWORKS, required=True)
     agenda_parser.add_argument("--file", default=str(DEFAULT_AGENDA))

@@ -175,6 +175,12 @@ missing or invalid file stops the post before any browser interaction.
 The journal is the source of truth. A `started` or `unconfirmed` record blocks another publish
 until a human checks the profile and edits the private state deliberately.
 
+## Discovery
+
+Recent public posts can be curated for a contextual reply. The discovery flow is separate
+from scheduled posts and never replies automatically. See
+[discovery and contextual replies](SOCIAL-DISCOVERY.md).
+
 ## Scope
 
 Implemented: text, one image, UTM, dry run, idempotency, login check, confirmation and error
