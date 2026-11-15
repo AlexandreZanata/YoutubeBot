@@ -149,6 +149,34 @@ class AccountContracts(AccountFixture):
             runtime._write_preferences()
         self.assertTrue(json.loads(preferences.read_text())["keep_existing"])
 
+    def test_generation_ready_index_accepts_actual_event_journals_and_legacy_maps(self):
+        with patch.object(config, "DATA", self.root / "data"):
+            channels.apply("fallem-prince")
+            run = config.RUNS / "generated"
+            run.mkdir(parents=True)
+            video = run / "video.mp4"
+            record = run / "record.json"
+            for stages, expected in [
+                ([{"stage": "render", "status": "ok"},
+                  {"stage": "ready", "status": "ok"}], "ready"),
+                ({"render": {"status": "ok"}}, "ready"),
+                ([{"stage": "duration", "status": "ok"}], "in_progress"),
+                ({"render": {"status": "running"}}, "in_progress"),
+                ([{"stage": "render", "status": "error"}], "error"),
+            ]:
+                with self.subTest(stages=stages):
+                    video.write_bytes(b"SYNTHETIC_RENDER_ARTIFACT")
+                    record.write_text(json.dumps({"stages": stages}))
+                    self.assertEqual(library.runs("fallem-prince")[0]["state"], expected)
+                    self.assertEqual(video.read_bytes(), b"SYNTHETIC_RENDER_ARTIFACT")
+            record.write_text(json.dumps({"stages": [{"stage": "render", "status": "ok"}]}))
+            video.unlink()
+            self.assertEqual(library.runs("fallem-prince")[0]["state"], "in_progress")
+            outside = self.root / "outside.mp4"
+            outside.write_bytes(b"SYNTHETIC_UNRELATED_ARTIFACT")
+            video.symlink_to(outside)
+            self.assertEqual(library.runs("fallem-prince")[0]["state"], "in_progress")
+
     def test_profile_process_selection_uses_exact_arguments_and_rejects_foreign_cdp(
         self,
     ):

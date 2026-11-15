@@ -39,6 +39,10 @@ summaries. No raw Google token, cookie, account email, absolute file path, ChatG
 traceback or private provider error is serialized. Output is one JSON document capped
 at 65,536 bytes. The caller must further bound results to its task/wire budget.
 Rejected operations exit nonzero with `{ "schema_version": 1, "error": "operation_rejected" }`.
+Generation readiness recognizes successful render events in the actual append-only
+stage journal and the legacy stage map. A video file alone, a running/failed render or
+a symlink cannot establish readiness. This index never modifies the journal or media;
+the caller still performs independent full-file media verification.
 Host media capacity is one active job across all accounts/channels. A busy new operation
 exits nonzero with `{ "schema_version": 1, "error": "capacity_reached" }`; it creates no
 job or waiting unit. Count 1–10 remains a sequential batch in that one actor. Browser article/audio/assets
