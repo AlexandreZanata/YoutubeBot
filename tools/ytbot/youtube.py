@@ -26,6 +26,27 @@ def click_text(page, names: list[str]) -> bool:
 
 
 def video_id_from(page) -> str:
+    match = re.search(r"/video/([A-Za-z0-9_-]{11})/", page.url)
+    if match:
+        return match.group(1)
+    for selector, pattern in (("a[href*='youtu.be/']", r"youtu\.be/([A-Za-z0-9_-]{11})"),
+                              ("a[href*='watch?v=']", r"watch\?v=([A-Za-z0-9_-]{11})")):
+        try:
+            links = page.locator(selector)
+            for index in range(min(links.count(), 3)):
+                href = links.nth(index).get_attribute("href") or ""
+                found = re.search(pattern, href)
+                if found:
+                    return found.group(1)
+        except Exception:
+            pass
+    try:
+        texts = page.get_by_text(re.compile(r"youtu\.be/[A-Za-z0-9_-]{11}")).all_inner_texts()
+        found = re.search(r"youtu\.be/([A-Za-z0-9_-]{11})", " ".join(texts))
+        if found:
+            return found.group(1)
+    except Exception:
+        pass
     body = page.locator("body").inner_text()
     match = re.search(r"(?:Link do vídeo|Video link)\s*(https://youtu\.be/[A-Za-z0-9_-]+)", body, re.I)
     if not match:
@@ -34,7 +55,23 @@ def video_id_from(page) -> str:
     return match.group(1).rsplit("/", 1)[-1]
 
 
+def wait_for_video_id(page, timeout: int = 90) -> str:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        video_id = video_id_from(page)
+        if video_id:
+            return video_id
+        page.wait_for_timeout(3000)
+    return ""
+
+
 def upload_video(context, run_dir: Path, meta: dict) -> str:
+    page, video_id = open_upload(context, run_dir, meta)
+    page.close()
+    return video_id
+
+
+def open_upload(context, run_dir: Path, meta: dict):
     page = context.new_page()
     page.goto(config.STUDIO_UPLOAD, timeout=90000)
     runtime.select_channel(page)
@@ -47,7 +84,9 @@ def upload_video(context, run_dir: Path, meta: dict) -> str:
     click_text(page, ["Enviar vídeos", "Upload videos"])
     page.wait_for_timeout(1500)
     page.wait_for_selector('input[type=file][name="Filedata"]', state="attached", timeout=60000)
-    upload_file = run_dir / f"upload-{run_dir.name}.mp4"
+    staging = config.ROOT / ".local/ytbot/upload-tmp"
+    staging.mkdir(parents=True, exist_ok=True)
+    upload_file = staging / f"upload-{run_dir.name}.mp4"
     upload_file.unlink(missing_ok=True)
     try:
         os.link(run_dir / "video.mp4", upload_file)
@@ -64,18 +103,22 @@ def upload_video(context, run_dir: Path, meta: dict) -> str:
         log("audience set to not made for kids")
     except Exception as error:
         log(f"audience pending on the draft: {error}")
-    upload_guard.wait_upload(page)
     try:
-        upload_dialog.ensure_title(page, meta["title"])
-    except Exception as error:
-        log(f"title will be re-applied on the edit page: {error}")
-    video_id = video_id_from(page)
+        upload_guard.wait_upload(page)
+        try:
+            upload_dialog.ensure_title(page, meta["title"])
+        except Exception as error:
+            log(f"title will be re-applied on the edit page: {error}")
+        video_id = wait_for_video_id(page)
+        if not video_id:
+            raise RuntimeError("could not read the uploaded video id")
+    except Exception:
+        page.close()
+        raise
+    finally:
+        upload_file.unlink(missing_ok=True)
     log(f"uploaded video id: {video_id}")
-    if not video_id:
-        raise RuntimeError("could not read the uploaded video id")
-    page.close()
-    upload_file.unlink(missing_ok=True)
-    return video_id
+    return page, video_id
 
 
 def open_edit(context, video_id: str):
@@ -147,6 +190,26 @@ def open_upload_dialog(context, video_id: str, title: str = ""):
     return page
 
 
+def upload_and_schedule_short(context, run_dir: Path, meta: dict, slot) -> dict:
+    """Upload and schedule in one dialog, without the edit page or custom tags."""
+    upload_guard.preflight(run_dir, meta)
+    page, video_id = open_upload(context, run_dir, meta)
+    result = {"videoId": video_id, "url": f"https://youtu.be/{video_id}",
+              "slot": logic.slot_label(slot), "visibility": "scheduled",
+              "endScreen": False, "customThumbnail": False, "scheduled": False}
+    try:
+        write_result(run_dir, result)
+        if (run_dir / "thumbnail.png").is_file():
+            upload_dialog.set_thumbnail(page, run_dir / "thumbnail.png")
+        upload_dialog.schedule_in_dialog(page, slot)
+        result["scheduled"] = True
+        write_result(run_dir, result)
+        log(f"scheduled {video_id} at {result['slot']}")
+        return result
+    finally:
+        page.close()
+
+
 def schedule_existing(context, run_dir: Path, result: dict, slot) -> dict:
     title = ""
     try:
@@ -177,7 +240,8 @@ def schedule_existing(context, run_dir: Path, result: dict, slot) -> dict:
     raise RuntimeError("could not confirm the schedule")
 
 
-def upload_and_schedule_with_context(context, run_dir: Path, meta: dict, slot) -> dict:
+def upload_and_schedule_with_context(context, run_dir: Path, meta: dict, slot, *,
+                                     custom_thumbnail: bool = True, end_screen: bool = True) -> dict:
     upload_guard.preflight(run_dir, meta)
     video_id = upload_video(context, run_dir, meta)
     result = {"videoId": video_id, "url": f"https://youtu.be/{video_id}",
@@ -186,15 +250,16 @@ def upload_and_schedule_with_context(context, run_dir: Path, meta: dict, slot) -
     write_result(run_dir, result)
     page = open_edit(context, video_id)
     try:
-        video_details.apply_details(page, run_dir, meta)
-        wait_for_checks(page)
-        add_end_screen(page)
-        try:
-            upload_guard.verify_end_screen(page)
-        except upload_guard.UploadBlocked as error:
-            log(f"end screen warning: {error}")
+        video_details.apply_details(page, run_dir, meta, custom_thumbnail=custom_thumbnail)
+        if end_screen:
+            wait_for_checks(page)
+            add_end_screen(page)
+            try:
+                upload_guard.verify_end_screen(page)
+            except upload_guard.UploadBlocked as error:
+                log(f"end screen warning: {error}")
     finally:
         page.close()
-    result["endScreen"] = True
+    result["endScreen"] = end_screen
     write_result(run_dir, result)
     return schedule_existing(context, run_dir, result, slot)

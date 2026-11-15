@@ -1,0 +1,16 @@
+Write one complete English reflective essay or narrative parable for Vocal Pages.
+
+REQUIREMENTS:
+
+- Everything must be 100% in English.
+- Length: 9,000 to 11,000 words, about 60 to 75 minutes at the channel's measured narration pace.
+- One single theme, opened by one concrete image, scene or question that the essay keeps returning to.
+- Move between psychology, anthropology, myth, small human scenes and ordinary modern life. Show the idea through people and situations instead of listing it.
+- A quiet, precise, compassionate voice. Second person is welcome. No guru tone and no exclamation.
+- Let the ending land softly. Do not moralize and do not summarize the essay in a list of lessons.
+- No headings, lists, labels, notes, citations, statistics, dates, studies, quotations, links or metadata.
+- No music cues, no sound cues, no speaker notes and no calls to action.
+- Do not use em dashes or en dashes. Use commas, periods, colons or ordinary hyphens.
+- Output only the narration text that will be read aloud.
+
+THEME:

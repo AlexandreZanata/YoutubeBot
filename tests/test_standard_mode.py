@@ -43,13 +43,14 @@ class TestStandardMode(unittest.TestCase):
         self.assertTrue(fields["in_img"].isEnabled())
         self.assertEqual(fields["in_img"].text(), "original.png")
 
-    def test_given_channel_themes_then_all_five_choices_are_exclusive_and_optional(self):
-        """Contract: Whispers joins the four existing optional Standard backgrounds."""
+    def test_given_channel_themes_then_all_six_choices_are_exclusive_and_optional(self):
+        """Contract: Whispers and Vocal Pages join the four existing Standard backgrounds."""
         from src.ui.standard_controls import selected_standard_theme
         fields = self.fields()
         checks = fields["background_checks"]
         self.assertEqual(set(checks), {
             "religious", "black", "agro", "fallem_prince", "whispers_from_heaven",
+            "vocal_pages",
         })
         self.assertTrue(all(not checkbox.isChecked() for checkbox in checks.values()))
         for name, checkbox in checks.items():

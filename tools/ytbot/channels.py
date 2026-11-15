@@ -51,6 +51,38 @@ CHANNELS = {
         article_retry="Target narration length: at least 6,500 words.",
         slots=(0, 6, 12, 18),
     ),
+    "infinite-random-worlds": Channel(
+        slug="infinite-random-worlds",
+        name="Infinite Random Worlds",
+        handle="@InfiniteRandomWorlds",
+        channel_id="UCY3Zp50I6Y6semQQccJxRPg",
+        prompts="infinite_random_worlds",
+        background="thumbnail",
+        language="en",
+        min_article_chars=30000,
+        article_retry=(
+            "Target narration length: 4,500 to 6,000 English words, about 32 to 43 "
+            "minutes at a measured pace. Each story must use a unique world and cast."
+        ),
+        max_article_chars=45000,
+        slots=(12,),
+    ),
+    "vocal-pages": Channel(
+        slug="vocal-pages",
+        name="Vocal Pages",
+        handle="@VocalPages01",
+        channel_id="UCm13oIPS1W43j9BYo0kewcQ",
+        prompts="vocal_pages",
+        background="vocal_pages",
+        language="en",
+        min_article_chars=58000,
+        article_retry=(
+            "Target narration length: 9,000 to 11,000 English words, about 60 to 75 "
+            "minutes at the channel's measured pace. Keep one theme and the quiet ending."
+        ),
+        max_article_chars=74000,
+        slots=(0,),
+    ),
     "whispers-from-heaven": Channel(
         slug="whispers-from-heaven",
         name="Whispers From Heaven",

@@ -12,7 +12,10 @@ from .chat import copy_last, dismiss_notice, log, send_text, wait_for_assistant
 
 
 def article_excerpt(run_dir: Path, limit: int = 8000) -> str:
-    return (run_dir / "article.txt").read_text(encoding="utf-8")[:limit]
+    script = run_dir / "article.txt"
+    if not script.is_file():
+        script = run_dir / "short.txt"
+    return script.read_text(encoding="utf-8")[:limit]
 
 
 def generate_metadata(context, run_dir: Path, topic: str) -> dict:
@@ -62,8 +65,7 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
     if codex_media.available():
         for attempt in range(2):
             try:
-                return (codex_media.generate_thumbnail(run_dir) if style == "dense"
-                        else codex_media.generate_thumbnail(run_dir, "classic"))
+                return codex_media.generate_thumbnail(run_dir, style)
             except (ValueError, RuntimeError):
                 if attempt:
                     raise
@@ -75,7 +77,9 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
         page.goto("https://chatgpt.com/", timeout=90000)
         page.wait_for_timeout(7000)
         dismiss_notice(page)
-        request = (config.prompt("thumbnail-classic.txt" if style == "classic" else "thumbnail.txt")
+        prompt_file = {"classic": "thumbnail-classic.txt",
+                       "shorts": "thumbnail-shorts.txt"}.get(style, "thumbnail.txt")
+        request = (config.prompt(prompt_file)
                    + "\n\nARTICLE (excerpt, included below):\n" + article_excerpt(run_dir))
         send_text(page, request)
         log("thumbnail prompt sent")

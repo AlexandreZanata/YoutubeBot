@@ -91,7 +91,7 @@ def _upload_context(playwright, context, upload_cdp):
 
 
 def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
-              start_date=None) -> list:
+              start_date=None, topics: list[str] | None = None) -> list:
     if not (config.PROFILE / "Default" / "Cookies").is_file():
         runtime.setup_profile()
     runtime.start_hidden_chrome()
@@ -106,7 +106,7 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
         local_occupied, local_titles = _local_state()
         scheduled_titles = [item.get("title", "") for item in catalog.studio_videos(studio_payload)] + local_titles
         occupied = logic.scheduled_slots(studio_payload) | local_occupied
-        topics = prepare_topics(context, count, scheduled_titles)
+        topics = topics or prepare_topics(context, count, scheduled_titles)
         start = datetime.combine(start_date, datetime.min.time()) if start_date else None
         if start and start < datetime.now():
             start = None

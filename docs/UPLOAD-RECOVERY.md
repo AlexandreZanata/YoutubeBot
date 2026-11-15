@@ -25,7 +25,7 @@ retry the Codex thumbnail.
 | Page blank or Create/Upload missing | goto timeout or missing button | Retry the page once; log the URL | Stop; check Studio/session/layout |
 | Upload dialog does not open | no `#textbox`/draft dialog after `Editar rascunho` | Reopen the edit page or `?d=ud`; if a video ID exists, schedule it | Do not upload a second copy; report the ID |
 | Upload stuck | no `Envio concluído` for 15 minutes | Log every 60s; `UploadBlocked` | Check connection/Studio; record any ID |
-| Video ID missing | ID regex empty | Retry the read; log the page | Open Studio content and find the draft |
+| Video ID missing | edit URL and share link both lack an ID | Poll both for 90 seconds; log the page URL | Open Studio content and find the draft |
 | Title becomes the filename | edit-page title differs after reload | `video_details` reapplies title/description and verifies | Block; fix in Studio manually |
 | Description empty | edit-page description empty | Same details pass | Block; regenerate metadata |
 | SEO tags empty | `input[aria-label=Tags]` empty | Description keeps the `TAGS:` line; report tags separately | Fill tags manually when the UI allows |

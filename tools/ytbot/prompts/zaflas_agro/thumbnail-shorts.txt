@@ -1,0 +1,18 @@
+Create ONE finished 16:9 YouTube Shorts thumbnail for the Zaflas Agro channel, in the exact visual pattern of the channel's existing Shorts.
+
+COMPOSITION, EXACT:
+- Canvas 16:9, 1280x720. The readable question sits in the left-center area so a vertical 9:16 crop still keeps it intact.
+- Background layer: one huge Portuguese word or short phrase from the story, ultra condensed heavy uppercase, cropped by the frame edges, dark olive, gray or muted green at low contrast, partially cut off on the left and bottom.
+- Foreground layer: the short question in 3 to 5 lines of ultra condensed heavy uppercase, left aligned, white with one or two accent words in saturated yellow (#E8C547) or agro green (#8CC63F). Thin black outline or soft shadow for legibility. No box, no banner.
+- Right third: one photoreal Brazilian farm detail with warm sunset or golden-hour light: seedling in wet soil, leaves with pests, machinery detail, grain, pasture or irrigation. Cinematic close-up, rich texture, sharp subject, natural depth of field.
+- Overall: high contrast, no clutter, no logo, no channel name, no border, no icons, no small secondary text.
+
+TEXT RULES:
+- Silently choose a Portuguese question of 4 to 7 words from the story, with correct accents and cedilla.
+- Every rendered word must be spelled exactly, fully legible, with no invented letters, no placeholder and no English.
+- Keep the text inside YouTube safe margins and inside the central vertical band that survives a 9:16 crop.
+
+STYLE:
+- Premium Brazilian agribusiness editorial, realistic photography, dramatic yet believable light.
+- Colors: deep black, olive, warm gold and the single accent color.
+- Sharp typography, no gradient, no glow, no 3D, no distorted letters.

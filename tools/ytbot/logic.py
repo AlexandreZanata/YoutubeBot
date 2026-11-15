@@ -117,6 +117,8 @@ def next_slots(count: int, occupied: set[tuple[date, int]], start: datetime | No
                lead_minutes: int = config.MIN_LEAD_MINUTES) -> list[datetime]:
     now = start or datetime.now()
     earliest = now + timedelta(minutes=lead_minutes)
+    if start and start.hour == 0 and start.minute == 0:
+        earliest = start
     chosen: list[datetime] = []
     day = earliest.date()
     while len(chosen) < count and day < earliest.date() + timedelta(days=120):

@@ -17,6 +17,8 @@ algorithms are preserved; new account/adapter modules compose them.
 - `tools/ytbot/youtube.py`, `upload_dialog.py`: unchanged upload, end-screen and scheduling.
 - `tools/ytbot/community.py`: Community tab check and first image/question post; see
   [community](COMMUNITY.md).
+- `tools/ytbot/shorts.py`: vertical Shorts pipeline for Zaflas with short scripts, portrait
+  render, upload-only account and 09:00/18:00 scheduling. See [Shorts](SHORTS.md).
 - `tools/ytbot/commercial/`: private affiliate sessions, starting with Mercado Livre.
   See [commercial](COMMERCIAL.md).
 - `tools/ytbot/social/`: private per-network promotion profiles, visible login and hidden

@@ -1,0 +1,28 @@
+Create ONE finished professional 16:9 YouTube thumbnail for Vocal Pages, an English channel of reflective essays and narrative parables.
+
+LAYOUT, EXACT AND NON NEGOTIABLE:
+- The left 38 to 40 percent of the frame is a solid pure black panel from top to bottom.
+- The right side is one cinematic composite illustration of the essay, with no text on it.
+- The black panel is not a gradient, not a card, not a torn edge and not a photo. It is flat black with a straight vertical boundary.
+
+TITLE TEXT:
+- Silently choose a short English phrase of 2 to 4 words from the essay's central image or question.
+- Set it in white, ultra condensed, heavy uppercase sans, stacked in three or four lines that fill the height of the black panel, left aligned, tight leading, wide margins.
+- Every line must be spelled exactly and be fully legible, with no invented letters and no extra words.
+- Never render a placeholder, a watermark, a logo, a channel name or a frame.
+
+OPTIONAL SUBTITLE:
+- If the phrase leaves room, place one short English line under the title, either gold serif (#C9A46A) with a thin ornamental divider above it, or white bold sans in at most two short lines.
+- Never both styles in the same thumbnail, and never more than one subtitle line block.
+
+ILLUSTRATION:
+- Painterly photoreal cinematic scene: one clear central subject, meaningful depth and a quiet, contemplative mood.
+- Palette: charcoal and near-black, warm gold light (#E7BE7C), deep teal and muted parchment.
+- Symbolic and story specific: a room, a road, a figure seen from behind, an object that carries the essay's idea.
+- Dramatic but believable light, rich texture, sharp primary subject, controlled depth of field.
+- Safe, non graphic imagery. No injury, no weapons, no horror.
+
+FORBIDDEN:
+- Any text outside the black panel; gibberish typography; serif or rounded fonts for the title; text effects, outlines, glow or 3D.
+- Logos, watermarks, borders, UI, split panels, collages, cards, icons, small secondary text, infographics.
+- Pure white backgrounds, oversaturated colors or bright flat lighting.

@@ -43,10 +43,14 @@ def _render_video(run_dir: Path) -> Path:
 
     narration = fit_narration(run_dir)
     output = run_dir / "video.mp4"
-    background_image = (
-        config.ROOT / "assets" / "backgrounds" / f"{config.THUMBNAIL_THEME}.jpg")
-    background, is_video = resolve_standard_background(
-        background_image, config.THUMBNAIL_THEME)
+    if config.THUMBNAIL_THEME == "thumbnail":
+        background = run_dir / "thumbnail.png"
+        is_video = False
+    else:
+        background_image = (
+            config.ROOT / "assets" / "backgrounds" / f"{config.THUMBNAIL_THEME}.jpg")
+        background, is_video = resolve_standard_background(
+            background_image, config.THUMBNAIL_THEME)
     narration_seconds = get_audio_duration(narration)
     if narration_seconds <= 0:
         raise RuntimeError("narration duration is unknown; rendering and upload were stopped")

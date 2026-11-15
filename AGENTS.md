@@ -9,19 +9,29 @@ English in code, comments, documentation and commits; user-facing UI may use Por
 
 - Extension capture, filename templates and download behavior stay unchanged.
 - Keep the existing generation modes, narration, voices, subtitles, backgrounds and rendering.
-- Fallem Prince and Whispers From Heaven use English narration, subtitles and metadata.
-  Only Zaflas uses Brazilian Portuguese. Operator/browser interface language never changes content language.
+- Every channel is English-only except Zaflas. Infinite Random Worlds, Vocal Pages, Fallem
+  Prince and Whispers From Heaven use English narration, subtitles, metadata and thumbnail
+  text. Zaflas is Brazilian Portuguese in every long video and every Short: script,
+  narration, titles, descriptions, tags and thumbnail text. Reject any English output on
+  Zaflas before audio, render or upload. The Read aloud voice remains Cove as selected by
+  the owner. Operator/browser interface language never changes content language.
 - `tools/ytbot` keeps channel prompts, deduplication, resumable stage records and sequential
-  upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`.
+  upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`
+  and `infinite-random-worlds`.
   Whispers uses 2,400 to 2,800 words (15 to 17 minutes), Sacred Brown Engraving thumbnails,
   brown stippling background and the metadata/tag patterns in
   [its channel profile](docs/channels/whispers-from-heaven.md). Zaflas uses Brazilian
-  Portuguese, 6,000 to 7,200 words (25 to 35 minutes), photorealistic agribusiness
+  Portuguese, 4,000 to 4,800 words (25 to 35 minutes), photorealistic agribusiness
   thumbnails, the fixed site/social description prefix and
   [its channel profile](docs/channels/zaflas.md). Zaflas publishes one video per day at
   12:00 America/Cuiaba. Its dedicated profile is upload-only; generation stays in legacy.
   Zaflas articles target 4,000 to 4,800 words (26,000 to 34,000 characters) with one bounded
   rewrite above the ceiling.
+- Infinite Random Worlds is English-only and has no background video: the episode thumbnail
+  is the still background under the burned-in subtitles. It keeps no music, the five-second
+  quick finish and a free per-episode thumbnail style. Stories target 4,500 to 6,000 words
+  (32 to 43 minutes) with a unique world each. See
+  [its channel profile](docs/channels/infinite-random-worlds.md).
 - Require an explicit channel. Verify its YouTube channel ID before mutating Studio.
 - Schedule only: up to 4 videos/day for fallem prince at 00:00, 06:00, 12:00 and
   18:00 in America/Cuiaba, at least 60 minutes ahead, not made for kids, custom
@@ -82,6 +92,16 @@ every thumbnail reuse the same character. Keep the etched midtones and full-scen
 but invent a unique subject and metaphor for each article. The earlier large white
 void/two-color poster interpretation is superseded. Alternate the dense prompt with
 `thumbnail-classic.txt`: six dense and six classic in a twelve-video batch.
+
+## Shorts
+
+Vertical Shorts use the dedicated `shorts` protocol: 1080x1920, 35 to 55 seconds, 90 to 130
+Portuguese words, portrait Zaflas background, a custom 1280x720 thumbnail in the existing
+Zaflas Shorts style, no end screen, and two per day at 09:00/18:00 when requested. They use
+the legacy generation profile and the Zaflas upload-only profile. Schedule inside the upload
+dialog, with no edit-page pass, no tag chips and the upload file staged in
+`.local/ytbot/upload-tmp`; the dialog cannot read a file inside the `/data` symlink. Do not
+route them through the long-form batch. See [Shorts](docs/SHORTS.md).
 
 ## Commercial affiliates
 

@@ -118,6 +118,13 @@ def generate_article(page, topic: str, run_dir: Path, extra_header: str = "") ->
     page.wait_for_timeout(7000)
     dismiss_notice(page)
     header = config.prompt("article_header.txt")
+    context = run_dir / "context.txt"
+    if context.is_file():
+        header += ("\n\nSOURCE STORY. The text inside the source block is established canon for "
+                   "this episode. Follow its characters, world rules and events, and continue "
+                   "from its ending without retelling it. This episode is the explicit exception "
+                   "to any rule that forbids recurring people or settings.\n<SOURCE>\n"
+                   + context.read_text(encoding="utf-8").strip() + "\n</SOURCE>")
     if extra_header:
         header += "\n\n" + extra_header
     language = config.CHANNEL.language if config.CHANNEL else "en"
@@ -244,6 +251,46 @@ def _capture_once(page, context, run_dir: Path, tab_url: str, start: str,
         if item.get("state") == "interrupted":
             raise RuntimeError("audio download was interrupted")
     return None
+
+
+PORTUGUESE_ACCENTS = "ãõçáéíóúâêôà"
+
+
+def is_brazilian_portuguese(text: str) -> bool:
+    """Reject the English output that occasionally slips through the short prompt."""
+    lowered = text.lower()
+    if " the " in lowered or " and " in lowered:
+        return False
+    return sum(lowered.count(char) for char in PORTUGUESE_ACCENTS) >= 3
+
+
+def generate_short(page, topic: str, run_dir: Path) -> str:
+    page.goto(config.GPT_URL, timeout=90000)
+    page.wait_for_timeout(7000)
+    dismiss_notice(page)
+    header = config.prompt("shorts.txt")
+    header += ("\n\nIDIOMA OBRIGATÓRIO: português do Brasil. Escreva todo o texto falado nesse "
+               "idioma, sem nenhuma palavra em inglês, independentemente da interface ou da "
+               "mensagem do operador. Responda apenas com a narração.")
+    send_text(page, header + "\n\nTema: " + topic)
+    log(f"short prompt sent: {topic}")
+    wait_for_assistant(page)
+    text = clean_article(copy_last(page))
+    if not is_brazilian_portuguese(text):
+        log("short came back without Portuguese; requesting a rewrite")
+        send_text(page, "Reescreva o texto inteiro em português do Brasil, sem nenhuma palavra "
+                        "em inglês. Mantenha o mesmo tema e o mesmo tamanho. Responda apenas "
+                        "com a narração.")
+        wait_for_assistant(page)
+        text = clean_article(copy_last(page))
+        if not is_brazilian_portuguese(text):
+            raise RuntimeError("short narration is not in Brazilian Portuguese")
+    words = len(text.split())
+    if words < 60 or words > 180:
+        raise RuntimeError(f"short narration has an unexpected length ({words} words)")
+    (run_dir / "short.txt").write_text(text, encoding="utf-8")
+    log(f"short saved: {len(text)} chars, {words} words")
+    return text
 
 
 def capture_audio(page, context, run_dir: Path, timeout: int = 1800) -> Path:

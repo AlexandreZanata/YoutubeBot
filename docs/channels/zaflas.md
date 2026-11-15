@@ -7,7 +7,7 @@
 | Channel | Zaflas |
 | Handle | `@zaflas` |
 | Channel ID | `UCi2aftoK7vlS3A6OozMHXKg` |
-| Language | Brazilian Portuguese |
+| Language | Brazilian Portuguese only |
 | Spoken brand | Zaflas Agro |
 | Website | <https://zaflas.com.br/> |
 | Visual identity | Photorealistic agribusiness with bold Portuguese typography |
@@ -17,6 +17,11 @@ The public channel describes itself as a channel about agriculture, rural manage
 technology in the field. It promises simple, objective content about soil management,
 productivity, irrigation, machinery, precision agriculture and farm management. It also
 presents Zaflas Agro as the system built to centralize the farm's information.
+
+The article text is Brazilian Portuguese and the prompt enforces that language. The Read
+aloud voice remains **Cove**, as selected by the owner; it is not changed by the channel
+profile. Existing audio files are kept as recorded. Fallem Prince and Whispers From Heaven
+remain English-only.
 
 The channel description must keep the website link at the top:
 
