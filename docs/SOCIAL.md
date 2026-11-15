@@ -78,6 +78,18 @@ Add the next network as a sibling package, for example `social/instagram/`, with
 login URL, CDP port, selectors and README. Keep one private `.local/social/<network>/`
 folder per network. Do not share a Chrome profile between networks.
 
+## Runtime rule for every network
+
+Every social-network module follows the YouTube runtime model: a visible Chrome window is
+used only for owner login and platform challenges. After login, catalog or agenda checks,
+status and publishing run in a hidden Chrome/Xvfb runtime on a dedicated display, with the
+same private profile and a separate CDP port. No publishing path may require a visible
+window.
+
+Each network defines its own hidden display and CDP port. Never reuse `:90` or `9322` for a
+second network. The visible login command and the hidden operation commands must switch the
+same profile safely.
+
 ## Operational rules
 
 - Require an explicit network; never guess the account.

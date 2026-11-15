@@ -9,6 +9,10 @@ The agenda is a review calendar, not a publishing schedule. Every row is a propo
 owner must approve. The agent never posts, schedules, sends messages, follows accounts or
 changes a profile while producing it.
 
+All network modules use the YouTube runtime model: a visible browser only for owner login and
+challenges; agenda validation, status and publishing run hidden in Xvfb with the same private
+profile. Each network gets its own display and CDP port.
+
 ## Inputs
 
 Read these before researching:
