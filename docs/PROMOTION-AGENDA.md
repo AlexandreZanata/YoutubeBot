@@ -13,6 +13,10 @@ All network modules use the YouTube runtime model: a visible browser only for ow
 challenges; agenda validation, status and publishing run hidden in Xvfb with the same private
 profile. Each network gets its own display and CDP port.
 
+Discovery is a separate review step. It searches public conversations from the last 7 days,
+filters out politics, violence and engagement bait, and proposes contextual replies. A human
+reads the thread before a reply is written. See [discovery](SOCIAL-DISCOVERY.md).
+
 ## Inputs
 
 Read these before researching:

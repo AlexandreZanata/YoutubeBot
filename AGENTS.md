@@ -92,6 +92,13 @@ same private profile and a separate CDP port. No publishing path may require a v
 window.
 See [X publishing](docs/SOCIAL-POSTING.md).
 
+Discovery searches public X posts from the last 7 days for fuel, fitness, agro and developer
+conversations. Filter politics, violence, profanity and engagement bait. A human reads the
+target thread before any reply. A reply must add context or a method, may carry one relevant
+link, and never consists only of a link. One reply per target, recorded in the private reply
+journal; never retry a started or unconfirmed reply. See
+[discovery](docs/SOCIAL-DISCOVERY.md).
+
 ## Community
 
 After the asset stage of every batch, check the selected channel's Community tab. The rule

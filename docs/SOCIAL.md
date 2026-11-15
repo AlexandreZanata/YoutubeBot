@@ -72,6 +72,10 @@ The X publisher is intentionally bounded to one approved agenda item, text or on
 image. It uses a private journal to prevent duplicates and never retries an uncertain post.
 See [X publishing](SOCIAL-POSTING.md).
 
+Discovery finds recent public conversations and prepares them for human review. Replies add
+context, may carry one relevant link and are recorded in a separate journal. See
+[discovery and contextual replies](SOCIAL-DISCOVERY.md).
+
 ## Network folders
 
 Add the next network as a sibling package, for example `social/instagram/`, with its own
