@@ -8,7 +8,7 @@ import shutil
 import time
 from pathlib import Path
 
-from . import config, logic, runtime, upload_dialog
+from . import config, logic, runtime, upload_dialog, video_details
 
 
 def log(message: str) -> None:
@@ -186,6 +186,7 @@ def upload_and_schedule_with_context(context, run_dir: Path, meta: dict, slot) -
     write_result(run_dir, result)
     page = open_edit(context, video_id)
     try:
+        video_details.apply_details(page, run_dir, meta)
         wait_for_checks(page)
         add_end_screen(page)
     finally:
