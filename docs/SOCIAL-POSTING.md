@@ -118,8 +118,9 @@ python3 -m tools.ytbot social post --network x --id P01 --dry-run
 python3 -m tools.ytbot social post --network x --id P01
 ```
 
-`--dry-run` fills the visible composer, waits for the Post button, then closes without
-clicking. It does not write the journal.
+`--dry-run` fills the composer in the hidden browser, waits for the Post button, then closes
+without clicking. It does not write the journal. The agenda command is the validation gate: a
+missing or invalid file stops the post before any browser interaction.
 
 ## Publish path
 
