@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from . import catalog, channels, config, logic, runtime
+from . import catalog, channels, config, flow_profiles, logic, runtime
 
 
 def command_setup(_args) -> None:
@@ -44,6 +44,7 @@ def command_check(args) -> None:
 
 
 def command_run(args) -> None:
+    flow_profiles.activate(flow_profiles.name(getattr(args, "flow_profile", None), environment=True))
     channels.apply(args.channel)
     from .batch import run_batch
     from .account_commands import apply_bound_account
@@ -76,6 +77,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--parallel", type=int, default=0,
                      help="tabs used for article and audio stages (0 = one per video)")
     run.add_argument("--upload-cdp", type=int, default=0)
+    run.add_argument("--flow-profile", choices=flow_profiles.NAMES, default=None,
+                     help="ASR/render execution profile (or YTBOT_FLOW_PROFILE; default standard)")
     run.set_defaults(func=command_run)
     from .account_commands import add_parser
     add_parser(sub)

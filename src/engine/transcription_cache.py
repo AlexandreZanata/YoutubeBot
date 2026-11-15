@@ -21,9 +21,11 @@ def engine_versions():
     return versions
 
 
-def cache_key(audio_path, model, language, words):
-    options = ["asr-cache-v1-beam1-vad", model, language, words, engine_versions()]
-    digest = hashlib.sha256(json.dumps(options, sort_keys=True).encode())
+def cache_key(audio_path, model, language, words, options=None):
+    settings = ["asr-cache-v1-beam1-vad", model, language, words, engine_versions()]
+    if options:
+        settings.append(options)
+    digest = hashlib.sha256(json.dumps(settings, sort_keys=True).encode())
     with Path(audio_path).open("rb") as source:
         while chunk := source.read(1024 * 1024):
             digest.update(chunk)
@@ -60,10 +62,10 @@ def save_entry(path, segments):
 
 
 def cached_transcription(audio_path, model_name, language, word_timestamps, transcribe,
-                         cache_dir=None):
+                         cache_dir=None, *, options=None):
     try:
         folder = CACHE_DIR if cache_dir is None else Path(cache_dir)
-        path = folder / f"{cache_key(audio_path, model_name, language, word_timestamps)}.json"
+        path = folder / f"{cache_key(audio_path, model_name, language, word_timestamps, options)}.json"
     except OSError:
         return transcribe(str(audio_path), model_name, language, word_timestamps)
     try:
