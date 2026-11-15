@@ -178,9 +178,13 @@ Sample tag families:
 ## Account status
 
 A dedicated `zaflas` browser profile was created under
-`.local/accounts/browser/zaflas` with CDP port `9302`. The visible Google/YouTube login was
-opened. Channel binding and Studio permission must be verified after the owner signs in;
-public channel identity is already confirmed, but Studio access is not assumed.
+`.local/accounts/browser/zaflas` with CDP port `9302`. The channel identity is bound and
+verified. This is an **upload-only** profile: ChatGPT and the capture extension are not
+required. Generation uses the main `legacy` profile; catalog, Community, upload and
+scheduling use the Zaflas profile.
+
+Zaflas publishes **one video per day at 12:00 America/Cuiaba**. The channel profile uses
+`slots=(12,)`, so a batch fills one noon slot per day.
 
 ## Limits
 

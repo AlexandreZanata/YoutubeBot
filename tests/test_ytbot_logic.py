@@ -2,7 +2,7 @@ import unittest
 from datetime import date, datetime
 from unittest.mock import patch
 
-from tools.ytbot import chat, config, logic
+from tools.ytbot import channels, chat, config, logic
 
 
 META = """TITLE OPTIONS:
@@ -86,6 +86,14 @@ class TopicTests(unittest.TestCase):
         catalog = [{"title": "Why We Fall in Love With People Who Are Wrong for Us"}]
         self.assertTrue(logic.similar_topics("Why We Fall in Love With the Wrong Person", catalog))
         self.assertFalse(logic.similar_topics("The Mathematics of Loneliness", catalog))
+
+
+class ChannelProfileTests(unittest.TestCase):
+    def test_zaflas_has_one_noon_slot_per_day(self):
+        self.assertEqual(channels.get("zaflas").slots, (12,))
+
+    def test_fallem_keeps_four_daily_slots(self):
+        self.assertEqual(channels.get("fallem-prince").slots, (0, 6, 12, 18))
 
 
 class CaptureStatusTests(unittest.TestCase):
