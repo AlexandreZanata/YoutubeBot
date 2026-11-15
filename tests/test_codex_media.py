@@ -44,7 +44,7 @@ class CodexMediaContracts(TestCase):
         self.assertEqual(command[command.index('--model')+1], 'gpt-6-luna')
         self.assertIn('model_reasoning_effort="low"', command)
         self.assertIn('--ignore-user-config', command)
-        self.assertEqual(command.count('--image'), 2)
+        self.assertEqual(command.count('--image'), 0)
         self.assertEqual(command[command.index('--sandbox')+1], 'read-only')
         self.assertNotIn('--dangerously-bypass-approvals-and-sandbox', command)
         with self.assertRaises(ValueError):

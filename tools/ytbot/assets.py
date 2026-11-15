@@ -58,11 +58,12 @@ def image_data_url(page) -> str | None:
     )
 
 
-def generate_thumbnail(context, run_dir: Path, timeout: int = 1200) -> Path | None:
+def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: int = 1200) -> Path | None:
     if codex_media.available():
         for attempt in range(2):
             try:
-                return codex_media.generate_thumbnail(run_dir)
+                return (codex_media.generate_thumbnail(run_dir) if style == "dense"
+                        else codex_media.generate_thumbnail(run_dir, "classic"))
             except (ValueError, RuntimeError):
                 if attempt:
                     raise
@@ -74,7 +75,7 @@ def generate_thumbnail(context, run_dir: Path, timeout: int = 1200) -> Path | No
         page.goto("https://chatgpt.com/", timeout=90000)
         page.wait_for_timeout(7000)
         dismiss_notice(page)
-        request = (config.prompt("thumbnail.txt")
+        request = (config.prompt("thumbnail-classic.txt" if style == "classic" else "thumbnail.txt")
                    + "\n\nARTICLE (excerpt, included below):\n" + article_excerpt(run_dir))
         send_text(page, request)
         log("thumbnail prompt sent")

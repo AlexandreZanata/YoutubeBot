@@ -6,7 +6,7 @@ import argparse
 import json
 from datetime import datetime
 
-from . import catalog, channels, config, flow_profiles, logic, runtime
+from . import account, catalog, channels, community, config, flow_profiles, logic, runtime
 
 
 def command_setup(_args) -> None:
@@ -44,6 +44,19 @@ def command_check(args) -> None:
         print("[ytbot] topic is new")
 
 
+def command_community(args) -> None:
+    channels.apply(args.channel)
+    runtime.start_hidden_chrome()
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as playwright:
+        _browser, context = runtime.connect_hidden(playwright)
+        account.ensure_channel(context)
+        topics = args.topic or []
+        if not topics and config.TOPICS.is_file():
+            topics = [config.TOPICS.read_text(encoding="utf-8").splitlines()[0].strip()]
+        community.ensure_post(context, topics or ["What do you think?"])
+
+
 def command_run(args) -> None:
     flow_profiles.activate(flow_profiles.name(getattr(args, "flow_profile", None), environment=True))
     channels.apply(args.channel)
@@ -71,6 +84,10 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("topic")
     check.add_argument("--channel", choices=sorted(channels.CHANNELS), default="")
     check.set_defaults(func=command_check)
+    community_parser = sub.add_parser("community", help="check the Community tab and publish a first post when empty")
+    community_parser.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True)
+    community_parser.add_argument("--topic", action="append", default=[])
+    community_parser.set_defaults(func=command_community)
     run = sub.add_parser("run", help="generate, render, upload and schedule videos")
     run.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True,
                      help="channel profile; ask the user when it is not specified")

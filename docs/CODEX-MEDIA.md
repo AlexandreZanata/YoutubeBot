@@ -56,12 +56,19 @@ browser sign-in help: [Linux setup](INSTALL-LINUX.md).
 
 ## Current Fallem Prince visual direction
 
-Use [reference one](../assets/styles/fallem_prince/reference-01.jpg) and
-[reference two](../assets/styles/fallem_prince/reference-02.jpg): dense dark monochrome
-etching, a prominent psychologically expressive classical figure, dramatic highlights,
-fine stippling/cross-hatching and a richly illustrated environment. Adapt the central
-metaphor to each article; mirrors, obscured faces and repeated reflections are examples,
-not mandatory subjects. No text, logos or watermarks. The canonical generation prompt is
-`tools/ytbot/prompts/fallem_prince/thumbnail.txt`. This replaces the earlier large-white-void,
+The style is written into `tools/ytbot/prompts/fallem_prince/thumbnail.txt`: dense dark
+monochrome etching, a prominent psychologically expressive classical figure, dramatic
+highlights, fine stippling/cross-hatching and a richly illustrated environment. Adapt the
+central metaphor to each article; mirrors, obscured faces and repeated reflections are
+examples, not mandatory subjects. No text, logos or watermarks.
+
+Do not attach the two files under `assets/styles/fallem_prince/` to an image request. They
+are documentation of the approved look only. Passing both images makes the model reuse the
+same face and scene, so the bot sends the written style lock instead and invents a unique
+subject for every article.
+
+Fallem prince alternates the dense prompt with
+`tools/ytbot/prompts/fallem_prince/thumbnail-classic.txt` (Black Ink Void) in each batch:
+six dense and six classic for a twelve-video run. This replaces the earlier large-white-void,
 strict two-color-poster interpretation. Reference assets contain pixels only, with source
 file names and embedded metadata removed.

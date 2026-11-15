@@ -157,7 +157,11 @@ The default shape is one tab per video:
 - **Read aloud** is clicked in every tab as soon as its article is ready. The
   extension stores the source tab URL in `captureHistory`, so the bot copies
   each download into the matching run (`narration.aac`/`.webm`).
-- **Metadata and thumbnail** run in parallel per video.
+- **Metadata and thumbnail** run in parallel per video. Fallem prince alternates dense and
+  classic thumbnail prompts, six of each in a twelve-video batch.
+- **Community** is checked after the assets: an empty tab receives one question post with
+  the first topic, a short text and a square thumbnail crop. See
+  [community](../../docs/COMMUNITY.md).
 - **Rendering** is serialized by a process lock because transcription and NVENC
   share the GPU. **Uploads and scheduling** stay sequential.
 
