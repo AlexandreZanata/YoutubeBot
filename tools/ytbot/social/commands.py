@@ -8,24 +8,29 @@ from pathlib import Path
 from .. import config
 from . import agenda as agenda_module
 from . import browser, discovery
+from .instagram import account as instagram_account
 from .store import SocialStore
 from .x import account as x_account
 from .x import publish
 
-NETWORKS = ("x",)
+NETWORKS = ("x", "instagram")
+X_NETWORKS = ("x",)
 DEFAULT_AGENDA = config.ROOT / ".local" / "promotion" / "agenda.json"
 
 
 def _network(name: str):
     if name == "x":
         return x_account
+    if name == "instagram":
+        return instagram_account
     raise ValueError("unsupported social network")
 
 
 def command_open(args) -> None:
     store = SocialStore()
     network = _network(args.network)
-    browser.open_visible(store, args.network, network.LOGIN_URL, network.CDP_PORT)
+    browser.open_visible(store, args.network, getattr(network, "OPEN_URL", network.LOGIN_URL),
+                         network.CDP_PORT)
     print(f"[social] {args.network} window opened. Log in there; the session stays in the "
           f"private {args.network} profile and is never written to Git.")
     print(f"[social] when finished run: python3 -m tools.ytbot social status --network {args.network}")
@@ -186,16 +191,16 @@ def add_parser(sub) -> None:
     stop_parser.add_argument("--network", choices=NETWORKS, required=True)
     stop_parser.set_defaults(func=command_stop)
     quota_parser = actions.add_parser("quota", help="show contextual replies per published post")
-    quota_parser.add_argument("--network", choices=NETWORKS, required=True)
+    quota_parser.add_argument("--network", choices=X_NETWORKS, required=True)
     quota_parser.set_defaults(func=command_quota)
     discover_parser = actions.add_parser("discover", help="search recent posts for contextual replies")
-    discover_parser.add_argument("--network", choices=NETWORKS, required=True)
+    discover_parser.add_argument("--network", choices=X_NETWORKS, required=True)
     discover_parser.add_argument("--product", choices=sorted(discovery.PRODUCTS), required=True)
     discover_parser.add_argument("--days", type=int, default=7)
     discover_parser.add_argument("--limit", type=int, default=10)
     discover_parser.set_defaults(func=command_discover)
     reply_parser = actions.add_parser("reply", help="reply to one discovery target with context")
-    reply_parser.add_argument("--network", choices=NETWORKS, required=True)
+    reply_parser.add_argument("--network", choices=X_NETWORKS, required=True)
     reply_parser.add_argument("--url", required=True)
     reply_parser.add_argument("--for-post", required=True,
                               help="own post id this reply supports, for the ten-reply quota")
@@ -205,11 +210,11 @@ def add_parser(sub) -> None:
     reply_parser.add_argument("--dry-run", action="store_true")
     reply_parser.set_defaults(func=command_reply)
     agenda_parser = actions.add_parser("agenda", help="list the private promotion agenda")
-    agenda_parser.add_argument("--network", choices=NETWORKS, required=True)
+    agenda_parser.add_argument("--network", choices=X_NETWORKS, required=True)
     agenda_parser.add_argument("--file", default=str(DEFAULT_AGENDA))
     agenda_parser.set_defaults(func=command_agenda)
     post_parser = actions.add_parser("post", help="publish one approved agenda item")
-    post_parser.add_argument("--network", choices=NETWORKS, required=True)
+    post_parser.add_argument("--network", choices=X_NETWORKS, required=True)
     post_parser.add_argument("--id", required=True)
     post_parser.add_argument("--file", default=str(DEFAULT_AGENDA))
     post_parser.add_argument("--dry-run", action="store_true",

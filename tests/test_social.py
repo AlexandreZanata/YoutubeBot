@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools.ytbot.social.instagram import account as instagram
 from tools.ytbot.social.store import SocialStore
 from tools.ytbot.social.x import account
 
@@ -23,6 +24,20 @@ class SocialStoreTests(unittest.TestCase):
             self.assertNotIn("token", record)
             self.assertEqual(store.account_path("x").stat().st_mode & 0o077, 0)
             self.assertEqual(store.public_status("x")["state"], "logged-in")
+
+
+class InstagramAccountTests(unittest.TestCase):
+    def test_handle_from_profile_alt_and_href(self):
+        self.assertEqual(instagram.parse_handle(text="Foto do perfil de exemplo.user"), "exemplo.user")
+        self.assertEqual(instagram.parse_handle(href="/exemplo.user/"), "exemplo.user")
+
+    def test_reserved_paths_are_not_handles(self):
+        self.assertEqual(instagram.parse_handle(href="/explore/"), "")
+        self.assertEqual(instagram.parse_handle(href="/direct/inbox/"), "")
+
+    def test_constants_are_separate_from_x(self):
+        self.assertNotEqual(instagram.CDP_PORT, 9322)
+        self.assertNotEqual(instagram.BACKGROUND_DISPLAY, ":90")
 
 
 class XAccountTests(unittest.TestCase):
