@@ -32,6 +32,10 @@ and can feed developer and build-in-public content without displacing the three 
 - Write in Brazilian Portuguese. Keep product names and official terms unchanged.
 - Lead with the reader's problem, then the evidence, then the action. Avoid "revolucionário",
   "disruptivo", "o melhor do mercado" and other unverifiable claims.
+- Write like a person explaining something to a friend, not like a press release or a model.
+  Use everyday words, direct address and varied sentence length. Read it aloud before approving.
+- Cut AI tells: "É importante destacar", "Neste contexto", "Além disso", "Vale ressaltar",
+  "Descubra", "transforme", forced triads and generic closing lines.
 - Use short sentences, concrete verbs and one idea per paragraph. Explain jargon before using
   it.
 - Mark what is shipped, beta or planned. Abastevo community contribution is planned; the app

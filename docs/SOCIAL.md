@@ -7,8 +7,8 @@ has its own code folder and its own private browser profile:
 ```
 tools/ytbot/social/
   store.py          private per-network folders and account records
-  browser.py        visible Chrome, one profile and one CDP port per network
-  commands.py       social open/status CLI
+  browser.py        visible login or hidden Xvfb Chrome, one profile and CDP port
+  commands.py       social open/status/stop/agenda/post CLI
   x/                X (Twitter) login detection
 ```
 
@@ -19,8 +19,10 @@ tools/ytbot/social/
   x/browser.pid     0600 process record
 ```
 
-The shared YouTube profile is never reused. The social browser opens in the owner's
-graphical session, so sign-in and any challenge stay visible and manual.
+The shared YouTube profile is never reused. `social open` shows a visible Chrome window only
+for sign-in and challenges. `status` and `post` switch that profile to a hidden Xvfb display
+(`:90` for X) and never put a window on the owner's desktop. The page still runs a full Chrome
+with the persistent profile, so the logged-in session is reused.
 
 ## Connect X
 
@@ -31,13 +33,15 @@ python3 -m tools.ytbot social open --network x
 The command starts Chrome with `--user-data-dir=.local/social/x/profile` and remote debugging
 on `127.0.0.1:9322`, then opens `https://x.com/home`. The wait for the debug port is bounded
 to 30 seconds. The owner signs in normally, including password, two-factor authentication,
-Google sign-in or any X challenge. The command never reads or prints the password.
+Google sign-in or any X challenge. The command never reads or prints the password. If a hidden
+browser is already running, `open` stops it first so the login window can appear.
 
 ```bash
 python3 -m tools.ytbot social status --network x
 ```
 
-The status command attaches to the same browser context and runs the recognition steps:
+The status command ensures the hidden Xvfb browser, attaches to its CDP endpoint and runs the
+recognition steps:
 
 1. Open `https://x.com/home` and wait for the client to render.
 2. If the URL is `accounts.google.com` or `/i/flow/login`, a login form is present, or the
@@ -53,6 +57,14 @@ The status command attaches to the same browser context and runs the recognition
 
 Any other result is `unknown` and is not saved. The bot does not click through login,
 two-factor or challenge screens. Rerun `status` after finishing them in the visible window.
+Stopping the background browser is explicit:
+
+```bash
+python3 -m tools.ytbot social stop --network x
+```
+
+`post` also uses the hidden runtime. A visible browser is stopped automatically before the
+background browser starts; the private profile is preserved.
 
 ## Publishing
 
