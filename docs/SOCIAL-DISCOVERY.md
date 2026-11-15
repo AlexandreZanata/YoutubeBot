@@ -10,8 +10,11 @@ the thread, and only then the reply command publishes one contextual comment.
 - Products: Abastevo, SorriFit, Zaflas and the GitHub projects.
 - Language: Brazilian Portuguese.
 - One reply per target, recorded in a private journal.
+- Target: five contextual replies for each original post published by the owner.
 - No mass replies, no automated engagement, no follow or like automation.
 - One contextual link maximum, never a link-only reply.
+- If fewer than five targets pass the relevance filter, report the gap. Never force a reply
+  or lower the bar to fill the quota.
 
 ## Search terms
 
@@ -85,9 +88,10 @@ The reply must not:
 ## Commands
 
 ```bash
+python3 -m tools.ytbot social quota --network x
 python3 -m tools.ytbot social discover --network x --product abastevo --days 7 --limit 10
-python3 -m tools.ytbot social reply --network x --url <status-url> --file <reply.txt> --dry-run
-python3 -m tools.ytbot social reply --network x --url <status-url> --file <reply.txt>
+python3 -m tools.ytbot social reply --network x --for-post P01 --url <status-url> --file <reply.txt> --dry-run
+python3 -m tools.ytbot social reply --network x --for-post P01 --url <status-url> --file <reply.txt>
 ```
 
 `discover` runs in the hidden Xvfb browser, saves candidates to
@@ -96,20 +100,23 @@ python3 -m tools.ytbot social reply --network x --url <status-url> --file <reply
 `reply` validates the target status URL, requires a contextual link and at least ten words,
 checks the X length, fills the inline reply in the hidden browser and stops before clicking
 on `--dry-run`. A real reply writes `started` before the click and `posted` or `unconfirmed`
-after it.
+after it. `--for-post` ties the reply to the owner's original post for quota tracking.
 
-## First validated reply
+## Five validated replies
 
-- Target: <https://x.com/messsquita_/status/2121420107528413418>
-- Reply: <https://x.com/AlexandreZanat/status/2121926973194973370>
-- Context: a driver questioned a low gasoline price in Manaus.
-- Comment: check the ANP weekly average before concluding the math does not add up; the
-  Abastevo guide explains what goes into the price and where to verify the source.
-- Link: Abastevo price formation guide with UTM.
-- Result: posted and confirmed.
+The first quota cycle for P01 closed at five contextual replies. Each target was read before
+writing, each reply has one project link and the private journal records the target and reply.
 
-This is a manual validation of the path, not permission to scale. Every future reply still
-needs a human read of the target thread.
+| Context | Reply |
+| --- | --- |
+| A driver questioned a low gasoline price in Manaus | <https://x.com/AlexandreZanat/status/2121926973194973370> |
+| An app driver audited real cost per kilometer | <https://x.com/AlexandreZanat/status/2121930091609620816> |
+| A car account compared two SUVs by official consumption | <https://x.com/AlexandreZanat/status/2121930251521630487> |
+| A trainee had to reduce load because recovery was incomplete | <https://x.com/AlexandreZanat/status/2121930415628034445> |
+| An agro account discussed precision agriculture on a budget | <https://x.com/AlexandreZanat/status/2121930575736881396> |
+
+This validates the path, not permission to scale. Every future reply still needs a human read
+of the target thread, and the quota is a target, not a reason to spam.
 
 ## Error handling
 
@@ -117,6 +124,7 @@ needs a human read of the target thread.
 | --- | --- |
 | Search page does not load | Stop; reopen the hidden browser and retry once |
 | No candidate passes filters | Report zero; do not lower the relevance bar silently |
+| Quota is below five | Report the gap and wait for relevant targets; never force a reply |
 | Candidate is political or sensitive | Discard; never reply |
 | Target already has a reply in the journal | Stop; inspect the target and journal |
 | Reply has no link | Stop; the comment needs contextual value and a destination |
