@@ -74,7 +74,7 @@ See [X publishing](SOCIAL-POSTING.md).
 
 Discovery finds recent public conversations and prepares them for human review. Replies add
 context, may carry one relevant link and are recorded in a separate journal. The target is
-five contextual replies for each original post, tracked with `social quota`; a gap is reported,
+ten contextual replies for each original post, tracked with `social quota`; a gap is reported,
 never filled with unrelated comments. See [discovery and contextual replies](SOCIAL-DISCOVERY.md).
 
 ## Network folders

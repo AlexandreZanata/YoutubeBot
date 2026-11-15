@@ -96,7 +96,7 @@ Discovery searches public X posts from the last 7 days for fuel, fitness, agro a
 conversations. Filter politics, violence, profanity and engagement bait. A human reads the
 target thread before any reply. A reply must add context or a method, may carry one relevant
 link, and never consists only of a link. One reply per target, recorded in the private reply
-journal; never retry a started or unconfirmed reply. The target is five contextual replies for
+journal; never retry a started or unconfirmed reply. The target is ten contextual replies for
 each original post published; track it with `social quota` and report gaps instead of forcing
 irrelevant comments. See [discovery](docs/SOCIAL-DISCOVERY.md).
 

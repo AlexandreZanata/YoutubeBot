@@ -10,10 +10,10 @@ the thread, and only then the reply command publishes one contextual comment.
 - Products: Abastevo, SorriFit, Zaflas and the GitHub projects.
 - Language: Brazilian Portuguese.
 - One reply per target, recorded in a private journal.
-- Target: five contextual replies for each original post published by the owner.
+- Target: ten contextual replies for each original post published by the owner.
 - No mass replies, no automated engagement, no follow or like automation.
 - One contextual link maximum, never a link-only reply.
-- If fewer than five targets pass the relevance filter, report the gap. Never force a reply
+- If fewer than ten targets pass the relevance filter, report the gap. Never force a reply
   or lower the bar to fill the quota.
 
 ## Search terms
@@ -102,9 +102,9 @@ checks the X length, fills the inline reply in the hidden browser and stops befo
 on `--dry-run`. A real reply writes `started` before the click and `posted` or `unconfirmed`
 after it. `--for-post` ties the reply to the owner's original post for quota tracking.
 
-## Five validated replies
+## Ten validated replies
 
-The first quota cycle for P01 closed at five contextual replies. Each target was read before
+The first quota cycle for P01 closed at ten contextual replies. Each target was read before
 writing, each reply has one project link and the private journal records the target and reply.
 
 | Context | Reply |
@@ -114,6 +114,11 @@ writing, each reply has one project link and the private journal records the tar
 | A car account compared two SUVs by official consumption | <https://x.com/AlexandreZanat/status/2121930251521630487> |
 | A trainee had to reduce load because recovery was incomplete | <https://x.com/AlexandreZanat/status/2121930415628034445> |
 | An agro account discussed precision agriculture on a budget | <https://x.com/AlexandreZanat/status/2121930575736881396> |
+| A news account reported a low gasoline price in Manaus | <https://x.com/AlexandreZanat/status/2121933207998222559> |
+| A developer shared an app-driver cost tracker | <https://x.com/AlexandreZanat/status/2121933377448103984> |
+| A training account argued execution comes before load | <https://x.com/AlexandreZanat/status/2121933540556173356> |
+| An agro field account showed a rain sensor without internet | <https://x.com/AlexandreZanat/status/2121933715899359692> |
+| A user recommended an Android video downloader | <https://x.com/AlexandreZanat/status/2121933881503101290> |
 
 This validates the path, not permission to scale. Every future reply still needs a human read
 of the target thread, and the quota is a target, not a reason to spam.
@@ -124,7 +129,7 @@ of the target thread, and the quota is a target, not a reason to spam.
 | --- | --- |
 | Search page does not load | Stop; reopen the hidden browser and retry once |
 | No candidate passes filters | Report zero; do not lower the relevance bar silently |
-| Quota is below five | Report the gap and wait for relevant targets; never force a reply |
+| Quota is below ten | Report the gap and wait for relevant targets; never force a reply |
 | Candidate is political or sensitive | Discard; never reply |
 | Target already has a reply in the journal | Stop; inspect the target and journal |
 | Reply has no link | Stop; the comment needs contextual value and a destination |

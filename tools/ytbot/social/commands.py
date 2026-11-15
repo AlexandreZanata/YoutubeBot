@@ -198,7 +198,7 @@ def add_parser(sub) -> None:
     reply_parser.add_argument("--network", choices=NETWORKS, required=True)
     reply_parser.add_argument("--url", required=True)
     reply_parser.add_argument("--for-post", required=True,
-                              help="own post id this reply supports, for the five-reply quota")
+                              help="own post id this reply supports, for the ten-reply quota")
     reply_group = reply_parser.add_mutually_exclusive_group(required=True)
     reply_group.add_argument("--text")
     reply_group.add_argument("--file")

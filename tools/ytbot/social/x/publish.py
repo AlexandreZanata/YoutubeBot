@@ -180,7 +180,7 @@ def reply(context, store: SocialStore, network: str, target_url: str, text: str,
         page.close()
 
 
-REPLIES_PER_POST = 5
+REPLIES_PER_POST = 10
 
 
 def reply_counts(store: SocialStore, network: str) -> dict:
