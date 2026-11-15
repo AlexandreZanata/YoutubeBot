@@ -81,6 +81,14 @@ but invent a unique subject and metaphor for each article. The earlier large whi
 void/two-color poster interpretation is superseded. Alternate the dense prompt with
 `thumbnail-classic.txt`: six dense and six classic in a twelve-video batch.
 
+## Commercial affiliates
+
+Mercado Livre affiliate products live in the `commercial` module. Each network has a private
+profile under `.local/commercial/<network>/`; login is manual in the visible browser and
+status/publishing work runs hidden. Read products and links only from the logged-in affiliate
+hub, never invent prices, commissions or links, and never commit browser state. See
+[commercial](docs/COMMERCIAL.md).
+
 ## Social promotion
 
 The promotion module publishes the owner's GitHub projects in Brazilian Portuguese. The

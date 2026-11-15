@@ -125,6 +125,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_parser(sub)
     from .social.commands import add_parser as add_social_parser
     add_social_parser(sub)
+    from .commercial.commands import add_parser as add_commercial_parser
+    add_commercial_parser(sub)
     return parser
 
 
