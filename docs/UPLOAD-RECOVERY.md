@@ -41,7 +41,7 @@ retry the Codex thumbnail.
 | End screen missing | Best for viewer/Subscribe absent | `verify_end_screen`; retry `add_end_screen`; a verification warning does not block scheduling | Fix during the final audit |
 | Codex thumbnail empty path | image path empty/invalid | Preserve the fence; automatic retry once | Block the upload; no ChatGPT fallback |
 | Codex login/model unavailable | Codex exits or no image tool | Stop; sign in/configure | Do not switch providers |
-| Read aloud unavailable/audio timeout | article/audio stage error; often low disk | Record the asset failure; no upload | Free disk space and rerun the audio stage |
+| Read aloud unavailable/audio timeout | article/audio stage error; often low disk or no capture entry | Wait up to 60 s for the button, retry once after 10 min without a capture, then fail the asset; no upload | Free disk, inspect the conversation, rerun the audio stage |
 | Wrong account/channel | channel ID mismatch | `ensure_channel` stops | Sign in/select the channel |
 
 ## Rules
@@ -78,6 +78,9 @@ caches.
 
 - Articles and Read aloud use one tab per video; `--parallel N` caps the tabs.
 - Batch, audio, render and capture check free disk before writing; uploads use hard links.
+- Read aloud waits up to 60 seconds for the button. If no captureHistory entry appears in 10
+  minutes, it reloads the conversation and retries once; the whole capture is bounded to 30
+  minutes. A click that enters playback without a download no longer blocks a tab for an hour.
 - Codex topics are requested in chunks of at most 12, so batches above 12 loop\n  and an empty/invalid Codex thumbnail is retried once automatically.
 - Upload waits are bounded and logged; title, description, thumbnail and end screen are
   verified before scheduling.
