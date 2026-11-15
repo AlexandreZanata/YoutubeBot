@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from . import assets, audio_tools, chat, logic, render, youtube
+from . import assets, audio_tools, chat, config, logic, render, youtube
 
 
 def log(message: str) -> None:
@@ -77,6 +77,8 @@ def _extra_assets(context, topic: str, run_dir: Path) -> None:
         try:
             style = json.loads((run_dir / "record.json").read_text(encoding="utf-8")).get("thumbnail_style", "dense")
         except (OSError, ValueError):
+            style = "dense"
+        if style == "classic" and not (config.PROMPTS / "thumbnail-classic.txt").is_file():
             style = "dense"
         assets.generate_thumbnail(context, run_dir, style)
         logic.record_event(run_dir, "thumbnail", "ok")

@@ -70,6 +70,9 @@ stop. Never silently use a more expensive coordinator, API-key fallback,
 or ChatGPT image fallback after a Codex failure. Preserve media-attempt fences and existing
 artifacts. See [Codex media setup](docs/CODEX-MEDIA.md).
 
+Only fallem prince alternates dense and classic thumbnail prompts. Whispers and Zaflas use
+their single channel prompt; a stale classic style falls back to dense.
+
 Fallem Prince thumbnails follow the owner's dense, dark monochrome narrative
 engravings. The style is written into `tools/ytbot/prompts/fallem_prince/thumbnail.txt`;
 never attach the two style-reference images, because they override the subject and make

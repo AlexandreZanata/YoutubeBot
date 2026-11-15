@@ -161,8 +161,9 @@ The default shape is one tab per video:
   capture is bounded to 30 minutes. The monitor logs extension badge, session count, recording
 state, newest capture/download and page Read aloud/audio state when they change, so a missing
 capture is visible instead of silent.
-- **Metadata and thumbnail** run in parallel per video. Fallem prince alternates dense and
-  classic thumbnail prompts, six of each in a twelve-video batch.
+- **Metadata and thumbnail** run in parallel per video. Only fallem prince alternates dense
+  and classic thumbnail prompts, six of each in a twelve-video batch; Whispers and Zaflas use
+  their single channel prompt. Metadata hashtags are trimmed before validation.
 - **Community** is checked after the assets: an empty tab receives one question post with
   the first topic, a short text and a square thumbnail crop. See
   [community](../../docs/COMMUNITY.md).
