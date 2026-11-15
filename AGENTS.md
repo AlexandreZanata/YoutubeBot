@@ -73,13 +73,15 @@ void/two-color poster interpretation is superseded. Alternate the dense prompt w
 
 ## Social promotion
 
-The promotion module publishes the owner's GitHub projects in Brazilian Portuguese. Keep
-one code folder and one private browser profile per network under `tools/ytbot/social/` and
-`.local/social/`. Require an explicit network. X sign-in is manual in the visible browser;
-never automate passwords, two-factor or challenges, and never commit cookies, tokens,
-screenshots with account data or private paths. `social status` saves only the handle,
-display name and verification time. Do not publish or change a profile until the owner gives
-explicit copy and action instructions. See [social](docs/SOCIAL.md).
+The promotion module publishes the owner's GitHub projects in Brazilian Portuguese. The
+primary destinations are abastevo.com.br, zaflas.com.br and sorrifit.com, with Abastevo first;
+the GitHub repositories support credibility and developer reach. Keep one code folder and one
+private browser profile per network under `tools/ytbot/social/` and `.local/social/`. Require
+an explicit network. X sign-in is manual in the visible browser; never automate passwords,
+two-factor or challenges, and never commit cookies, tokens, screenshots with account data or
+private paths. `social status` saves only the handle, display name and verification time. Do
+not publish or change a profile until the owner gives explicit copy and action instructions.
+See [social](docs/SOCIAL.md) and [promotion focus](docs/PROMOTION.md).
 
 ## Community
 
