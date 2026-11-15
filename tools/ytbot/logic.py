@@ -114,7 +114,8 @@ def scheduled_slots(payload: dict) -> set[tuple[date, int]]:
 
 
 def next_slots(count: int, occupied: set[tuple[date, int]], start: datetime | None = None,
-               lead_minutes: int = config.MIN_LEAD_MINUTES) -> list[datetime]:
+               lead_minutes: int = config.MIN_LEAD_MINUTES,
+               interval_days: int = 1) -> list[datetime]:
     now = start or datetime.now()
     earliest = now + timedelta(minutes=lead_minutes)
     if start and start.hour == 0 and start.minute == 0:
@@ -129,7 +130,7 @@ def next_slots(count: int, occupied: set[tuple[date, int]], start: datetime | No
             chosen.append(moment)
             if len(chosen) == count:
                 break
-        day += timedelta(days=1)
+        day += timedelta(days=max(1, interval_days))
     return chosen
 
 

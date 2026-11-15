@@ -63,6 +63,12 @@ class ScheduleTests(unittest.TestCase):
         labels = [logic.slot_label(slot) for slot in slots]
         self.assertEqual(labels, ["2026-11-10 00:00", "2026-11-10 12:00", "2026-11-11 00:00"])
 
+    def test_interval_days_skips_the_days_between_slots(self):
+        config.SLOT_HOURS = (0,)
+        slots = logic.next_slots(3, set(), start=datetime(2026, 11, 16, 0, 0), interval_days=2)
+        self.assertEqual([logic.slot_label(slot) for slot in slots],
+                         ["2026-11-16 00:00", "2026-11-18 00:00", "2026-11-20 00:00"])
+
     def test_start_date_includes_its_midnight_slot(self):
         config.SLOT_HOURS = (0,)
         slots = logic.next_slots(1, set(), start=datetime(2026, 11, 16, 0, 0))
@@ -113,6 +119,7 @@ class ChannelProfileTests(unittest.TestCase):
         self.assertEqual(channel.background, "vocal_pages")
         self.assertEqual(channel.channel_id, "UCm13oIPS1W43j9BYo0kewcQ")
         self.assertEqual(channel.slots, (0,))
+        self.assertEqual(channel.interval_days, 2)
         self.assertEqual(channel.language, "en")
 
     def test_infinite_uses_the_thumbnail_as_background(self):

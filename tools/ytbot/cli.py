@@ -69,6 +69,15 @@ def command_shorts(args) -> None:
         raise SystemExit(1)
 
 
+def command_distribute(args) -> None:
+    from .distribute import run_distribution
+    failures = run_distribution(args.count, args.dry_run)
+    print("[ytbot] distribution finished")
+    if failures:
+        print(f"[ytbot] channel failures: {failures}")
+        raise SystemExit(1)
+
+
 def command_run(args) -> None:
     flow_profiles.activate(flow_profiles.name(getattr(args, "flow_profile", None), environment=True))
     channels.apply(args.channel)
@@ -130,6 +139,11 @@ def build_parser() -> argparse.ArgumentParser:
     shorts.add_argument("--skip-slots", type=int, default=0,
                         help="skip this many leading schedule slots")
     shorts.set_defaults(func=command_shorts)
+    distribute = sub.add_parser("distribute",
+                                help="spread new videos over the channels with fewer scheduled")
+    distribute.add_argument("--count", type=int, default=20)
+    distribute.add_argument("--dry-run", action="store_true")
+    distribute.set_defaults(func=command_distribute)
     run = sub.add_parser("run", help="generate, render, upload and schedule videos")
     run.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True,
                      help="channel profile; ask the user when it is not specified")
