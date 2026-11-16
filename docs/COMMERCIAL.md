@@ -144,9 +144,26 @@ Rules for the local bot agent and operator:
    - Updated human-assisted WhatsApp Web drafts written locally to
      `../ZaturoBot/.secrets/procurali-local-bot/whatsapp-assisted-drafts.json`.
 4. **Change detection:** `zaturo-worker commerce watch-ml` hashes `products.json` with SHA-256 and
-   skips re-uploading when the file digest has not changed (`"status": "unchanged"`). When testing
-   with new items, pick SKUs that have not already been published unless an updated price observation
-   is intended.
+   skips re-uploading when the file digest has not changed (`"status": "unchanged"`). On the VPS,
+   repeat ingests of the same SKU compare against the prior current price, update the 30-day history
+   (collapsing same-day identical polls), preserve WhatsApp drafts deduplicated by SKU, and only
+   re-queue Telegram on a new product or a strict price drop (`"📉 BAIXOU DE PREÇO"`).
+
+### Fast local VPS reference database (`commercial reference`)
+
+YoutubeBot maintains a local indexed SQLite cache (`.local/commercial/mercadolivre/vps-reference.sqlite3`)
+synced from the ETag-cached `GET /v1/device/commerce/mercadolivre/reference-catalog` Hub snapshot:
+
+1. **Refresh from VPS (uses HTTP `If-None-Match` -> `304 Not Modified` over the physical-key tunnel):**
+   `python3 -m tools.ytbot commercial reference --network mercadolivre --refresh`
+2. **Instant sub-millisecond local lookup & summary (zero network calls):**
+   - Overview + drops: `python3 -m tools.ytbot commercial reference --network mercadolivre --trend down`
+   - Keyword filter: `python3 -m tools.ytbot commercial reference --network mercadolivre --query "mouse"`
+   - Exact SKU lookup: `python3 -m tools.ytbot commercial reference --network mercadolivre --product-id MLB63816534`
+3. **Automatic future comparison during capture:** `commercial products` compares newly captured
+   prices against the cached VPS database and includes `vps_comparison` (`new`, `price_drop`,
+   `price_increase`, `unchanged`, 30d min/avg, and short summary); pass `--skip-existing` to keep
+   only new or price-changed offers in `products.json`.
 
 ### Verified end-to-end run (2026-11-16)
 
