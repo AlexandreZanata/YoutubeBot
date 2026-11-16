@@ -46,6 +46,35 @@ def _apply_tags(page, meta: dict) -> None:
     page.wait_for_timeout(800)
 
 
+def apply_thumbnail(page, run_dir: Path) -> None:
+    """Upload only the custom thumbnail and save the edit page."""
+    thumbnail = run_dir / "thumbnail.png"
+    if not thumbnail.is_file():
+        raise UploadBlocked("thumbnail.png is missing; cannot apply it")
+    field = page.locator('input[type=file][accept*="image"]')
+    if not field.count():
+        raise UploadBlocked("thumbnail input is not available on the edit page")
+    try:
+        with page.expect_response(
+                lambda response: "studiothumbnail" in response.url and response.status == 200,
+                timeout=90000):
+            field.last.set_input_files(str(thumbnail))
+    except Exception as error:
+        raise UploadBlocked("thumbnail upload did not complete") from error
+    page.wait_for_timeout(2500)
+    save = page.locator("#save")
+    if save.count() and save.get_attribute("aria-disabled") != "true":
+        save.click()
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            if page.evaluate("()=>document.querySelector('#save')?.getAttribute('aria-disabled')") == "true":
+                break
+            page.wait_for_timeout(2000)
+        else:
+            raise UploadBlocked("thumbnail save did not finish")
+    log("thumbnail saved")
+
+
 def apply_details(page, run_dir: Path, meta: dict, *, custom_thumbnail: bool = True) -> None:
     upload_dialog.fill_editable(page, 0, meta["title"])
     upload_dialog.fill_editable(page, 1, meta["description"])

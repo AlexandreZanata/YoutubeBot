@@ -13,7 +13,7 @@ when the owner explicitly asks for Shorts.
 | Background | `assets/backgrounds/zaflas_agro_shorts.mp4` |
 | Audio | ChatGPT Read aloud, Cove voice |
 | Subtitles | centered, large condensed sans, burned in |
-| Thumbnail | custom 1280x720 in the Zaflas Shorts style, generated per short |
+| Thumbnail | custom 1080x1920 vertical in the Zaflas Shorts style |
 | End screen | not applied |
 | Upload | Zaflas upload-only profile |
 | Generation | legacy profile with ChatGPT and audio capture |
@@ -42,12 +42,11 @@ Each short runs through four stages and logs its own duration:
    90 to 130 Portuguese words, rejected outside 60 to 180 words.
 2. **Audio** (`audio Ns`): Read aloud through the capture extension, saved as
    `narration.aac`.
-3. **Thumbnail** (`thumbnail Ns`): Codex renders one 1280x720 image with
-   `prompts/zaflas_agro/thumbnail-shorts.txt` and saves `thumbnail.png`. The style copies
-   the channel's existing Shorts: one huge cropped Portuguese word in the background, the
-   short question in ultra condensed uppercase with one or two yellow or green accent words,
-   and one photoreal farm detail on the right. The readable question stays inside the
-   central band that survives a 9:16 crop. A frame is used only when the image is missing.
+3. **Thumbnail** (`thumbnail Ns`): Codex renders one vertical 9:16 image with
+   `prompts/zaflas_agro/thumbnail-shorts.txt` and saves `thumbnail.png` at **1080x1920**.
+   The title sits in the upper half in ultra condensed uppercase with one or two yellow or
+   green accent words, and the lower half carries one photoreal farm detail. Never crop a
+   16:9 design for a short: the phone frame would cut the text.
 4. **Render** (`render Ns`): one pass at 1080x1920, 30 fps, portrait background, burned-in
    subtitles, no music and no end screen.
 5. **Upload** (`upload Ns`): the proven long-form path with a custom thumbnail and no end
