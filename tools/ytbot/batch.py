@@ -119,7 +119,7 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
             style = (logic.thumbnail_style(index)
                      if config.THUMBNAIL_THEME == "fallem_prince" else "dense")
             logic.set_run_field(logic.run_path(topic), thumbnail_style=style)
-        workers = parallel if parallel > 0 else len(topics)
+        workers = parallel if parallel > 0 else 1
         log(f"topics: {topics}")
         log(f"tabs: {workers}, slots: {[logic.slot_label(slot) for slot in slots]}")
         asset_failures = _asset_phase(context, topics, workers)
