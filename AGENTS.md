@@ -145,6 +145,13 @@ journal; never retry a started or unconfirmed reply. The target is ten contextua
 each original post published; track it with `social quota` and report gaps instead of forcing
 irrelevant comments. See [discovery](docs/SOCIAL-DISCOVERY.md).
 
+On X only, every day also carries fifteen polemic comments on public posts under 24 hours with
+large reach. The comment defends a contrarian but defensible thesis that invites disagreement,
+never a personal attack, a false claim, politics, violence or a bait phrase. One project link
+maximum, after the argument, with no invented number. If fewer than fifteen pass the bar,
+report the gap. Drafts stay local until the owner gives the publish command. This rule never
+applies to YouTube or to Community posts.
+
 ## Intelligent distribution
 
 "Distribuição inteligente" or "distribui" is the mode that chooses the channels by itself.
