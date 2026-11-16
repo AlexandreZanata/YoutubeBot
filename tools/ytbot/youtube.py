@@ -29,17 +29,6 @@ def video_id_from(page) -> str:
     match = re.search(r"/video/([A-Za-z0-9_-]{11})/", page.url)
     if match:
         return match.group(1)
-    for selector, pattern in (("a[href*='youtu.be/']", r"youtu\.be/([A-Za-z0-9_-]{11})"),
-                              ("a[href*='watch?v=']", r"watch\?v=([A-Za-z0-9_-]{11})")):
-        try:
-            links = page.locator(selector)
-            for index in range(min(links.count(), 3)):
-                href = links.nth(index).get_attribute("href") or ""
-                found = re.search(pattern, href)
-                if found:
-                    return found.group(1)
-        except Exception:
-            pass
     try:
         texts = page.get_by_text(re.compile(r"youtu\.be/[A-Za-z0-9_-]{11}")).all_inner_texts()
         found = re.search(r"youtu\.be/([A-Za-z0-9_-]{11})", " ".join(texts))
@@ -71,7 +60,28 @@ def upload_video(context, run_dir: Path, meta: dict) -> str:
     return video_id
 
 
-def open_upload(context, run_dir: Path, meta: dict):
+def lookup_video_id(context, title: str, timeout: int = 90) -> str:
+    """Find the draft by its unique title when the dialog link stays pending."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        page = context.new_page()
+        try:
+            page.goto(config.STUDIO_UPLOAD, timeout=90000)
+            page.wait_for_timeout(6000)
+            rows = page.evaluate("""(title) => [...document.querySelectorAll('ytcp-video-row')]
+                .filter(r => (r.innerText || '').includes(title))
+                .map(r => (r.querySelector('a') || {}).href || '')""", title)
+            for href in rows:
+                found = re.search(r"/video/([A-Za-z0-9_-]{11})/", href or "")
+                if found:
+                    return found.group(1)
+        finally:
+            page.close()
+        page.wait_for_timeout(4000)
+    return ""
+
+
+def open_upload(context, run_dir: Path, meta: dict, require_id: bool = True):
     page = context.new_page()
     page.goto(config.STUDIO_UPLOAD, timeout=90000)
     runtime.select_channel(page)
@@ -110,7 +120,9 @@ def open_upload(context, run_dir: Path, meta: dict):
         except Exception as error:
             log(f"title will be re-applied on the edit page: {error}")
         video_id = wait_for_video_id(page)
-        if not video_id:
+        if not video_id and require_id:
+            video_id = lookup_video_id(context, meta["title"])
+        if not video_id and require_id:
             raise RuntimeError("could not read the uploaded video id")
     except Exception:
         page.close()
@@ -195,21 +207,22 @@ def open_upload_dialog(context, video_id: str, title: str = ""):
 def upload_and_schedule_short(context, run_dir: Path, meta: dict, slot) -> dict:
     """Upload and schedule in one dialog, without the edit page or custom tags."""
     upload_guard.preflight(run_dir, meta)
-    page, video_id = open_upload(context, run_dir, meta)
-    result = {"videoId": video_id, "url": f"https://youtu.be/{video_id}",
-              "slot": logic.slot_label(slot), "visibility": "scheduled",
-              "endScreen": False, "customThumbnail": False, "scheduled": False}
+    page, video_id = open_upload(context, run_dir, meta, require_id=False)
     try:
-        write_result(run_dir, result)
         if (run_dir / "thumbnail.png").is_file():
             upload_dialog.set_thumbnail(page, run_dir / "thumbnail.png")
         upload_dialog.schedule_in_dialog(page, slot)
-        result["scheduled"] = True
-        write_result(run_dir, result)
-        log(f"scheduled {video_id} at {result['slot']}")
-        return result
     finally:
         page.close()
+    video_id = video_id or lookup_video_id(context, meta["title"])
+    if not video_id:
+        raise RuntimeError("could not find the scheduled short in Studio")
+    result = {"videoId": video_id, "url": f"https://youtu.be/{video_id}",
+              "slot": logic.slot_label(slot), "visibility": "scheduled",
+              "endScreen": False, "customThumbnail": False, "scheduled": True}
+    write_result(run_dir, result)
+    log(f"scheduled {video_id} at {result['slot']}")
+    return result
 
 
 def schedule_existing(context, run_dir: Path, result: dict, slot) -> dict:

@@ -134,6 +134,7 @@ def run_shorts(channel_slug: str, count: int = 12, per_day: int = 2,
         for topic, slot in zip(topics, slots):
             run_dir = root / logic.slug(topic)
             run_dir.mkdir(parents=True, exist_ok=True)
+            run_dir.chmod(0o700)
             (run_dir / "topic.txt").write_text(topic, encoding="utf-8")
             logic.set_run_field(run_dir, topic=topic)
             page = gen.new_page()
