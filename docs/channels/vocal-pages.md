@@ -13,7 +13,7 @@
 | Generation account | `legacy` |
 | Cadence | one video every two days at 00:00 America/Cuiaba |
 | Background | `assets/backgrounds/vocal_pages.mp4` (24 s loop) |
-| Article target | 9,000 to 11,000 words, 60 to 75 minutes |
+| Article target | 9,000 to 10,500 words, hard cap 70,000 characters |
 
 The public catalog was measured on 15/11/2026. The `vocal` profile now opens Studio directly
 on `UCm13oIPS1W43j9BYo0kewcQ` and the binding is saved. Studio first signed in to another
@@ -32,7 +32,8 @@ between uploads.
 | Longest | 103.9 |
 
 Duration target: about **60 to 75 minutes**, with 66 minutes as the regular shape. At the
-channel pace that is roughly **9,500 to 11,000 words**.
+channel pace that is roughly **9,500 to 10,500 words**. The narration is never sped up: an
+oversized article may render up to about 124 minutes, the channel's longest video plus 20.
 
 ## Themes and approach
 
