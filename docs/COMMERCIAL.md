@@ -106,10 +106,47 @@ link, share ID and share text. Prices and availability must be rechecked before 
 
 ### Telegram offers group
 
-The owner created the Telegram offers group. Delivery is **not configured in this repository**
-yet: it needs the group username/ID and a bot token stored privately. Do not guess a group,
-token or chat ID, and never commit them. Until that configuration exists, the commercial
-module only produces the private product JSON and affiliate links.
+The owner created the Telegram offers group (`@procurali`) and paired it with the remote
+Procurali VPS (`procurali.com.br`). Keep bot tokens, SSH keys and VPS origin addresses out of
+this repository; delivery runs through the companion ZaturoBot pipeline described below.
+
+## Local-to-VPS physical-key delivery
+
+Once `.local/commercial/mercadolivre/products.json` and its downloaded images are ready on this
+workstation, deliver them to the remote Procurali VPS through the sibling ZaturoBot sync runner:
+
+```bash
+# 1. Confirm affiliate session and capture products locally
+python3 -m tools.ytbot commercial status --network mercadolivre
+python3 -m tools.ytbot commercial products --network mercadolivre \
+  --query "<search terms>" --limit 4
+
+# 2. Send once over the physical-key SSH tunnel (or pass --watch for continuous monitoring)
+bash ../ZaturoBot/scripts/procurali-local-sync.sh --once \
+  --category hardware-e-perifericos
+```
+
+Rules for the local bot agent and operator:
+
+1. **Physical-key tunnel only:** `procurali-local-sync.sh` authenticates solely with this
+   workstation's private Ed25519 key and device token in `../ZaturoBot/.secrets/procurali-local-bot/`
+   against the VPS `procurali-link` (`nologin`, port-forwarding-only) account, forwarding only local
+   loopback ports for MinIO object storage and the ZaturoBot Hub HTTP API.
+2. **Never bypass or leak secrets:** Never open a direct server shell, never copy `.secrets/` files
+   into this repository, and never commit VPS origin IP addresses, SSH keys, tokens or `.local/`
+   files. Keep Telegram/WhatsApp credentials outside YoutubeBot.
+3. **Automatic downstream fan-out:** A successful ingest to the VPS Hub (`worker_id =
+   procurali-local-pc`) triggers:
+   - Static image upload to MinIO (9:16 vertical reel frames filtered out, `.local/` paths stripped),
+   - Persistent storage + 30-day price history tracking in the Hub SQLite database,
+   - Automatic static site rebuild (`procurali-site-sync.service`) serving <https://procurali.com.br/>,
+   - Queueing into the VPS `procurali-telegram-poll.service` (paced 1–3 minutes between posts),
+   - Updated human-assisted WhatsApp Web drafts written locally to
+     `../ZaturoBot/.secrets/procurali-local-bot/whatsapp-assisted-drafts.json`.
+4. **Change detection:** `zaturo-worker commerce watch-ml` hashes `products.json` with SHA-256 and
+   skips re-uploading when the file digest has not changed (`"status": "unchanged"`). When testing
+   with new items, pick SKUs that have not already been published unless an updated price observation
+   is intended.
 
 ## Privacy and limits
 
@@ -119,3 +156,5 @@ module only produces the private product JSON and affiliate links.
 - Do not use another account's affiliate links.
 - Do not claim a product is affiliated until the hub returns its link for this account.
 - Product prices and availability must be rechecked before publication.
+- Never automate WhatsApp Web or call WhatsApp Meta APIs from YoutubeBot; use the generated
+  human-assisted drafts only.

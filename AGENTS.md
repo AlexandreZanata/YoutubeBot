@@ -111,7 +111,15 @@ route them through the long-form batch. See [Shorts](docs/SHORTS.md).
 Mercado Livre affiliate products live in the `commercial` module. Each network has a private
 profile under `.local/commercial/<network>/`; login is manual in the visible browser and
 status/publishing work runs hidden. Read products and links only from the logged-in affiliate
-hub, never invent prices, commissions or links, and never commit browser state. See
+hub, never invent prices, commissions or links, and never commit browser state.
+
+When delivering captured products from this workstation to the remote Procurali VPS (database,
+site, Telegram offers group queue, and WhatsApp Web assisted drafts), never copy VPS origin IPs,
+SSH private keys or device tokens into this repository and never post to Telegram/WhatsApp directly
+from YoutubeBot. Instead run the sibling ZaturoBot physical-key sync launcher
+(`bash ../ZaturoBot/scripts/procurali-local-sync.sh --once` or `--watch`), which opens a
+port-forwarding-only `nologin` SSH tunnel (`procurali-link`), checks SHA-256 changes, uploads static
+product photos to MinIO, and ingests validated batches to the VPS Hub as `procurali-local-pc`. See
 [commercial](docs/COMMERCIAL.md).
 
 ## Social promotion
