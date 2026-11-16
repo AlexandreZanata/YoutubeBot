@@ -134,6 +134,10 @@ def next_slots(count: int, occupied: set[tuple[date, int]], start: datetime | No
     return chosen
 
 
+MONTHS_EN = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+             "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
+
+
 def format_pt_date(value: date) -> str:
     return f"{value.day} de {MONTHS[value.month]} de {value.year}"
 

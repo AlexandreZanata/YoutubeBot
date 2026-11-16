@@ -45,9 +45,12 @@ def log(message: str) -> None:
 
 def _calendar_date(page, slot) -> bool:
     month = logic.format_pt_date(slot.date()).split(" de ")[1][:3].upper()
+    english = logic.MONTHS_EN[slot.month - 1]
     for section in page.locator(".calendar-month").all():
         text = section.inner_text().upper()
-        if month not in text or str(slot.year) not in text:
+        if month not in text and english not in text:
+            continue
+        if str(slot.year) not in text:
             continue
         day = section.get_by_text(str(slot.day), exact=True)
         if day.count():
@@ -56,11 +59,27 @@ def _calendar_date(page, slot) -> bool:
     return False
 
 
+def _model_date(page) -> dict | None:
+    model = page.evaluate(
+        "()=>document.querySelector('#publish-from-private-non-sponsor-selector')?.getAttribute('model')")
+    if not model:
+        return None
+    try:
+        return json.loads(model).get("date")
+    except (TypeError, ValueError):
+        return None
+
+
 def _set_date(page, slot) -> None:
     if page.locator("ytcp-date-picker input").count():
         field = page.locator("ytcp-date-picker input").first
+        expected = {"year": slot.year, "month": slot.month - 1, "day": slot.day}
         field.fill(logic.format_pt_date(slot.date()))
         field.press("Enter")
+        page.wait_for_timeout(1500)
+        if _model_date(page) != expected:
+            field.fill(f"{slot.strftime('%b')} {slot.day}, {slot.year}")
+            field.press("Enter")
     else:
         page.evaluate("()=>{const b=document.querySelector('#datepicker-trigger'); if(b)b.click()}")
         page.wait_for_timeout(1500)

@@ -67,7 +67,27 @@ def log(message: str) -> None:
 
 
 def community_url() -> str:
+    handle = config.CHANNEL.handle if config.CHANNEL else ""
+    if handle:
+        return f"https://www.youtube.com/{handle}/posts"
     return f"https://www.youtube.com/channel/{config.CHANNEL_ID}/community"
+
+
+def open_community(page) -> None:
+    """Open the channel's Posts tab; the /community URL no longer renders for every profile."""
+    handle = config.CHANNEL.handle if config.CHANNEL else ""
+    if handle:
+        page.goto(f"https://www.youtube.com/{handle}", timeout=90000)
+        page.wait_for_timeout(7000)
+        for label in ("Posts", "Postagens"):
+            tab = page.get_by_text(label, exact=True)
+            if tab.count():
+                tab.first.click()
+                page.wait_for_timeout(5000)
+                break
+        return
+    page.goto(community_url(), timeout=90000)
+    page.wait_for_timeout(5000)
 
 
 def post_text(topic: str, language: str = "en") -> str:
@@ -242,7 +262,7 @@ def _topic_image(topics: list[str]) -> tuple[str, Path | None]:
 def ensure_post(context, topics: list[str]) -> dict:
     page = context.new_page()
     try:
-        page.goto(community_url(), timeout=90000)
+        open_community(page)
         sort_recent(page)
         if has_posts(page):
             if posted_today(page):
