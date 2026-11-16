@@ -78,8 +78,8 @@ CHANNELS = {
         language="en",
         min_article_chars=58000,
         article_retry=(
-            "Target narration length: 9,000 to 11,000 English words, about 60 to 75 "
-            "minutes at the channel's measured pace. Keep one theme and the quiet ending."
+            "Reduce the narration to at most 70,000 characters, about 10,000 words. Cut "
+            "whole sections instead of summarizing. Keep one theme and the quiet ending."
         ),
         max_article_chars=74000,
         slots=(0,),
