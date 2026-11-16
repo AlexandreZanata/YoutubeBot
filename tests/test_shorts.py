@@ -6,10 +6,10 @@ from tools.ytbot import chat, shorts
 
 class ShortsTests(unittest.TestCase):
     def test_slots_are_two_per_day(self):
-        slots = shorts.short_slots(4, 2, date(2026, 11, 16))
+        slots = shorts.short_slots(4, 2, date(2027, 1, 1))
         self.assertEqual([slot.strftime("%Y-%m-%d %H:%M") for slot in slots], [
-            "2026-11-16 09:00", "2026-11-16 18:00",
-            "2026-11-17 09:00", "2026-11-17 18:00",
+            "2027-01-01 09:00", "2027-01-01 18:00",
+            "2027-01-02 09:00", "2027-01-02 18:00",
         ])
 
     def test_metadata_keeps_the_site_and_shorts_tag(self):

@@ -10,11 +10,24 @@ the thread, and only then the reply command publishes one contextual comment.
 - Products: Abastevo, SorriFit, Zaflas and the GitHub projects.
 - Language: Brazilian Portuguese.
 - One reply per target, recorded in a private journal.
-- Target: ten contextual replies for each original post published by the owner.
+- Target: ten contextual replies for each original post published by the owner, plus fifteen
+  polemic comments per day.
 - No mass replies, no automated engagement, no follow or like automation.
 - One contextual link maximum, never a link-only reply.
 - If fewer than ten targets pass the relevance filter, report the gap. Never force a reply
   or lower the bar to fill the quota.
+
+## Daily polemic comments on X
+
+X carries fifteen polemic comments per day, on public posts younger than 24 hours with large
+reach. This rule belongs to X only and never applies to YouTube videos or Community posts.
+
+Each comment defends a contrarian but defensible thesis that invites disagreement. It is
+never a personal attack, a false claim, politics, violence or a bait phrase. At most one
+project link, placed after the argument, with no invented number or result.
+
+Drafts stay local until the owner gives the publish command. If fewer than fifteen targets
+pass the bar, report the gap instead of forcing a comment.
 
 ## Search terms
 
@@ -84,6 +97,15 @@ The reply must not:
 - promise savings, results or correctness;
 - use engagement bait;
 - reply to politics, violence or a sensitive personal crisis.
+
+## Polemic comments
+
+Fifteen polemic comments join the ten contextual replies every day, 25 comments in total. They target public posts under
+24 hours with large reach (high likes or views) in the same four niches. The comment defends a
+contrarian but defensible thesis that invites disagreement; it never attacks a person, invents a
+number, promises a result or uses a bait phrase. One project link maximum, after the argument.
+Read the thread first, run `--dry-run`, and record the reply in the same journal. If fewer than
+fifteen pass the bar, report the gap.
 
 ## Commands
 
