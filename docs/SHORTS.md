@@ -50,15 +50,13 @@ Each short runs through four stages and logs its own duration:
    central band that survives a 9:16 crop. A frame is used only when the image is missing.
 4. **Render** (`render Ns`): one pass at 1080x1920, 30 fps, portrait background, burned-in
    subtitles, no music and no end screen.
-5. **Upload** (`upload Ns`): one Studio page per short. Title and description are filled in
-   the upload dialog, the thumbnail is uploaded in the Miniaturas section, the audience
-   answer is applied, and the schedule is set **in the same dialog** with
-   `upload_dialog.schedule_in_dialog`. The edit page is not opened, no end screen is added
-   and tags are not typed.
+5. **Upload** (`upload Ns`): the proven long-form path with a custom thumbnail and no end
+   screen. The title, description, thumbnail and schedule are applied through the edit page,
+   and the video id is resolved by the unique title when the Studio share link stays in
+   `Criando o link...`. The dialog-only schedule was abandoned: Studio can close the upload
+   wizard before saving, which loses the draft.
 
-This removes the edit-page load, the details pass, the tag chips and the two per-video
-`Programado` verifications that the long-form path needs. A short should take about two to
-three minutes end to end.
+A short should take about three to four minutes end to end.
 
 The upload file is staged in `.local/ytbot/upload-tmp/` before Studio reads it. Studio
 reports `Arquivo ilegível` when the file is hard-linked inside the `/data` symlink, so never
