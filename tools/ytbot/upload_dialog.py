@@ -79,7 +79,7 @@ def schedule_in_dialog(page, slot) -> None:
     answer_audience(page)
     _show_visibility(page)
     if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
-        page.evaluate("()=>{const e=[...document.querySelectorAll('*')].find(x=>x.children.length===0 && (x.innerText||'').trim()==='Programar'); if(e){const c=e.closest('#second-container')||e.parentElement; if(c)c.click()}}")
+        page.evaluate("()=>{const e=[...document.querySelectorAll('*')].find(x=>x.children.length===0 && ['Programar','Schedule'].includes((x.innerText||'').trim())); if(e){const c=e.closest('#second-container')||e.parentElement; if(c)c.click()}}")
         page.wait_for_timeout(2500)
     if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
         raise RuntimeError("the schedule dialog did not open")
@@ -98,7 +98,7 @@ def schedule_in_dialog(page, slot) -> None:
         raise RuntimeError("video checks did not finish")
     log("setting schedule date")
     if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
-        page.evaluate("()=>{const e=[...document.querySelectorAll('*')].find(x=>x.children.length===0 && (x.innerText||'').trim()==='Programar'); if(e){const c=e.closest('#second-container')||e.parentElement; if(c)c.click()}}")
+        page.evaluate("()=>{const e=[...document.querySelectorAll('*')].find(x=>x.children.length===0 && ['Programar','Schedule'].includes((x.innerText||'').trim())); if(e){const c=e.closest('#second-container')||e.parentElement; if(c)c.click()}}")
         page.wait_for_timeout(2500)
     if not page.locator("#datepicker-trigger").is_visible():
         page.evaluate("()=>{const b=document.querySelector('#second-container-expand-button'); if(b)b.click()}")
@@ -136,7 +136,7 @@ def scheduled_at(context, video_id: str, slot) -> bool:
             page.wait_for_timeout(8000)
             page.mouse.wheel(0, 4000)
             page.wait_for_timeout(1200)
-            if page.evaluate("()=>document.querySelector('#visibility-text')?.innerText") == "Programado":
+            if page.evaluate("()=>document.querySelector('#visibility-text')?.innerText") in ("Programado", "Scheduled"):
                 button = page.get_by_role("button", name="Editar status de visibilidade")
                 if button.count():
                     button.click()
