@@ -15,6 +15,13 @@ python3 -m tools.ytbot community --channel fallem-prince --topic "An exact topic
 The channel must be explicit. The same check runs automatically inside
 `python3 -m tools.ytbot run`.
 
+## Language
+
+Community text follows the channel language without exception: English on Fallem Prince,
+Whispers From Heaven, Infinite Random Worlds and Vocal Pages, and Brazilian Portuguese only
+on Zaflas. The image and the video it references follow the same channel. Never publish an
+English post on Zaflas or a Portuguese post on any other channel.
+
 ## YouTube options mapped
 
 | Post type | YouTube support | Bot behavior |

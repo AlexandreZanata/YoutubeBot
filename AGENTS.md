@@ -162,8 +162,9 @@ quantity. See [distribution](docs/DISTRIBUTE.md).
 After the asset stage of every batch, check the selected channel's Community tab. The rule
 is one post per calendar day after 00:00 in the channel timezone. If today already has a
 post, do nothing; otherwise publish one question post with the first topic, a short text and
-a square crop of that video's thumbnail. Never retry an unconfirmed publish blindly. See
-[community](docs/COMMUNITY.md).
+a square crop of that video's thumbnail. Community text follows the channel language: English
+everywhere except Zaflas, which is Brazilian Portuguese. Never retry an unconfirmed publish
+blindly. See [community](docs/COMMUNITY.md).
 
 ## Generation and upload profiles
 
