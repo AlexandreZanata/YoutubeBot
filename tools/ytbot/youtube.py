@@ -171,6 +171,8 @@ def write_result(run_dir: Path, result: dict) -> None:
 def open_upload_dialog(context, video_id: str, title: str = ""):
     page = open_edit(context, video_id)
     draft = page.get_by_text("Editar rascunho", exact=True)
+    if not draft.count():
+        draft = page.get_by_text("Edit draft", exact=True)
     if draft.count():
         draft.first.click()
         page.wait_for_timeout(8000)
