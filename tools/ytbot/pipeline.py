@@ -47,6 +47,25 @@ def article_stage(context, topic: str) -> Path:
     return run_dir
 
 
+def _check_audio(run_dir: Path) -> None:
+    """Fail when the captured audio cannot belong to the saved article."""
+    from src.engine.audio_mixer import get_audio_duration
+
+    article = run_dir / "article.txt"
+    audio = run_dir / "narration.aac"
+    if not article.is_file() or not audio.is_file():
+        return
+    chars = len(article.read_text(encoding="utf-8"))
+    if chars < 2000:
+        return
+    expected = chars / 6 / 150 * 60
+    actual = get_audio_duration(audio)
+    if expected >= 60 and actual > 0 and abs(actual - expected) > expected * 0.5:
+        raise RuntimeError(
+            f"narration does not match the article (audio {actual / 60:.1f} min, "
+            f"expected about {expected / 60:.1f} min)")
+
+
 def _article_audio(context, topic: str, run_dir: Path) -> None:
     narration = next((run_dir / f"narration{ext}" for ext in (".aac", ".webm") if (run_dir / f"narration{ext}").is_file()), None)
     need_article = not (run_dir / "article.txt").is_file()
@@ -56,6 +75,7 @@ def _article_audio(context, topic: str, run_dir: Path) -> None:
         need_article = True
     need_audio = narration is None
     if not need_article and not need_audio:
+        _check_audio(run_dir)
         return
     page = context.new_page() if need_article else _open_conversation(context, run_dir)
     if page is None:
@@ -70,6 +90,7 @@ def _article_audio(context, topic: str, run_dir: Path) -> None:
             logic.require_free_space(run_dir, 0.8, "audio stage")
             chat.capture_audio(page, context, run_dir)
             logic.record_event(run_dir, "audio", "ok")
+            _check_audio(run_dir)
     finally:
         page.close()
 
