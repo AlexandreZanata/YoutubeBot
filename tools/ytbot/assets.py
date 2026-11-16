@@ -69,6 +69,9 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
             except (ValueError, RuntimeError):
                 if attempt:
                     raise
+                stale = run_dir / "thumbnail.png"
+                if stale.is_file():
+                    stale.rename(run_dir / f"thumbnail-attempt-{int(time.time())}.png")
                 state = run_dir / ".codex-media" / "thumbnail"
                 if state.is_dir():
                     state.rename(state.with_name(f"thumbnail-attempt-{int(time.time())}"))
