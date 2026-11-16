@@ -37,7 +37,7 @@ CHANNELS = {
             "about 25 to 35 minutes at the channel's current narration pace. Preserve the "
             "fixed Zaflas Agro opening identification and final sign-off."
         ),
-        max_article_chars=34000,
+        max_article_chars=100000,
         slots=(12,),
     ),
     "fallem-prince": Channel(

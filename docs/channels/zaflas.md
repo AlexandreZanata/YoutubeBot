@@ -47,11 +47,12 @@ sample.
 The channel header shows 86 videos because it includes Shorts and other content outside the
 Videos tab. Do not use that number as the long-form sample size.
 
-The Zaflas article generation now has a **26,000 to 34,000-character** window (about 4,000
-to 4,800 words). A 15/11 batch generated articles around 10,000 words and videos around 70
-to 77 minutes, far outside the channel's normal 23 to 43 minute range. If an article
-exceeds 34,000 characters, the bot asks ChatGPT for one bounded rewrite; a still-oversized
-result fails the asset instead of rendering another long video.
+The Zaflas article generation targets **26,000 to 34,000 characters** (about 4,000 to 4,800
+words). The hard ceiling follows the longest published video plus 30 minutes: the channel
+longest is about 77 minutes, so a video up to about 107 minutes is accepted and the article
+safety cap is **100,000 characters**. Above that the bot asks for one rewrite that must cut
+at least 15 percent; a rewrite below 2,000 characters is rejected. This avoids discarding a
+long article that would still fit the channel.
 
 ## Title patterns
 
