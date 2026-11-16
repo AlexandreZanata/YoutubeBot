@@ -67,7 +67,27 @@ def log(message: str) -> None:
 
 
 def community_url() -> str:
+    handle = config.CHANNEL.handle if config.CHANNEL else ""
+    if handle:
+        return f"https://www.youtube.com/{handle}/posts"
     return f"https://www.youtube.com/channel/{config.CHANNEL_ID}/community"
+
+
+def open_community(page) -> None:
+    """Open the channel's Posts tab; the /community URL no longer renders for every profile."""
+    handle = config.CHANNEL.handle if config.CHANNEL else ""
+    if handle:
+        page.goto(f"https://www.youtube.com/{handle}", timeout=90000)
+        page.wait_for_timeout(7000)
+        for label in ("Posts", "Postagens"):
+            tab = page.get_by_text(label, exact=True)
+            if tab.count():
+                tab.first.click()
+                page.wait_for_timeout(5000)
+                break
+        return
+    page.goto(community_url(), timeout=90000)
+    page.wait_for_timeout(5000)
 
 
 def post_text(topic: str, language: str = "en") -> str:
@@ -156,10 +176,24 @@ def has_posts(page) -> bool:
     raise RuntimeError("community page did not load or show the composer")
 
 
+def _click_text(page, labels: tuple[str, ...]) -> bool:
+    for label in labels:
+        target = page.get_by_text(label, exact=True)
+        if target.count():
+            target.first.click()
+            return True
+    return False
+
+
 def _open_create_dialog(page) -> None:
-    page.get_by_role("button", name="Criar", exact=True).first.click()
+    for label in ("Criar", "Create"):
+        button = page.get_by_role("button", name=label, exact=True)
+        if button.count():
+            button.first.click()
+            break
     page.wait_for_timeout(1000)
-    page.get_by_text("Criar post", exact=True).first.click()
+    if not _click_text(page, ("Criar post", "Create post")):
+        raise RuntimeError("create post entry is not available")
     page.wait_for_timeout(2500)
 
 
@@ -170,21 +204,32 @@ def _fill_message(page, text: str) -> None:
 
 
 def _select_image(page) -> None:
-    page.get_by_text("Imagem", exact=True).last.click()
-    page.wait_for_timeout(1200)
+    for label in ("Imagem", "Image"):
+        target = page.get_by_text(label, exact=True)
+        if target.count():
+            target.last.click()
+            page.wait_for_timeout(1200)
+            return
+    raise RuntimeError("image option is not available")
 
 
 def _attach_image(page, image: Path) -> None:
     page.locator("input[type=file]").last.set_input_files(str(image.resolve()))
-    page.wait_for_selector("text=Editar visualização", timeout=60000)
+    page.wait_for_timeout(6000)
 
 
 def _publish(page) -> None:
-    page.get_by_role("button", name="Postar", exact=True).last.click()
+    for label in ("Postar", "Post"):
+        button = page.get_by_role("button", name=label, exact=True)
+        if button.count():
+            button.last.click()
+            break
     page.wait_for_timeout(1500)
-    confirm = page.get_by_role("button", name="Publicar post", exact=True)
-    if confirm.count() and confirm.last.is_visible():
-        confirm.last.click()
+    for label in ("Publicar post", "Publish post"):
+        confirm = page.get_by_role("button", name=label, exact=True)
+        if confirm.count() and confirm.last.is_visible():
+            confirm.last.click()
+            break
     page.wait_for_timeout(6000)
 
 
@@ -217,7 +262,7 @@ def _topic_image(topics: list[str]) -> tuple[str, Path | None]:
 def ensure_post(context, topics: list[str]) -> dict:
     page = context.new_page()
     try:
-        page.goto(community_url(), timeout=90000)
+        open_community(page)
         sort_recent(page)
         if has_posts(page):
             if posted_today(page):

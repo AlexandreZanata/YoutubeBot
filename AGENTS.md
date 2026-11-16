@@ -9,8 +9,9 @@ English in code, comments, documentation and commits; user-facing UI may use Por
 
 - Extension capture, filename templates and download behavior stay unchanged.
 - Keep the existing generation modes, narration, voices, subtitles, backgrounds and rendering.
-  Never speed up or alter the owner's narration audio. A long video may run up to 20 minutes
-  past the channel's longest published video (Vocal Pages: about 124 minutes) instead.
+  Never speed up or alter the owner's narration audio in new videos; existing uploads keep
+  their audio. A long video may run up to 20 minutes past the channel's longest published
+  video (Vocal Pages: about 124 minutes) instead.
 - Every channel is English-only except Zaflas. Infinite Random Worlds, Vocal Pages, Fallem
   Prince and Whispers From Heaven use English narration, subtitles, metadata and thumbnail
   text. Zaflas is Brazilian Portuguese in every long video and every Short: script,
