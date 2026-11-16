@@ -231,12 +231,16 @@ def generate_thumbnail(run_dir: Path, style: str = "dense") -> Path:
         source = _recent_image(generated_root, started)
     if source is None:
         raise ValueError("Codex thumbnail must be an actual bounded image in its generated-images directory")
-    from PIL import Image
+    from PIL import Image, ImageOps
 
     with Image.open(source) as master:
         if master.width < 400 or master.height < 200:
             raise ValueError("Codex thumbnail is too small")
-        exported = master.convert("RGB").resize((1280, 720), Image.Resampling.LANCZOS)
+        if style == "shorts":
+            exported = ImageOps.fit(master.convert("RGB"), (1080, 1920),
+                                    Image.Resampling.LANCZOS)
+        else:
+            exported = master.convert("RGB").resize((1280, 720), Image.Resampling.LANCZOS)
         if config.THUMBNAIL_THEME == "fallem_prince":
             # Preserve the engraved midtones and dark detail of the prompt style.
             exported = exported.convert("L").convert("RGB")
