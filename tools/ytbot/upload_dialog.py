@@ -137,8 +137,10 @@ def scheduled_at(context, video_id: str, slot) -> bool:
             page.mouse.wheel(0, 4000)
             page.wait_for_timeout(1200)
             if page.evaluate("()=>document.querySelector('#visibility-text')?.innerText") in ("Programado", "Scheduled"):
-                button = page.get_by_role("button", name="Editar status de visibilidade")
-                if button.count():
+                for name in ("Editar status de visibilidade", "Edit video visibility status", "Edit visibility"):
+                    button = page.get_by_role("button", name=name)
+                    if not button.count():
+                        continue
                     button.click()
                     page.wait_for_timeout(1500)
                     model = page.evaluate(
@@ -148,6 +150,7 @@ def scheduled_at(context, video_id: str, slot) -> bool:
                         expected = {"year": slot.year, "month": slot.month - 1, "day": slot.day}
                         matched = (parsed.get("date") == expected
                                    and parsed.get("selectedTimeOfDayValue") == slot.hour * 3600)
+                    break
         except Exception:
             pass
         finally:
