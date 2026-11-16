@@ -148,6 +148,21 @@ Rules for the local bot agent and operator:
    with new items, pick SKUs that have not already been published unless an updated price observation
    is intended.
 
+### Verified end-to-end run (2026-11-16)
+
+A live run with four unpublished hardware peripherals confirmed the full path:
+
+1. `commercial status --network mercadolivre` reported `logged-in`.
+2. `commercial products --network mercadolivre --query "mouse gamer" --limit 4` saved four new
+   SKUs (`MLB72674962`, `MLB56669422`, `MLB63816534`, `MLB51383856`), each with its own
+   `https://meli.la/...` short link, a positive price, extracted specs and four private photos.
+3. `procurali-local-sync.sh --once --category hardware-e-perifericos` returned
+   `"status": "ingested"` with `worker_id = "procurali-local-pc"`, `product_count = 4`,
+   `image_count = 12` and `telegram_queued_count = 4`.
+4. The automatic rebuild served all four new cards on <https://procurali.com.br/>, their MinIO
+   image URLs answered `200`, and `whatsapp-assisted-drafts.json` listed the new products next
+   to the previously published offers.
+
 ## Privacy and limits
 
 - Keep the commercial profile under `.local/`; never commit browser state.
