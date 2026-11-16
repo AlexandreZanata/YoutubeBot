@@ -253,10 +253,10 @@ def upload_and_schedule_with_context(context, run_dir: Path, meta: dict, slot, *
         video_details.apply_details(page, run_dir, meta, custom_thumbnail=custom_thumbnail)
         if end_screen:
             wait_for_checks(page)
-            add_end_screen(page)
             try:
+                add_end_screen(page)
                 upload_guard.verify_end_screen(page)
-            except upload_guard.UploadBlocked as error:
+            except Exception as error:
                 log(f"end screen warning: {error}")
     finally:
         page.close()
