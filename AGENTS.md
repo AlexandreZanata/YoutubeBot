@@ -119,8 +119,10 @@ SSH private keys or device tokens into this repository and never post to Telegra
 from YoutubeBot. Instead run the sibling ZaturoBot physical-key sync launcher
 (`bash ../ZaturoBot/scripts/procurali-local-sync.sh --once` or `--watch`), which opens a
 port-forwarding-only `nologin` SSH tunnel (`procurali-link`), checks SHA-256 changes, uploads static
-product photos to MinIO, and ingests validated batches to the VPS Hub as `procurali-local-pc`. See
-[commercial](docs/COMMERCIAL.md).
+product photos to MinIO, and ingests validated batches to the VPS Hub as `procurali-local-pc`. For
+sub-millisecond local queries of prior VPS offers and price history (plus automatic comparison
+during `commercial products`), use `commercial reference --network mercadolivre` (with `--refresh`
+when a fresh ETag snapshot from the VPS is needed). See [commercial](docs/COMMERCIAL.md).
 
 ## Social promotion
 

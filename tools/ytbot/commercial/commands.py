@@ -7,6 +7,7 @@ import json
 from .. import config
 from ..social import browser
 from ..social.store import SocialStore
+from . import reference
 from .mercadolivre import account as mercadolivre
 from .mercadolivre import products
 
@@ -86,11 +87,58 @@ def command_products(args) -> None:
                 )
             finally:
                 page.close()
-        path = store.network(args.network) / "products.json"
+        net_dir = store.network(args.network)
+        ref_available, comparisons = reference.compare_with_store_reference(
+            net_dir,
+            args.network,
+            rows,
+            refresh=getattr(args, "refresh_ref", False),
+        )
+        if getattr(args, "skip_existing", False) and ref_available:
+            unchanged_ids = {
+                c["product_id"]
+                for c in comparisons
+                if c.get("status") == "unchanged" and c.get("product_id")
+            }
+            rows = [
+                r for r in rows
+                if str(r.get("product_id") or "").strip().upper() not in unchanged_ids
+            ]
+        path = net_dir / "products.json"
         products.save(path, args.query, rows)
-        print(json.dumps({"query": args.query, "count": len(rows),
-                          "products_file": str(path), "products": rows},
-                         ensure_ascii=False))
+        print(json.dumps({
+            "query": args.query,
+            "count": len(rows),
+            "products_file": str(path),
+            "reference_available": ref_available,
+            "vps_comparison": comparisons,
+            "products": rows,
+        }, ensure_ascii=False))
+    except Exception as error:
+        raise SystemExit(f"[commercial] {error}")
+
+
+def command_reference(args) -> None:
+    try:
+        store = _store()
+        _network(args.network)
+        net_dir = store.network(args.network)
+        sync_info = reference.refresh_from_vps() if args.refresh else None
+        json_path = reference.resolve_reference_json_path(args.network, network_dir=net_dir)
+        db_path = reference.resolve_reference_db_path(net_dir)
+        rebuilt = reference.ensure_local_reference_db(json_path, db_path)
+        result = reference.query_reference_db(
+            db_path,
+            query=args.query,
+            product_id=args.product_id,
+            category=args.category,
+            trend=args.trend,
+            limit=args.limit,
+        )
+        result["db_rebuilt"] = rebuilt
+        if sync_info is not None:
+            result["vps_sync"] = sync_info
+        print(json.dumps(result, ensure_ascii=False))
     except Exception as error:
         raise SystemExit(f"[commercial] {error}")
 
@@ -118,7 +166,28 @@ def add_parser(sub) -> None:
                                  help="list products without opening the share dialog")
     products_parser.add_argument("--no-details", action="store_true",
                                  help="skip the product page details and photo download")
+    products_parser.add_argument("--skip-existing", action="store_true",
+                                 help="omit products whose captured price equals the VPS reference")
+    products_parser.add_argument("--refresh-ref", action="store_true",
+                                 help="refresh the cached VPS reference database before comparing")
     products_parser.set_defaults(func=command_products)
+    ref_parser = actions.add_parser(
+        "reference",
+        help="query the fast local VPS product and price-history reference DB",
+    )
+    ref_parser.add_argument("--network", choices=NETWORKS, required=True)
+    ref_parser.add_argument("--refresh", action="store_true",
+                            help="sync latest ETag-cached snapshot from the VPS before querying")
+    ref_parser.add_argument("--query", default="",
+                            help="search keywords in title, brand, category or summary")
+    ref_parser.add_argument("--product-id", default="",
+                            help="exact Mercado Livre MLB catalog ID lookup")
+    ref_parser.add_argument("--category", default="",
+                            help="filter by category or subcategory slug")
+    ref_parser.add_argument("--trend", choices=("", "new", "down", "up", "stable"), default="",
+                            help="filter by price trend")
+    ref_parser.add_argument("--limit", type=int, default=20)
+    ref_parser.set_defaults(func=command_reference)
     stop_parser = actions.add_parser("stop", help="stop the hidden affiliate browser")
     stop_parser.add_argument("--network", choices=NETWORKS, required=True)
     stop_parser.set_defaults(func=command_stop)

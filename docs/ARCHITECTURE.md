@@ -23,8 +23,9 @@ algorithms are preserved; new account/adapter modules compose them.
   block of new videos toward the emptiest channels. See [distribution](DISTRIBUTE.md).
 - `tools/ytbot/cleanup.py`: pre-run trash, staging and scheduled-media cleanup with the space
   report. See [cleanup](CLEANUP.md).
-- `tools/ytbot/commercial/`: private affiliate sessions, starting with Mercado Livre.
-  See [commercial](COMMERCIAL.md).
+- `tools/ytbot/commercial/`: private affiliate sessions, starting with Mercado Livre, plus a local
+  SQLite reference index (`reference.py`) for sub-millisecond VPS catalog lookups and price-change
+  comparisons. See [commercial](COMMERCIAL.md).
 - `tools/ytbot/social/`: private per-network promotion profiles, visible login and hidden
   Xvfb operation after login; X starts the module. See [social](SOCIAL.md) and the
   [promotion focus](PROMOTION.md). The agent runbook for research, audit and the 30-day
