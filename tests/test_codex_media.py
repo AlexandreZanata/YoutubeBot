@@ -116,6 +116,30 @@ class CodexMediaContracts(TestCase):
         thumbnail.assert_called_once_with(self.run, 'dense')
         context.new_page.assert_not_called()
 
+    def test_recent_image_recovers_a_missing_codex_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            older = root / "old.png"
+            older.write_bytes(b"x")
+            newer = root / "run" / "new.png"
+            newer.parent.mkdir()
+            newer.write_bytes(b"x")
+            import os
+            os.utime(older, (1000, 1000))
+            os.utime(newer, (2000, 2000))
+            self.assertEqual(codex_media._recent_image(root, 1900), newer.resolve())
+            self.assertIsNone(codex_media._recent_image(root, 2500))
+
+    def test_bounded_image_rejects_empty_and_outside_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "generated_images"
+            root.mkdir()
+            inside = root / "a.png"
+            inside.write_bytes(b"x")
+            self.assertEqual(codex_media._bounded_image(str(inside), root), inside.resolve())
+            self.assertIsNone(codex_media._bounded_image("", root))
+            self.assertIsNone(codex_media._bounded_image("/etc/hosts", root))
+
     def test_metadata_normalizes_hashtags_with_leading_space(self):
         value = {'title_options':['First Actual Title','Second Title','Third Title'], 'description':' '.join(['Narrative']*120), 'hashtags':['#faith',' #hope','#jesus','#bible','#prayer'], 'tags':['faith','hope']}
         with patch.object(config, 'CHANNEL', SimpleNamespace(slug='fallem-prince')), patch.object(codex_media, '_execute', return_value=self.fake_result('metadata', value)):

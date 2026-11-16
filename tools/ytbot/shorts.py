@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-import time
+import time as clock
 import sys
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
@@ -138,12 +138,12 @@ def run_shorts(channel_slug: str, count: int = 12, per_day: int = 2,
             logic.set_run_field(run_dir, topic=topic)
             page = gen.new_page()
             try:
-                started = time.time()
+                started = clock.time()
                 text = chat.generate_short(page, topic, run_dir)
-                log(f"script {time.time() - started:.0f}s")
-                audio_start = time.time()
+                log(f"script {clock.time() - started:.0f}s")
+                audio_start = clock.time()
                 chat.capture_audio(page, gen, run_dir)
-                log(f"audio {time.time() - audio_start:.0f}s")
+                log(f"audio {clock.time() - audio_start:.0f}s")
             except Exception as error:
                 failures.append((topic, str(error)))
                 log(f"asset failure for {topic}: {error}")
@@ -154,19 +154,19 @@ def run_shorts(channel_slug: str, count: int = 12, per_day: int = 2,
                     page.close()
                 except Exception:
                     pass
-            finish_start = time.time()
+            finish_start = clock.time()
             try:
-                thumb_start = time.time()
+                thumb_start = clock.time()
                 assets.generate_thumbnail(gen, run_dir, "shorts")
-                log(f"thumbnail {time.time() - thumb_start:.0f}s")
+                log(f"thumbnail {clock.time() - thumb_start:.0f}s")
                 render_short(run_dir)
-                log(f"render {time.time() - finish_start:.0f}s")
+                log(f"render {clock.time() - finish_start:.0f}s")
                 meta = short_metadata(topic, text)
                 (run_dir / "metadata.json").write_text(
                     json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-                upload_start = time.time()
+                upload_start = clock.time()
                 youtube.upload_and_schedule_short(up, run_dir, meta, slot)
-                log(f"upload {time.time() - upload_start:.0f}s")
+                log(f"upload {clock.time() - upload_start:.0f}s")
                 log(f"scheduled {topic} at {logic.slot_label(slot)}")
             except Exception as error:
                 failures.append((topic, str(error)))

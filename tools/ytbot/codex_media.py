@@ -187,6 +187,28 @@ def generate_metadata(run_dir: Path, topic: str) -> dict:
     return parsed
 
 
+def _bounded_image(value: str, root: Path) -> Path | None:
+    if not value:
+        return None
+    source = Path(value).resolve()
+    if not source.is_relative_to(root) or not source.is_file():
+        return None
+    if source.stat().st_size > 20 * 1024 * 1024:
+        return None
+    return source
+
+
+def _recent_image(root: Path, since: float) -> Path | None:
+    """Codex sometimes finishes the image without returning its path."""
+    if not root.is_dir():
+        return None
+    candidates = [item for item in root.rglob("*.png")
+                  if item.is_file() and item.stat().st_mtime >= since - 5]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: item.stat().st_mtime).resolve()
+
+
 def generate_thumbnail(run_dir: Path, style: str = "dense") -> Path:
     schema = {"type": "object", "properties": {"image_path": {"type": "string", "maxLength": 4096}},
               "required": ["image_path"], "additionalProperties": False}
@@ -201,10 +223,13 @@ def generate_thumbnail(run_dir: Path, style: str = "dense") -> Path:
               "Return only JSON with the absolute path of the image actually saved by that tool. "
               "The image engine creates the image; you only coordinate the request.\nVISUAL IDENTITY:\n"
               + config.prompt(prompt_file) + "\n<ARTICLE>\n" + _article(run_dir)[:8000] + "\n</ARTICLE>")
+    started = time.time()
     value = _execute(run_dir, "thumbnail", prompt, schema, images=True)
-    source = Path(value.get("image_path", "")).resolve()
     generated_root = (Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")) / "generated_images").resolve()
-    if not source.is_relative_to(generated_root) or not source.is_file() or source.stat().st_size > 20 * 1024 * 1024:
+    source = _bounded_image(value.get("image_path", ""), generated_root)
+    if source is None:
+        source = _recent_image(generated_root, started)
+    if source is None:
         raise ValueError("Codex thumbnail must be an actual bounded image in its generated-images directory")
     from PIL import Image
 
