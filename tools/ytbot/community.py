@@ -156,10 +156,24 @@ def has_posts(page) -> bool:
     raise RuntimeError("community page did not load or show the composer")
 
 
+def _click_text(page, labels: tuple[str, ...]) -> bool:
+    for label in labels:
+        target = page.get_by_text(label, exact=True)
+        if target.count():
+            target.first.click()
+            return True
+    return False
+
+
 def _open_create_dialog(page) -> None:
-    page.get_by_role("button", name="Criar", exact=True).first.click()
+    for label in ("Criar", "Create"):
+        button = page.get_by_role("button", name=label, exact=True)
+        if button.count():
+            button.first.click()
+            break
     page.wait_for_timeout(1000)
-    page.get_by_text("Criar post", exact=True).first.click()
+    if not _click_text(page, ("Criar post", "Create post")):
+        raise RuntimeError("create post entry is not available")
     page.wait_for_timeout(2500)
 
 
@@ -170,21 +184,32 @@ def _fill_message(page, text: str) -> None:
 
 
 def _select_image(page) -> None:
-    page.get_by_text("Imagem", exact=True).last.click()
-    page.wait_for_timeout(1200)
+    for label in ("Imagem", "Image"):
+        target = page.get_by_text(label, exact=True)
+        if target.count():
+            target.last.click()
+            page.wait_for_timeout(1200)
+            return
+    raise RuntimeError("image option is not available")
 
 
 def _attach_image(page, image: Path) -> None:
     page.locator("input[type=file]").last.set_input_files(str(image.resolve()))
-    page.wait_for_selector("text=Editar visualização", timeout=60000)
+    page.wait_for_timeout(6000)
 
 
 def _publish(page) -> None:
-    page.get_by_role("button", name="Postar", exact=True).last.click()
+    for label in ("Postar", "Post"):
+        button = page.get_by_role("button", name=label, exact=True)
+        if button.count():
+            button.last.click()
+            break
     page.wait_for_timeout(1500)
-    confirm = page.get_by_role("button", name="Publicar post", exact=True)
-    if confirm.count() and confirm.last.is_visible():
-        confirm.last.click()
+    for label in ("Publicar post", "Publish post"):
+        confirm = page.get_by_role("button", name=label, exact=True)
+        if confirm.count() and confirm.last.is_visible():
+            confirm.last.click()
+            break
     page.wait_for_timeout(6000)
 
 
