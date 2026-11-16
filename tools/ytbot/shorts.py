@@ -157,7 +157,8 @@ def run_shorts(channel_slug: str, count: int = 12, per_day: int = 2,
             finish_start = clock.time()
             try:
                 thumb_start = clock.time()
-                assets.generate_thumbnail(gen, run_dir, "shorts")
+                if not (run_dir / "thumbnail.png").is_file():
+                    assets.generate_thumbnail(gen, run_dir, "shorts")
                 log(f"thumbnail {clock.time() - thumb_start:.0f}s")
                 render_short(run_dir)
                 log(f"render {clock.time() - finish_start:.0f}s")
