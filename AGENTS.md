@@ -98,8 +98,8 @@ void/two-color poster interpretation is superseded. Alternate the dense prompt w
 Vertical Shorts use the dedicated `shorts` protocol: 1080x1920, 35 to 55 seconds, 90 to 130
 Portuguese words, portrait Zaflas background, a custom 1280x720 thumbnail in the existing
 Zaflas Shorts style, no end screen, and two per day at 09:00/18:00 when requested. They use
-the legacy generation profile and the Zaflas upload-only profile. Schedule inside the upload
-dialog, with no edit-page pass, no tag chips and the upload file staged in
+the legacy generation profile and the Zaflas upload-only profile. Use the proven upload path
+with a custom thumbnail and no end screen, and stage the upload file in
 `.local/ytbot/upload-tmp`; the dialog cannot read a file inside the `/data` symlink. Do not
 route them through the long-form batch. See [Shorts](docs/SHORTS.md).
 

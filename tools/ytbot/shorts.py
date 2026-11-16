@@ -167,7 +167,8 @@ def run_shorts(channel_slug: str, count: int = 12, per_day: int = 2,
                 (run_dir / "metadata.json").write_text(
                     json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
                 upload_start = clock.time()
-                youtube.upload_and_schedule_short(up, run_dir, meta, slot)
+                youtube.upload_and_schedule_with_context(
+                    up, run_dir, meta, slot, custom_thumbnail=True, end_screen=False)
                 log(f"upload {clock.time() - upload_start:.0f}s")
                 log(f"scheduled {topic} at {logic.slot_label(slot)}")
             except Exception as error:

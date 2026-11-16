@@ -77,7 +77,7 @@ def lookup_video_id(context, title: str, timeout: int = 90) -> str:
                     return found.group(1)
         finally:
             page.close()
-        page.wait_for_timeout(4000)
+        time.sleep(4)
     return ""
 
 
@@ -208,15 +208,20 @@ def upload_and_schedule_short(context, run_dir: Path, meta: dict, slot) -> dict:
     """Upload and schedule in one dialog, without the edit page or custom tags."""
     upload_guard.preflight(run_dir, meta)
     page, video_id = open_upload(context, run_dir, meta, require_id=False)
+    schedule_error = None
     try:
         if (run_dir / "thumbnail.png").is_file():
             upload_dialog.set_thumbnail(page, run_dir / "thumbnail.png")
         upload_dialog.schedule_in_dialog(page, slot)
+    except Exception as error:
+        schedule_error = error
     finally:
         page.close()
     video_id = video_id or lookup_video_id(context, meta["title"])
     if not video_id:
-        raise RuntimeError("could not find the scheduled short in Studio")
+        raise schedule_error or RuntimeError("could not find the short in Studio")
+    if not upload_dialog.scheduled_at(context, video_id, slot):
+        raise schedule_error or RuntimeError("the short schedule was not confirmed")
     result = {"videoId": video_id, "url": f"https://youtu.be/{video_id}",
               "slot": logic.slot_label(slot), "visibility": "scheduled",
               "endScreen": False, "customThumbnail": False, "scheduled": True}
