@@ -147,6 +147,11 @@ class VideoIdTests(unittest.TestCase):
         page = self.Page("https://studio.youtube.com/video/kK_wyNBAxgg/edit", "")
         self.assertEqual(youtube.video_id_from(page), "kK_wyNBAxgg")
 
+    def test_reads_a_shorts_share_link(self):
+        page = self.Page("https://studio.youtube.com/channel/UC/videos/upload",
+                         "Link do vídeo https://youtube.com/shorts/abc12345678")
+        self.assertEqual(youtube.video_id_from(page), "abc12345678")
+
     def test_reads_the_share_link_from_the_dialog(self):
         page = self.Page("https://studio.youtube.com/channel/UC/videos/upload",
                          "Link do vídeo https://youtu.be/blAcpdN9bVg")

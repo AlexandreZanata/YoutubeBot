@@ -29,19 +29,26 @@ def video_id_from(page) -> str:
     match = re.search(r"/video/([A-Za-z0-9_-]{11})/", page.url)
     if match:
         return match.group(1)
+    pattern = re.compile(r"(?:youtu\.be/|youtube\.com/shorts/|watch\?v=)([A-Za-z0-9_-]{11})")
     try:
-        texts = page.get_by_text(re.compile(r"youtu\.be/[A-Za-z0-9_-]{11}")).all_inner_texts()
-        found = re.search(r"youtu\.be/([A-Za-z0-9_-]{11})", " ".join(texts))
-        if found:
-            return found.group(1)
+        hrefs = page.locator("a[href*='/shorts/'], a[href*='youtu.be/']").all()
+        for element in hrefs:
+            found = pattern.search(element.get_attribute("href") or "")
+            if found:
+                return found.group(1)
     except Exception:
         pass
+    try:
+        texts = page.get_by_text(re.compile(r"(?:youtu\.be/|youtube\.com/shorts/)")).all_inner_texts()
+    except Exception:
+        texts = []
+    for text in texts:
+        found = pattern.search(text)
+        if found:
+            return found.group(1)
     body = page.locator("body").inner_text()
-    match = re.search(r"(?:Link do vídeo|Video link)\s*(https://youtu\.be/[A-Za-z0-9_-]+)", body, re.I)
-    if not match:
-        match = re.search(r"https://youtu\.be/([A-Za-z0-9_-]+)", body)
-        return match.group(1) if match else ""
-    return match.group(1).rsplit("/", 1)[-1]
+    found = pattern.search(body)
+    return found.group(1) if found else ""
 
 
 def wait_for_video_id(page, timeout: int = 90) -> str:
