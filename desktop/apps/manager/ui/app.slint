@@ -1,0 +1,289 @@
+import { Button, ScrollView } from "std-widgets.slint";
+
+export struct SessionRow {
+    id: string,
+    label: string,
+    network: string,
+    channel: string,
+    status: string,
+    detail: string,
+    key: string,
+    scope: string,
+    actionable: bool,
+}
+
+component FilterItem inherits Rectangle {
+    in property <string> label;
+    in property <bool> active;
+    callback picked();
+
+    height: 34px;
+    border-radius: 6px;
+    background: active ? #1f6feb2e : transparent;
+
+    Text {
+        text: root.label;
+        color: root.active ? #dbe7ff : #aab6c5;
+        font-size: 13px;
+        vertical-alignment: center;
+        x: 12px;
+    }
+
+    TouchArea {
+        clicked => { root.picked(); }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "YoutubeBot Manager";
+    width: 1180px;
+    height: 760px;
+    background: #0f1216;
+
+    in-out property <[SessionRow]> sessions;
+    in-out property <int> selected: -1;
+    in property <string> status-text: "Pronto";
+    in property <string> active-filter: "all";
+
+    callback refresh();
+    callback open-selected(int);
+    callback stop-selected(int);
+    callback filter-changed(string);
+
+    VerticalLayout {
+        spacing: 0px;
+
+        Rectangle {
+            height: 64px;
+            background: #151a21;
+
+            HorizontalLayout {
+                padding-left: 20px;
+                padding-right: 20px;
+                alignment: space-between;
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+
+                    Text {
+                        text: "YoutubeBot Manager";
+                        color: #eef2f7;
+                        font-size: 20px;
+                        font-weight: 700;
+                    }
+
+                    Text {
+                        text: "Contas, canais e janelas logadas";
+                        color: #8b98a9;
+                        font-size: 12px;
+                    }
+                }
+
+                Button {
+                    text: "Atualizar";
+                    clicked => { root.refresh(); }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 0px;
+
+            Rectangle {
+                width: 210px;
+                background: #121722;
+
+                VerticalLayout {
+                    padding: 14px;
+                    spacing: 6px;
+
+                    Text {
+                        text: "REDES";
+                        color: #6f7c8d;
+                        font-size: 11px;
+                        font-weight: 700;
+                    }
+
+                    FilterItem {
+                        label: "Todas";
+                        active: root.active-filter == "all";
+                        picked => { root.filter-changed("all"); }
+                    }
+                    FilterItem {
+                        label: "YouTube";
+                        active: root.active-filter == "YouTube";
+                        picked => { root.filter-changed("YouTube"); }
+                    }
+                    FilterItem {
+                        label: "WhatsApp";
+                        active: root.active-filter == "WhatsApp";
+                        picked => { root.filter-changed("WhatsApp"); }
+                    }
+                    FilterItem {
+                        label: "Mercado Livre";
+                        active: root.active-filter == "Mercado Livre";
+                        picked => { root.filter-changed("Mercado Livre"); }
+                    }
+                    FilterItem {
+                        label: "X";
+                        active: root.active-filter == "X";
+                        picked => { root.filter-changed("X"); }
+                    }
+                    FilterItem {
+                        label: "Instagram";
+                        active: root.active-filter == "Instagram";
+                        picked => { root.filter-changed("Instagram"); }
+                    }
+                }
+            }
+
+            Rectangle {
+                background: #0f1216;
+
+                ScrollView {
+                    for row[i] in root.sessions : Rectangle {
+                        height: 56px;
+                        background: i == root.selected ? #1f6feb26 : #11161f;
+
+                        HorizontalLayout {
+                            padding-left: 18px;
+                            padding-right: 18px;
+                            spacing: 12px;
+
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 2px;
+
+                                Text {
+                                    text: row.label;
+                                    color: #e8eef6;
+                                    font-size: 14px;
+                                    font-weight: 600;
+                                    overflow: elide;
+                                }
+
+                                Text {
+                                    text: row.network + "  ·  " + row.channel;
+                                    color: #7d8a9b;
+                                    font-size: 11px;
+                                    overflow: elide;
+                                }
+                            }
+
+                            Text {
+                                text: row.status;
+                                color: row.status == "logged-in" || row.status == "configurado" ? #4cc38a : #e0b341;
+                                font-size: 12px;
+                                horizontal-alignment: right;
+                                vertical-alignment: center;
+                                width: 140px;
+                            }
+                        }
+
+                        TouchArea {
+                            clicked => { root.selected = i; }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                width: 320px;
+                background: #121722;
+
+                VerticalLayout {
+                    padding: 18px;
+                    spacing: 12px;
+
+                    Text {
+                        text: "DETALHES";
+                        color: #6f7c8d;
+                        font-size: 11px;
+                        font-weight: 700;
+                    }
+
+                    if root.selected >= 0 && root.selected < root.sessions.length : VerticalLayout {
+                        spacing: 8px;
+
+                        Text {
+                            text: root.sessions[root.selected].label;
+                            color: #eef2f7;
+                            font-size: 18px;
+                            font-weight: 700;
+                            wrap: word-wrap;
+                        }
+
+                        Text {
+                            text: root.sessions[root.selected].network;
+                            color: #8b98a9;
+                            font-size: 13px;
+                        }
+
+                        Rectangle {
+                            height: 1px;
+                            background: #1d2530;
+                        }
+
+                        Text {
+                            text: "Canal: " + (root.sessions[root.selected].channel == "" ? "não vinculado" : root.sessions[root.selected].channel);
+                            color: #c8d3e0;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                        }
+
+                        Text {
+                            text: "Status: " + root.sessions[root.selected].status;
+                            color: #c8d3e0;
+                            font-size: 12px;
+                        }
+
+                        Text {
+                            text: root.sessions[root.selected].detail;
+                            color: #7d8a9b;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                        }
+
+                        Rectangle {
+                            height: 1px;
+                            background: #1d2530;
+                        }
+
+                        Button {
+                            text: "Abrir janela";
+                            enabled: root.sessions[root.selected].actionable;
+                            clicked => { root.open-selected(root.selected); }
+                        }
+
+                        Button {
+                            text: "Parar navegador";
+                            enabled: root.sessions[root.selected].actionable;
+                            clicked => { root.stop-selected(root.selected); }
+                        }
+                    }
+
+                    if root.selected < 0 : Text {
+                        text: "Selecione uma sessão para ver os detalhes.";
+                        color: #6f7c8d;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            height: 34px;
+            background: #151a21;
+
+            Text {
+                text: root.status-text;
+                color: #8b98a9;
+                font-size: 12px;
+                vertical-alignment: center;
+                x: 20px;
+            }
+        }
+    }
+}

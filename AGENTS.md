@@ -207,6 +207,13 @@ related video and, on Zaflas, the site https://zaflas.com.br/. Community text fo
 channel language: English everywhere except Zaflas, which is Brazilian Portuguese. Never
 retry an unconfirmed publish blindly. See [community](docs/COMMUNITY.md).
 
+## Desktop manager
+
+`desktop/` is a Rust + Slint manager that lists every profile and logged network from the
+private registries and exposes only open/stop actions through the typed CLI. Keep the domain
+crate free of UI types. See [desktop](docs/DESKTOP.md) and
+[desktop/README.md](desktop/README.md).
+
 ## Generation and upload profiles
 
 Generation always uses the main profile with the ChatGPT login and audio-capture extension.
