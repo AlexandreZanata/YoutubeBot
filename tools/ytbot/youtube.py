@@ -154,18 +154,24 @@ def open_edit(context, video_id: str):
 
 
 def add_end_screen(page) -> None:
-    page.get_by_text("Tela final", exact=True).last.click()
+    for label in ("Tela final", "End screen"):
+        tab = page.get_by_text(label, exact=True)
+        if tab.count():
+            tab.last.click()
+            break
+    else:
+        raise RuntimeError("end screen tab was not found")
     page.wait_for_timeout(4000)
     page.locator("#add-element-menu-button").first.click()
     page.wait_for_timeout(1000)
-    page.evaluate("""()=>{const els=[...document.querySelectorAll('tp-yt-paper-item')]; const v=els.find(e=>(e.innerText||'').trim()==='Vídeo'); if(v)v.click()}""")
+    page.evaluate("""()=>{const els=[...document.querySelectorAll('tp-yt-paper-item')]; const v=els.find(e=>['Vídeo','Video'].includes((e.innerText||'').trim())); if(v)v.click()}""")
     page.wait_for_timeout(1800)
-    page.evaluate("""()=>{const r=[...document.querySelectorAll('tp-yt-paper-radio-button')].find(e=>/melhor para o espectador/i.test(e.innerText||'')); if(r)r.click()}""")
+    page.evaluate("""()=>{const r=[...document.querySelectorAll('tp-yt-paper-radio-button')].find(e=>/melhor para o espectador|best for viewer/i.test(e.innerText||'')); if(r)r.click()}""")
     page.wait_for_timeout(1200)
     log("end screen video element set to best for viewer")
     page.locator("#add-element-menu-button").first.click()
     page.wait_for_timeout(1000)
-    page.evaluate("""()=>{const els=[...document.querySelectorAll('tp-yt-paper-item')]; const v=els.find(e=>(e.innerText||'').trim()==='Inscrever-se'); if(v)v.click()}""")
+    page.evaluate("""()=>{const els=[...document.querySelectorAll('tp-yt-paper-item')]; const v=els.find(e=>['Inscrever-se','Subscribe'].includes((e.innerText||'').trim())); if(v)v.click()}""")
     page.wait_for_timeout(1200)
     page.evaluate("""()=>{const modal=document.querySelector('ytve-endscreen-modal')||document; const b=[...modal.querySelectorAll('#save-button, button, ytcp-button')].filter(e=>e.offsetWidth>0 && /salvar|save/i.test((e.innerText||''))).pop(); if(b)b.click()}""")
     page.wait_for_timeout(4000)

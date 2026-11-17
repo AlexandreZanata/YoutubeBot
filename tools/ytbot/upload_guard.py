@@ -70,17 +70,21 @@ def wait_upload(page, timeout: int = 900) -> None:
 
 def verify_end_screen(page) -> None:
     for _ in range(3):
-        try:
-            page.get_by_text("Tela final", exact=True).last.click()
-            page.wait_for_timeout(3000)
-        except Exception:
-            pass
+        for label in ("Tela final", "End screen"):
+            tabs = page.get_by_text(label, exact=True)
+            target = next((tabs.nth(i) for i in range(tabs.count()) if tabs.nth(i).is_visible()), None)
+            if target is not None:
+                target.click()
+                page.wait_for_timeout(3000)
+                break
         body = page.locator("body").inner_text()
         checked = page.evaluate(
             "()=>[...document.querySelectorAll('tp-yt-paper-radio-button')]"
-            ".some(e=>/melhor para o espectador/i.test(e.innerText||'')"
+            ".some(e=>/melhor para o espectador|best for viewer/i.test(e.innerText||'')"
             " && (e.hasAttribute('checked')||e.getAttribute('aria-checked')==='true'))")
-        if "Melhor para o espectador" in body and "Inscrever-se" in body and checked:
+        best = "Melhor para o espectador" in body or "Best for viewer" in body
+        subscribe = "Inscrever-se" in body or "Subscribe" in body
+        if best and subscribe and checked:
             return
         page.wait_for_timeout(2000)
     raise UploadBlocked("end screen missing Best for viewer or Subscribe; retry the end screen")
