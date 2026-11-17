@@ -33,7 +33,9 @@ Titles are standalone speculative premises, each with its own world:
 Rules taken from that sample:
 
 - One self-contained story per episode, in English, with a unique world and cast.
-- Target **4,500 to 6,000 words**, about **32 to 43 minutes** at the channel pace.
+- Target **4,500 to 6,000 words**, about **32 to 43 minutes** at the channel pace. The hard
+  cap follows the longest video (59 min) plus 30 minutes, so articles up to **85,000
+  characters** are accepted without a rewrite.
 - No recurring protagonist, narrator persona, era or setting between episodes.
 - Titles name the specific world and conflict, without revealing the ending.
 - Description is one topic-specific paragraph, no calls to action or external links.

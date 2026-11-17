@@ -56,6 +56,23 @@ An upload-only check can report `chatgpt_authenticated: false` and
 `extension_ready: false`; that is expected. `channel_verified: true` is the required
 condition for that profile.
 
+## Expired sessions
+
+The bot never stores passwords and never tries to bypass a login. When a session really
+expires, it does not retry blindly:
+
+1. Studio shows `Fazer login` / `Sign in`, or a verification prompt; ChatGPT shows its login
+   page.
+2. The bot records `.local/ytbot/needs-login.json` with the profile, URL, reason and time.
+3. It sends a desktop notification and opens a **visible** Chrome window with that profile on
+   the sign-in page, then stops the current batch with a clear error.
+4. The owner signs in or completes the two-step verification by hand in that window.
+5. The next run verifies the channel again and removes the marker after a successful
+   `ensure_channel`.
+
+This only happens when the session is actually expired. A profile that is merely idle keeps
+working and is never reopened.
+
 ## Optional API connection
 
 Google OAuth is optional for account/channel discovery, not the existing browser uploader.

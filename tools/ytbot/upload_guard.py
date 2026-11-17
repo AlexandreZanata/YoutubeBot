@@ -38,8 +38,13 @@ def preflight(run_dir: Path, meta: dict) -> None:
 
 def page_blocked(page) -> None:
     body = page.locator("body").inner_text()
-    if "Fazer login" in body or "Sign in" in body:
-        raise UploadBlocked("YouTube session expired; sign in to the bot profile")
+    expired = ("Fazer login", "Sign in", "Verifique se é você", "Verify it’s you",
+               "Verify it's you", "confirme sua identidade")
+    if any(marker in body for marker in expired):
+        from . import runtime
+        runtime.request_login("https://studio.youtube.com/",
+                              "YouTube session expired or needs a manual verification")
+        raise UploadBlocked("YouTube session expired; finish the sign-in in the window that opened")
     if "Selecione um canal" in body or "Select a channel" in body:
         raise UploadBlocked("YouTube channel selection is required; select the channel in the bot profile")
 
