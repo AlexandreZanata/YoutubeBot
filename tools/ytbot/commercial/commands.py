@@ -13,6 +13,7 @@ from . import reference
 from .mercadolivre import account as mercadolivre
 from .mercadolivre import products
 from . import whatsapp
+from .whatsapp import listener as whatsapp_listener
 from .whatsapp import sender as whatsapp_sender
 
 NETWORKS = ("mercadolivre", "whatsapp")
@@ -170,6 +171,72 @@ def command_whatsapp_send(args) -> None:
         raise SystemExit(f"[commercial] {error}")
 
 
+def _whatsapp_page(args):
+    from playwright.sync_api import sync_playwright
+
+    store = _store()
+    network = _network("whatsapp")
+    if not _port_ready(network.CDP_PORT):
+        browser.ensure_background(store, "whatsapp", network.LOGIN_URL, network.CDP_PORT,
+                                  network.BACKGROUND_DISPLAY)
+    playwright = sync_playwright().start()
+    client = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{network.CDP_PORT}")
+    context = client.contexts[0]
+    page = context.new_page()
+    state = network.inspect(page)
+    if state["state"] != "logged-in":
+        page.close()
+        playwright.stop()
+        raise RuntimeError("WhatsApp Web is not logged in; run commercial open --network whatsapp")
+    return store, network, playwright, client, page
+
+
+def command_whatsapp_listen(args) -> None:
+    store, network, playwright, client, page = _whatsapp_page(args)
+    try:
+        events = whatsapp_listener.listen(
+            page, store.network("whatsapp"), once=args.once, interval=args.interval,
+            limit=args.max_chats)
+    finally:
+        page.close()
+        client.close()
+        playwright.stop()
+    print(json.dumps({"events": len(events),
+                      "file": str(store.network("whatsapp") / "events.jsonl")},
+                     ensure_ascii=False))
+    for event in events:
+        print(json.dumps(event, ensure_ascii=False))
+
+
+def command_whatsapp_events(args) -> None:
+    store = _store()
+    _network("whatsapp")
+    path = store.network("whatsapp") / "events.jsonl"
+    if not path.is_file():
+        print(json.dumps({"events": []}, ensure_ascii=False))
+        return
+    lines = path.read_text(encoding="utf-8").splitlines()[-args.limit:]
+    events = []
+    for line in lines:
+        try:
+            events.append(json.loads(line))
+        except ValueError:
+            continue
+    print(json.dumps(events, ensure_ascii=False, indent=2))
+
+
+def command_whatsapp_rules(args) -> None:
+    store = _store()
+    _network("whatsapp")
+    path = store.network("whatsapp") / "rules.json"
+    if not args.mode:
+        print(json.dumps(whatsapp_listener.load_rules(path), ensure_ascii=False))
+        return
+    contacts = [item.strip() for item in (args.contacts or "").split(",") if item.strip()]
+    rules = whatsapp_listener.save_rules(path, args.mode, contacts)
+    print(json.dumps(rules, ensure_ascii=False))
+
+
 def command_reference(args) -> None:
     if args.network != "mercadolivre":
         raise SystemExit("[commercial] reference is available only for mercadolivre")
@@ -237,6 +304,23 @@ def add_parser(sub) -> None:
     send_parser.add_argument("--min-interval", type=float, default=8.0)
     send_parser.add_argument("--max-interval", type=float, default=25.0)
     send_parser.set_defaults(func=command_whatsapp_send)
+    listen_parser = actions.add_parser(
+        "listen", help="scan WhatsApp Web and record incoming messages as events")
+    listen_parser.add_argument("--network", choices=("whatsapp",), required=True)
+    listen_parser.add_argument("--once", action="store_true")
+    listen_parser.add_argument("--interval", type=int, default=30)
+    listen_parser.add_argument("--max-chats", type=int, default=30)
+    listen_parser.set_defaults(func=command_whatsapp_listen)
+    events_parser = actions.add_parser("events", help="read recorded WhatsApp events")
+    events_parser.add_argument("--network", choices=("whatsapp",), required=True)
+    events_parser.add_argument("--limit", type=int, default=20)
+    events_parser.set_defaults(func=command_whatsapp_events)
+    rules_parser = actions.add_parser(
+        "rules", help="allow or block contacts for future WhatsApp replies")
+    rules_parser.add_argument("--network", choices=("whatsapp",), required=True)
+    rules_parser.add_argument("--mode", choices=("allow", "block"), default=None)
+    rules_parser.add_argument("--contacts", default="", help="comma-separated names")
+    rules_parser.set_defaults(func=command_whatsapp_rules)
     ref_parser = actions.add_parser(
         "reference",
         help="query the fast local VPS product and price-history reference DB",

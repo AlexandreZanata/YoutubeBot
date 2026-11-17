@@ -92,6 +92,45 @@ start
 7. Verify that the last outgoing bubble contains the first characters of the message.
 8. Journal `sent` or `unconfirmed`. `sent` is final; `unconfirmed` is never retried blindly.
 
+## Incoming event listener
+
+The listener turns incoming messages into durable events and records which contact wrote.
+It reads the **chat list previews** instead of opening conversations, so it never marks the
+owner's chats as read.
+
+```bash
+python3 -m tools.ytbot commercial listen --network whatsapp --once
+python3 -m tools.ytbot commercial listen --network whatsapp --interval 30
+python3 -m tools.ytbot commercial events --network whatsapp --limit 20
+python3 -m tools.ytbot commercial rules  --network whatsapp --mode allow \
+  --contacts "Renê,Frotas do L"
+```
+
+Event schema in `.local/commercial/whatsapp/events.jsonl`:
+
+```json
+{"id":"<sha256[0:20]>","at":"2026-11-17T12:35:50","message_at":"12:32 PM",
+ "chat":"Renê","text":"Já mudei","unread":true,"allowed":true}
+```
+
+- `chat` is the contact or group name; group previews keep the sender prefix (`João: Sim`).
+- `id` hashes chat, preview and time; `seen.json` stores the last 5000 ids so a scan never
+  duplicates an event.
+- `allowed` comes from `rules.json`: `mode: allow` replies only to listed contacts; `mode:
+  block` replies to everyone except them. Matching is case-insensitive and accepts partial
+  names. The default is `allow` with an empty list, so nothing is auto-approved.
+- Previews that start with `You:`/`Você:` are the owner's own messages and are skipped.
+
+Limits: the listener sees only the newest preview per chat, so it does not backfill history;
+media show as labels (`Photo`, `Sticker`, `Audio`); an edited message can re-emit if its
+preview changes. A future auto-reply must consume only `allowed: true` events and must never
+answer a blocked contact.
+
+The approach follows the WhatsApp Web adapter already validated in
+[MeuAssistente](https://github.com/AlexandreZanata/MeuAssistente): contact-scoped observation,
+hashed deduplication and explicit filters. This module keeps the lighter preview-based scan
+so it cannot disturb the owner's unread state.
+
 ## Journal and idempotency
 
 `journal.jsonl` keeps one line per attempt:
