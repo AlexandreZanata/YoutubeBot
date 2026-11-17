@@ -64,6 +64,43 @@ site) or whose `maps_url` is not a Google Maps link; it skips duplicates and num
 do-not-contact list. Importing is the owner's approval of the list. Keep the CSV outside the
 repository.
 
+## Lead names and phone contacts
+
+Every lead gets a category number when it enters the funnel: the CSV `category` becomes a slug
+and a counter (`Barbearia` → `barbearia-1`, `barbearia-2`; `Salão de Beleza` →
+`salao-de-beleza-1`; empty → `lead-N`). Numbers are never reused or renumbered. The phone
+contact name is `<label> <name>` (`barbearia-1 Barbearia do Zé`), so searching `barbearia` on
+the phone lists the whole niche and the label identifies the lead in notifications and in the
+Central. When the owner saves that contact, WhatsApp shows it as the chat title; the agent
+matches titles by phone digits, saved contact name or label prefix.
+
+Each import writes `sales/contatos/novos-<data>.vcf` with the new batch and rewrites
+`sales/contatos/todos.vcf` with every lead that may still be contacted (refused and invalid
+numbers are left out). Import the file on the phone (Contacts → Import, or
+contacts.google.com → Import, which syncs to the phone and WhatsApp). `sales contacts`
+rewrites `todos.vcf` on demand.
+
+Acquisition contract: every source (the reviewed Maps CSV, a manual Maps search, Receita
+Federal data) adds leads through `SalesStore.import_rows(rows, now, source)` with `source` in
+`google-maps-reviewed`, `google-maps-manual`, `receita-federal`, `manual`. Rows carry `name`,
+`phone` and optionally `category`, `city`, `maps_url`, `website`, `note`; the same validation,
+do-not-contact check, numbering and vCard apply to all of them.
+
+## Central snapshot
+
+After every cycle and every owner command the agent writes `sales/central.json` for the desktop
+manager's Central page: `states` (14 states with Portuguese label, group and count),
+`interventions` (conversations with the owner, hot first, with label, name, phone, wa.me link,
+reason, last message and ficha), `messages` (the 100 most recent, both directions) and
+`leads`. `sales central` refreshes it and prints what needs the owner.
+
+| Group | States |
+| --- | --- |
+| Com você | `needs-owner` Precisa de você, `quote-requested` Orçamento a fazer, `unconfirmed` Envio não confirmado, `owner` Você está atendendo |
+| Em conversa | `qualifying` Coletando dados, `engaged` Em conversa |
+| Prospecção | `new` Novo, `opening` Abrindo conversa, `opened` Abordado, `followed-up` Follow-up enviado |
+| Encerrados | `closed` Encerrado, `no-response` Sem resposta, `do-not-contact` Não contatar, `invalid-number` Número sem WhatsApp |
+
 ## Commands
 
 Everything is dry-run unless `--live`. `run` needs the logged-in WhatsApp session; the other
@@ -73,6 +110,8 @@ commands work offline.
 python3 -m tools.ytbot commercial sales check    --network whatsapp [--ping]
 python3 -m tools.ytbot commercial sales import   --network whatsapp --csv ~/leads.csv
 python3 -m tools.ytbot commercial sales leads    --network whatsapp [--state opened]
+python3 -m tools.ytbot commercial sales contacts --network whatsapp
+python3 -m tools.ytbot commercial sales central  --network whatsapp [--json]
 python3 -m tools.ytbot commercial sales simulate --network whatsapp --text "Quanto custa?"
 python3 -m tools.ytbot commercial sales rehearse --network whatsapp [--only negoci] [--no-llm]
 python3 -m tools.ytbot commercial sales run      --network whatsapp --once
@@ -199,9 +238,15 @@ When the agent opens a chat to answer, it reads every bubble since its last mess
   (hand-off); during it, it is material.
 - Voice messages are captured through a hook installed only on the bot's page
   (`sender.MEDIA_HOOK`: records the media WhatsApp plays or turns into object URLs, muted), then
-  transcribed locally by faster-whisper large-v3-turbo on the GPU, Portuguese
-  (`src/core/ai_transcriber.py`, ~5 s per note). The transcript is the message: classified,
-  answered and stored as "Cliente (áudio transcrito)". The voice never leaves the PC.
+  transcribed locally by faster-whisper large-v3-turbo on the GPU, Portuguese, beam 5 with word
+  timestamps (`sales/transcribe.py`; ~2.5 s model load + ~0.5 s for a 26 s note; the project's
+  subtitle transcriber is the fallback). The transcript is the message: classified, answered
+  and stored as "Cliente (áudio transcrito)"; numbers heard with confidence below 0.6 are kept
+  in `uncertain`. The voice never leaves the PC.
+- Measured on the owner's test notes: beam 1, beam 5, a vocabulary prompt and hotwords gave the
+  same words, and "9h74" was heard with 0.99 confidence, so it was what the client said. An
+  impossible clock time is approximated to the logical value by carrying the minutes
+  (`9h74` → `10h14`, `25:10` → `1:10`) and the brief notes the client's original words.
 - If the audio cannot be read or transcribed, it falls back to the `audio` hand-off.
 - Videos and documents are noted as `[vídeo]` / `[documento]` and handed to the owner.
 

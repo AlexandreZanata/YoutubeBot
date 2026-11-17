@@ -90,6 +90,7 @@ def render(transcripts: list[dict]) -> str:
                 lines.append(f"     [{turn['intent']}/{turn['action']}/{turn['source']} -> "
                              f"{turn['state']}]")
         for entry in record["handoffs"]:
-            lines.append(f"  >> {entry['label']} | {entry['reason']} | {entry['phone']}")
+            lines.append(f"  >> {entry['priority_label']} | {entry['reason']} | "
+                         f"{entry.get('contact_name') or entry['name']} {entry['phone']}")
         lines.append("")
     return "\n".join(lines)

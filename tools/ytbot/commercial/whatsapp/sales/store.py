@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -29,6 +30,9 @@ CSV_FIELDS = ("name", "phone", "city", "category", "maps_url", "website", "note"
 # States where the agent may still send automated messages.
 AUTOMATED_STATES = ("opened", "followed-up", "engaged", "qualifying", "closed")
 TERMINAL_STATES = ("do-not-contact", "no-response", "invalid-number")
+# Where leads come from; the acquisition module (Receita Federal, manual Maps search) adds rows
+# through `import_rows` with its own source so numbering and contact export stay the same.
+SOURCES = ("google-maps-reviewed", "google-maps-manual", "receita-federal", "manual")
 
 
 def stamp(now: datetime) -> str:
@@ -71,6 +75,37 @@ def lead_id(phone: str) -> str:
 def dnc_hash(phone: str) -> str:
     key = phone_key(phone) or re.sub(r"\D", "", phone)
     return hashlib.sha256(f"zaflas-dnc:{key}".encode()).hexdigest()[:24]
+
+
+def category_slug(category: str) -> str:
+    """"Barbearia" -> "barbearia", "Salão de Beleza" -> "salao-de-beleza"; empty -> "lead"."""
+    plain = unicodedata.normalize("NFKD", category or "")
+    plain = "".join(char for char in plain if not unicodedata.combining(char)).lower()
+    return re.sub(r"[^a-z0-9]+", "-", plain).strip("-")[:30] or "lead"
+
+
+def contact_name(lead: dict) -> str:
+    """Name saved on the phone: the category label first, so one search finds a whole niche."""
+    label = lead.get("label") or ""
+    return f"{label} {lead.get('name', '')}".strip()
+
+
+def _vcard_text(value: str) -> str:
+    """Escape a vCard 3.0 text value."""
+    for raw, escaped in (("\\", "\\\\"), (",", "\\,"), (";", "\\;"), ("\n", "\\n")):
+        value = value.replace(raw, escaped)
+    return value
+
+
+def vcard(lead: dict) -> str:
+    name = _vcard_text(contact_name(lead))
+    note = " · ".join(part for part in (f"Lead {lead['id']}", lead.get("source", ""),
+                                        lead.get("city", ""), lead.get("maps_url", "")) if part)
+    lines = ["BEGIN:VCARD", "VERSION:3.0", f"N:;{name};;;", f"FN:{name}",
+             "ORG:Zaflas prospecção", f"TEL;TYPE=CELL:+{lead['phone']}",
+             f"CATEGORIES:Zaflas,{category_slug(lead.get('category', ''))}",
+             f"NOTE:{_vcard_text(note)}", "END:VCARD"]
+    return "\r\n".join(lines) + "\r\n"
 
 
 def mask(phone: str) -> str:
@@ -132,6 +167,8 @@ class SalesStore:
         self.usage_path = self.root / "llm-usage.jsonl"
         self.key_path = self.root / "llm.env"
         self.lock_path = self.root / "run.lock"
+        self.contacts_dir = self.root / "contatos"
+        self.central_path = self.root / "central.json"
         # Shared with the sender and the listener; formats stay compatible.
         self.journal_path = base / "journal.jsonl"
         self.contact_rules_path = base / "rules.json"
@@ -186,8 +223,30 @@ class SalesStore:
         self.save_leads(leads)
         return leads[identifier]
 
+    def ensure_labels(self, leads: dict[str, dict] | None = None) -> dict[str, dict]:
+        """Give every lead a category number (barbearia-1, barbearia-2, ...), never reused."""
+        own = leads is None
+        leads = self.leads() if own else leads
+        used: dict[str, int] = {}
+        for lead in leads.values():
+            match = re.fullmatch(r"(.+)-(\d+)", lead.get("label") or "")
+            if match:
+                used[match.group(1)] = max(used.get(match.group(1), 0), int(match.group(2)))
+        changed = False
+        for lead in sorted(leads.values(), key=lambda item: item.get("imported_at") or ""):
+            if lead.get("label"):
+                continue
+            slug = category_slug(lead.get("category", ""))
+            used[slug] = used.get(slug, 0) + 1
+            lead["label"] = f"{slug}-{used[slug]}"
+            lead["contact_name"] = contact_name(lead)
+            changed = True
+        if own and changed:
+            self.save_leads(leads)
+        return leads
+
     def find_lead(self, chat: str) -> dict | None:
-        """Match a WhatsApp chat title to a lead by phone digits or exact saved name."""
+        """Match a WhatsApp chat title to a lead: phone digits, saved contact name or label."""
         leads = self.leads().values()
         digits = re.sub(r"\D", "", chat or "")
         if len(digits) >= 10:
@@ -199,9 +258,10 @@ class SalesStore:
         if not title:
             return None
         for lead in leads:
-            names = {str(lead.get("name", "")).strip().casefold(),
-                     str(lead.get("chat") or "").strip().casefold()}
-            if title in names:
+            names = {str(lead.get(key) or "").strip().casefold()
+                     for key in ("name", "chat", "contact_name", "label")} - {""}
+            label = str(lead.get("label") or "").casefold()
+            if title in names or (label and title.startswith(label + " ")):
                 return lead
         return None
 
@@ -242,42 +302,79 @@ class SalesStore:
         return _read_lines(self.handoff_path)
 
     # Import --------------------------------------------------------------------------
-    def import_csv(self, path: Path, now: datetime) -> dict:
+    def import_csv(self, path: Path, now: datetime, source: str = "google-maps-reviewed") -> dict:
         """Import the owner's reviewed Google Maps list (no scraping, see the docs)."""
-        report = {"imported": 0, "duplicates": 0, "do_not_contact": 0, "rejected": []}
-        leads = self.leads()
         with path.open(encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
             missing = [field for field in ("name", "phone") if field not in (reader.fieldnames or [])]
             if missing:
                 raise ValueError(f"CSV needs the columns {', '.join(CSV_FIELDS)}; "
                                  f"missing {', '.join(missing)}")
-            for line, row in enumerate(reader, start=2):
-                row = {key: (value or "").strip() for key, value in row.items() if key}
-                reason = self._reject_reason(row)
-                if reason:
-                    report["rejected"].append({"line": line, "reason": reason})
-                    continue
-                phone = canonical_phone(row["phone"])
-                if self.is_dnc(phone):
-                    report["do_not_contact"] += 1
-                    continue
-                identifier = lead_id(phone)
-                if identifier in leads:
-                    report["duplicates"] += 1
-                    continue
-                leads[identifier] = {
-                    "id": identifier, "name": row["name"], "phone": phone,
-                    "city": row.get("city", ""), "category": row.get("category", ""),
-                    "maps_url": row.get("maps_url", ""), "note": row.get("note", ""),
-                    "source": "google-maps-reviewed", "state": "new",
-                    "imported_at": stamp(now), "opened_at": None, "followups": 0,
-                    "last_out_at": None, "last_in_at": None, "awaiting": None,
-                    "replies": {}, "handoff_reason": None, "chat": None,
-                }
-                report["imported"] += 1
+            rows = [{key: (value or "").strip() for key, value in row.items() if key}
+                    for row in reader]
+        return self.import_rows(rows, now, source, first_line=2)
+
+    def import_rows(self, rows: list[dict], now: datetime, source: str = "manual",
+                    first_line: int = 1) -> dict:
+        """Add approved leads, number them per category and export their contacts.
+
+        The single entry point for every acquisition path (reviewed Maps list, manual search,
+        Receita Federal data): same validation, do-not-contact check, numbering and vCard.
+        """
+        if source not in SOURCES:
+            raise ValueError(f"source must be one of {', '.join(SOURCES)}")
+        report = {"imported": 0, "duplicates": 0, "do_not_contact": 0, "rejected": [],
+                  "labels": [], "contacts_file": None}
+        leads = self.ensure_labels(self.leads())
+        added = []
+        for line, row in enumerate(rows, start=first_line):
+            reason = self._reject_reason(row)
+            if reason:
+                report["rejected"].append({"line": line, "reason": reason})
+                continue
+            phone = canonical_phone(row["phone"])
+            if self.is_dnc(phone):
+                report["do_not_contact"] += 1
+                continue
+            identifier = lead_id(phone)
+            if identifier in leads:
+                report["duplicates"] += 1
+                continue
+            leads[identifier] = {
+                "id": identifier, "name": row["name"], "phone": phone,
+                "city": row.get("city", ""), "category": row.get("category", ""),
+                "maps_url": row.get("maps_url", ""), "note": row.get("note", ""),
+                "source": source, "state": "new",
+                "imported_at": stamp(now), "opened_at": None, "followups": 0,
+                "last_out_at": None, "last_in_at": None, "awaiting": None,
+                "replies": {}, "handoff_reason": None, "chat": None,
+            }
+            self.ensure_labels(leads)
+            added.append(leads[identifier])
+            report["imported"] += 1
         self.save_leads(leads)
+        report["labels"] = [f"{lead['label']} {lead['name']}" for lead in added]
+        if added:
+            report["contacts_file"] = str(self.export_contacts(added, now, "novos"))
+            self.export_contacts(None, now, "todos")
         return report
+
+    # Phone contacts --------------------------------------------------------------------
+    def export_contacts(self, leads: list[dict] | None, now: datetime, kind: str) -> Path:
+        """vCard file to import into the phone (Google Contacts syncs it to WhatsApp).
+
+        `novos` holds one batch; `todos` is every lead that may still be contacted.
+        """
+        if leads is None:
+            leads = [lead for lead in self.ensure_labels().values()
+                     if lead.get("state") not in ("do-not-contact", "invalid-number")
+                     and not self.is_dnc(lead["phone"])]
+        _private_dir(self.contacts_dir)
+        name = "todos.vcf" if kind == "todos" else f"novos-{now.strftime('%Y%m%d-%H%M%S')}.vcf"
+        path = self.contacts_dir / name
+        path.write_text("".join(vcard(lead) for lead in leads), encoding="utf-8")
+        path.chmod(0o600)
+        return path
 
     @staticmethod
     def _reject_reason(row: dict) -> str | None:

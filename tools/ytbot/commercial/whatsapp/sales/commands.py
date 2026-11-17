@@ -9,6 +9,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .. import listener as whatsapp_listener
+from . import central
 from . import llm as sales_llm
 from . import rehearsal
 from .agent import (SalesAgent, WhatsAppChannel, owner_block, owner_reset, owner_resolve,
@@ -47,7 +48,7 @@ def _model(rules, store, enabled: bool):
 
 
 def _public(lead: dict, show_phone: bool = False) -> dict:
-    view = {key: lead.get(key) for key in ("id", "name", "city", "category", "state",
+    view = {key: lead.get(key) for key in ("id", "label", "name", "city", "category", "state",
                                            "opened_at", "followups", "last_in_at",
                                            "last_out_at", "handoff_reason")}
     view["phone"] = lead["phone"] if show_phone else mask(lead["phone"])
@@ -64,14 +65,38 @@ def command_import(args, store_factory) -> None:
     except ValueError as error:
         raise SystemExit(f"[sales] {error}")
     report["daily_openings"] = rules.limits["daily_openings"]
+    central.write(store, now)
     _print(report)
 
 
 def command_leads(args, store_factory) -> None:
     _, store, _ = _context(args, store_factory)
-    leads = [lead for lead in store.leads().values()
+    leads = [lead for lead in store.ensure_labels().values()
              if not args.state or lead["state"] == args.state]
-    _print([_public(lead, args.show_phone) for lead in leads])
+    _print([_public(lead, args.show_phone) for lead in sorted(leads, key=lambda l: l["label"])])
+
+
+def command_contacts(args, store_factory) -> None:
+    """Write the vCard with every lead that may be contacted, to import into the phone."""
+    _, store, now = _context(args, store_factory)
+    path = store.export_contacts(None, now, "todos")
+    count = path.read_text(encoding="utf-8").count("BEGIN:VCARD")
+    _print({"contacts": count, "file": str(path)})
+
+
+def command_central(args, store_factory) -> None:
+    """Refresh central.json and print what needs the owner."""
+    _, store, now = _context(args, store_factory)
+    data = central.write(store, now)
+    if args.json:
+        _print(data)
+        return
+    print(f"central.json: {store.central_path}")
+    print("Estados: " + ", ".join(f"{item['label']} {item['count']}" for item in data["states"]
+                                  if item["count"]))
+    for item in data["interventions"]:
+        print(f"- {item.get('priority_label') or item['priority']} {item['label']} {item['name']} "
+              f"{item['phone']} · {item['reason']} · {item['wa_link']}")
 
 
 def command_history(args, store_factory) -> None:
@@ -94,12 +119,14 @@ def command_block(args, store_factory) -> None:
         _print(_public(owner_block(store, args.lead, now)))
     except KeyError:
         raise SystemExit(f"[sales] unknown lead {args.lead}")
+    central.write(store, now)
 
 
 def command_resolve(args, store_factory) -> None:
-    _, store, _ = _context(args, store_factory)
+    _, store, now = _context(args, store_factory)
     try:
         _print(_public(owner_resolve(store, args.lead, args.state)))
+        central.write(store, now)
     except KeyError:
         raise SystemExit(f"[sales] unknown lead {args.lead}")
     except ValueError as error:
@@ -127,6 +154,7 @@ def command_reset(args, store_factory) -> None:
                          "confirm with --yes (test numbers only)")
     try:
         _print(_public(owner_reset(store, args.lead)))
+        central.write(store, datetime.now())
     except KeyError:
         raise SystemExit(f"[sales] unknown lead {args.lead}")
     except ValueError as error:
@@ -298,6 +326,12 @@ def add_parser(actions, store_factory, page_factory) -> None:
                    partial(command_reset, store_factory=store_factory))
     reset.add_argument("--lead", required=True)
     reset.add_argument("--yes", action="store_true")
+    contacts = action("contacts", "write the vCard of every lead to save on the phone",
+                      partial(command_contacts, store_factory=store_factory))
+    contacts.set_defaults()
+    central_parser = action("central", "refresh central.json and list what needs the owner",
+                            partial(command_central, store_factory=store_factory))
+    central_parser.add_argument("--json", action="store_true")
     check = action("check", "validate the rules, key presence and counters",
                    partial(command_check, store_factory=store_factory))
     check.add_argument("--ping", action="store_true", help="one tiny paid model call")

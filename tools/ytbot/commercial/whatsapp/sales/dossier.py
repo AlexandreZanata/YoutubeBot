@@ -133,11 +133,46 @@ def extract(rules: SalesRules, lead: dict, history: list[dict], llm, now: dateti
         data = json.loads(text[text.find("{"):text.rfind("}") + 1])
     except ValueError:
         return dict(EMPTY_BRIEF), "invalid brief output"
-    brief = _merge(EMPTY_BRIEF, data)
+    brief = approximate_brief(_merge(EMPTY_BRIEF, data))
     question = brief.get("proxima_pergunta") or ""
     if question and guard.violations(rules, [question]):
         brief["proxima_pergunta"] = ""
     return brief, ""
+
+
+TIME = re.compile(r"\b(\d{1,2})\s*(h|:)\s*(\d{2})\b", re.IGNORECASE)
+
+
+def approximate_times(text: str) -> tuple[str, list[tuple[str, str]]]:
+    """Turn impossible clock times into the nearest logical one (9h74 -> 10h14, 25h -> 1h)."""
+    changes = []
+
+    def fix(match: re.Match) -> str:
+        hours, separator, minutes = int(match.group(1)), match.group(2), int(match.group(3))
+        if hours < 24 and minutes < 60:
+            return match.group(0)
+        carried, minutes = divmod(minutes, 60)
+        hours = (hours + carried) % 24
+        fixed = f"{hours}h{minutes:02d}" if separator.lower() == "h" else f"{hours}:{minutes:02d}"
+        changes.append((match.group(0), fixed))
+        return fixed
+
+    return TIME.sub(fix, text or ""), changes
+
+
+def approximate_brief(brief: dict) -> dict:
+    """Apply `approximate_times` to the hours and note the client's original words."""
+    contact = brief.get("contato_no_site") or {}
+    original = contact.get("horario")
+    if original:
+        fixed, changes = approximate_times(original)
+        if changes:
+            contact["horario"] = fixed
+            said = ", ".join(before for before, _ in changes)
+            brief.setdefault("observacoes", []).append(
+                f"Horário aproximado: o cliente disse \"{said}\", valor impossível; registrado "
+                f"como \"{fixed}\". Confirme com o cliente.")
+    return brief
 
 
 def client_said_done(rules: SalesRules, text: str) -> bool:

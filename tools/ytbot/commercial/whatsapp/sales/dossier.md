@@ -4,7 +4,7 @@ $schema
 
 REGRAS
 1. Use somente o que o cliente escreveu ou falou em áudio. Nunca invente nome, serviço, endereço, horário, cor, domínio ou funcionalidade. Campo sem informação fica null ou lista vazia.
-2. Escreva os valores em português do Brasil, curtos e organizados, do jeito que o cliente pediu.
+2. Escreva os valores em português do Brasil, curtos e organizados, do jeito que o cliente pediu. Copie horários exatamente como o cliente disse; o sistema corrige sozinho valores impossíveis (como 9h74) e anota o original.
 3. "resumo": duas ou três frases dizendo exatamente o que o cliente quer no site.
 4. "materiais_citados": logos, fotos, textos ou arquivos que o cliente mandou ou prometeu mandar.
 5. "faltando": itens obrigatórios ainda sem resposta, entre:

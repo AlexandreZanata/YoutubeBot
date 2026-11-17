@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from .. import listener, sender
-from . import dossier
+from . import central, dossier
 from . import notify as owner_notify
 from .context import effective
 from .decide import Decision, decide, stuck
@@ -318,9 +318,17 @@ class SalesAgent:
             transcript = ""
             if path is not None:
                 try:
-                    transcript = self.transcriber(path)
+                    heard = self.transcriber(path)
                 except Exception as error:
                     entry["transcription_error"] = str(error)[:200]
+                else:
+                    if isinstance(heard, dict):
+                        transcript = heard.get("text", "")
+                        if heard.get("uncertain"):
+                            entry["uncertain"] = heard["uncertain"]
+                        entry["engine"] = heard.get("engine", "")
+                    else:
+                        transcript = heard or ""
             entry["text"] = transcript or MEDIA_TEXT["audio"]
             if transcript:
                 entry["transcript"] = transcript
@@ -595,6 +603,10 @@ class SalesAgent:
         summary = {"ingested": self.ingest(events), "replies": self.reply_pending(),
                    "followups": self.followups()}
         summary["openings"] = self.prospect(limit) if prospect else []
+        try:
+            central.write(self.store, self.now())
+        except OSError as error:
+            self.log(f"central.json not written: {error}")
         return summary
 
 

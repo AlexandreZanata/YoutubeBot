@@ -48,8 +48,10 @@ def handoff_entry(lead: dict, history: list[dict], reason: str, priority: str, i
     priority = priority if priority in LABELS else "needed"
     return {
         "at": now.isoformat(timespec="seconds"), "lead": lead["id"], "name": lead["name"],
+        "label": lead.get("label", ""), "contact_name": lead.get("contact_name", ""),
         "phone": format_phone(lead.get("phone", "")), "wa_link": wa_link(lead.get("phone", "")),
-        "priority": priority, "label": LABELS[priority], "reason": reason, "intent": intent,
+        "priority": priority, "priority_label": LABELS[priority], "reason": reason,
+        "intent": intent,
         "state": lead.get("state"), "last_message": text,
         "recent": recent(history, agent_name), "ficha": ficha,
     }
@@ -57,8 +59,9 @@ def handoff_entry(lead: dict, history: list[dict], reason: str, priority: str, i
 
 def message(entry: dict) -> tuple[str, str]:
     """Notification title and body."""
-    title = f"Zaflas vendas · {entry['label']}"
-    lines = [f"{entry['name']} · {entry['phone']}", entry["reason"]]
+    title = f"Zaflas vendas · {entry['priority_label']}"
+    who = entry.get("contact_name") or entry["name"]
+    lines = [f"{who} · {entry['phone']}", entry["reason"]]
     if entry.get("last_message"):
         lines.append(f"“{entry['last_message'][:140]}”")
     if entry.get("wa_link"):
