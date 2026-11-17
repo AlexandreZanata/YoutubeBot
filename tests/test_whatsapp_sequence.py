@@ -118,19 +118,26 @@ class FakeClock:
 class DeliverPage:
     """Composer, Send button and bubbles; clicking Send adds our bubble."""
 
-    def __init__(self, clock):
+    def __init__(self, clock, covered=False, swallow=False):
         self.clock = clock
         self.typed = ""
+        self.focused = False
+        self.covered = covered
+        self.swallow = swallow
         self.bubbles = [{"dir": "out", "text": "anterior", "id": "old"}]
         self.sent_at = None
         page = self
 
         class Keyboard:
             def insert_text(self, chunk):
-                page.typed += chunk
+                if not page.swallow:
+                    page.typed += chunk
 
             def press(self, key):
-                raise AssertionError("the Send button exists")
+                if key == "Delete":
+                    page.typed = ""
+                elif key != "Control+A":
+                    raise AssertionError("the Send button exists")
 
         self.keyboard = Keyboard()
 
@@ -140,8 +147,16 @@ class DeliverPage:
         class Node:
             first = None
 
-            def click(self):
-                pass
+            def click(self, timeout=None):
+                if page.covered:
+                    raise TimeoutError("another element would receive the click")
+                page.focused = True
+
+            def evaluate(self, script):
+                page.focused = True
+
+            def inner_text(self):
+                return page.typed
 
             def count(self):
                 return 1
@@ -196,6 +211,24 @@ class DeliverTimingTests(unittest.TestCase):
         _, page, _ = self.deliver("https://zaflas.com.br", 1.0, last_send=50.0, start=50.4,
                                   link_wait=3.0)
         self.assertGreaterEqual(page.sent_at, 53.4)
+
+    def test_covered_composer_is_focused_directly_and_the_message_sent(self):
+        clock = FakeClock(10.0)
+        page = DeliverPage(clock, covered=True)
+        with patch.object(sender.time, "monotonic", clock.monotonic), \
+                patch.object(sender.time, "sleep", clock.sleep):
+            state = sender.deliver(page, "Bom dia", sender.Pacing(), delay=1.0)
+        self.assertEqual(state, "sent")
+        self.assertTrue(page.focused)
+
+    def test_text_that_never_reached_the_composer_is_not_sent(self):
+        clock = FakeClock(10.0)
+        page = DeliverPage(clock, swallow=True)
+        with patch.object(sender.time, "monotonic", clock.monotonic), \
+                patch.object(sender.time, "sleep", clock.sleep), \
+                self.assertRaises(RuntimeError):
+            sender.deliver(page, "Bom dia", sender.Pacing(), delay=1.0)
+        self.assertIsNone(page.sent_at)
 
     def test_missing_bubble_is_unconfirmed_after_the_bounded_wait(self):
         clock = FakeClock(10.0)

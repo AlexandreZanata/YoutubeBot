@@ -288,8 +288,8 @@ def add_parser(actions, store_factory, page_factory) -> None:
     resolve = action("resolve", "owner: hand a conversation back after handling it",
                      partial(command_resolve, store_factory=store_factory))
     resolve.add_argument("--lead", required=True)
-    resolve.add_argument("--state", choices=("engaged", "closed", "opened", "do-not-contact"),
-                         default="engaged")
+    resolve.add_argument("--state", choices=("engaged", "qualifying", "closed", "opened",
+                                              "do-not-contact"), default="engaged")
     ficha = action("ficha", "rebuild a client's folder and brief from the conversation",
                    partial(command_ficha, store_factory=store_factory))
     ficha.add_argument("--lead", required=True)

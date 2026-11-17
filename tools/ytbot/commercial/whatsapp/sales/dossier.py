@@ -65,9 +65,10 @@ def save_media(folder: Path, data: bytes, extension: str, kind: str, now: dateti
 
 
 def media_files(history: list[dict]) -> list[dict]:
-    return [{"tipo": entry.get("media"), "arquivo": entry["file"],
-             "legenda": entry.get("caption", ""), "em": entry.get("at", "")}
-            for entry in history if entry.get("dir") == "in" and entry.get("file")]
+    return [{"tipo": entry.get("media"), "arquivo": name, "legenda": entry.get("caption", ""),
+             "em": entry.get("at", "")}
+            for entry in history if entry.get("dir") == "in" and entry.get("file")
+            for name in entry.get("files") or [entry["file"]]]
 
 
 def transcript(history: list[dict], agent_name: str) -> list[str]:
@@ -81,7 +82,8 @@ def transcript(history: list[dict], agent_name: str) -> list[str]:
         if entry.get("media") == "audio":
             speaker += " (áudio transcrito)"
         if entry.get("file"):
-            text = f"{text} [{entry['media']}: {entry['file']}]"
+            names = ", ".join(entry.get("files") or [entry["file"]])
+            text = f"{text} [{entry['media']}: {names}]"
         lines.append(f"[{when}] {speaker}: {text}")
     return lines
 

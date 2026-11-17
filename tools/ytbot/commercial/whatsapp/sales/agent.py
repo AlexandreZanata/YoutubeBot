@@ -78,13 +78,14 @@ class WhatsAppChannel:
     def read_recent(self) -> list[dict]:
         return sender.read_bubbles(self.page, 30)
 
-    def fetch_media(self, bubble: dict) -> tuple[bytes, str] | None:
+    def fetch_media(self, bubble: dict) -> list[tuple[bytes, str]]:
         return sender.fetch_media(self.page, bubble.get("id", ""), bubble.get("media", ""))
 
     def send(self, lead: dict, items: list[dict], extra: dict) -> list[dict]:
         return sender.send_sequence(self.page, lead["name"], items, self.typing,
                                     self.journal_path, extra=extra,
-                                    link_wait=self.pacing.link_preview)
+                                    link_wait=self.pacing.link_preview,
+                                    debug_dir=self.journal_path.parent / "sales" / "debug")
 
 
 class SalesAgent:
@@ -301,13 +302,18 @@ class SalesAgent:
         path = None
         if media in ("image", "audio"):
             try:
-                fetched = self.channel.fetch_media(bubble)
+                fetched = self.channel.fetch_media(bubble) or []
             except Exception:
-                fetched = None
-            if fetched:
-                folder = dossier.client_dir(self.store.root, lead)
-                path = dossier.save_media(folder, fetched[0], fetched[1], media, now)
+                fetched = []
+            if fetched and isinstance(fetched, tuple):
+                fetched = [fetched]
+            folder = dossier.client_dir(self.store.root, lead)
+            files = [dossier.save_media(folder, data, extension, media, now)
+                     for data, extension in fetched]
+            if files:
+                path = files[0]
                 entry["file"] = str(path.relative_to(folder))
+                entry["files"] = [str(item.relative_to(folder)) for item in files]
         if media == "audio":
             transcript = ""
             if path is not None:
@@ -594,12 +600,17 @@ class SalesAgent:
 
 def owner_resolve(store: SalesStore, lead_id: str, state: str) -> dict:
     """The owner hands a conversation back (or closes it) after handling it personally."""
-    if state not in ("engaged", "closed", "opened", "do-not-contact"):
-        raise ValueError("state must be engaged, closed, opened or do-not-contact")
+    if state not in ("engaged", "qualifying", "closed", "opened", "do-not-contact"):
+        raise ValueError("state must be engaged, qualifying, closed, opened or do-not-contact")
     lead = store.lead(lead_id)
     if lead is None:
         raise KeyError(lead_id)
-    return store.update_lead(lead_id, state=state, awaiting=None, handoff_reason=None,
+    _, unanswered = split_pending(store.history(lead_id))
+    awaiting = None
+    if state in REPLYABLE and unanswered:
+        # Messages that arrived while the owner had the chat are answered on the next cycle.
+        awaiting = f"resume-{len(store.history(lead_id))}"
+    return store.update_lead(lead_id, state=state, awaiting=awaiting, handoff_reason=None,
                              intents=[], bot_replies=0)
 
 

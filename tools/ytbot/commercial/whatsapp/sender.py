@@ -94,13 +94,20 @@ FETCH_MEDIA = """async ({id, kind}) => {
   });
   const fromUrl = async (url) => read(await (await fetch(url)).blob());
   if (kind === 'image') {
-    const images = Array.from(node.querySelectorAll('img')).filter((img) => img.src.startsWith('blob:'));
-    images.sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight);
-    return images.length ? fromUrl(images[0].src) : null;
+    // One image or an album: every distinct full image in the bubble.
+    const sources = [...new Set(Array.from(node.querySelectorAll('img'))
+      .filter((img) => img.src.startsWith('blob:') && img.naturalWidth >= 200)
+      .map((img) => img.src))];
+    const files = [];
+    for (const source of sources) {
+      const file = await fromUrl(source);
+      if (file) files.push(file);
+    }
+    return files;
   }
   if (kind !== 'audio') return null;
   const inline = node.querySelector('audio[src^="blob:"]');
-  if (inline) return fromUrl(inline.src);
+  if (inline) return [await fromUrl(inline.src)];
   const blobs = (window.__ytbotBlobs || []).length;
   const played = (window.__ytbotPlayed || []).length;
   const button = Array.from(node.querySelectorAll('button,[role=button]'))
@@ -113,13 +120,13 @@ FETCH_MEDIA = """async ({id, kind}) => {
       .find((item) => (item.currentSrc || item.src || '').startsWith('blob:'));
     if (element) {
       try { element.pause(); } catch (error) {}
-      return fromUrl(element.currentSrc || element.src);
+      return [await fromUrl(element.currentSrc || element.src)];
     }
     const hooked = (window.__ytbotBlobs || []).slice(blobs)
       .find((item) => /^audio\\//.test(item.type) || /ogg|opus/.test(item.type));
-    if (hooked) return read(hooked.blob);
+    if (hooked) return [await read(hooked.blob)];
     const tag = node.querySelector('audio[src^="blob:"]') || document.querySelector('audio[src^="blob:"]');
-    if (tag) { try { tag.pause(); } catch (error) {} return fromUrl(tag.src); }
+    if (tag) { try { tag.pause(); } catch (error) {} return [await fromUrl(tag.src)]; }
   }
   return null;
 }"""
@@ -240,25 +247,27 @@ def read_bubbles(page, limit: int = 30) -> list[dict]:
              "id": row.get("id", ""), "media": row.get("media", "")} for row in rows or []]
 
 
-def fetch_media(page, message_id: str, kind: str) -> tuple[bytes, str] | None:
-    """Bytes and file extension of an image or voice message in the open chat."""
-    if not message_id or kind not in ("image", "audio"):
-        return None
-    try:
-        result = page.evaluate(FETCH_MEDIA, {"id": message_id, "kind": kind})
-    except Exception:
-        return None
-    if not result or not str(result.get("data", "")).startswith("data:"):
-        return None
+def fetch_media(page, message_id: str, kind: str) -> list[tuple[bytes, str]]:
+    """Bytes and extension of each image (an album has several) or of the voice message."""
     import base64
 
-    header, _, payload = result["data"].partition(",")
-    data = base64.b64decode(payload) if ";base64" in header else payload.encode()
-    if not data or len(data) > MAX_MEDIA_BYTES:
-        return None
-    kind_type = (result.get("type") or "").split(";")[0].strip().lower()
-    extension = EXTENSIONS.get(kind_type, ".ogg" if kind == "audio" else ".jpg")
-    return data, extension
+    if not message_id or kind not in ("image", "audio"):
+        return []
+    try:
+        results = page.evaluate(FETCH_MEDIA, {"id": message_id, "kind": kind}) or []
+    except Exception:
+        return []
+    files = []
+    for result in results if isinstance(results, list) else [results]:
+        if not result or not str(result.get("data", "")).startswith("data:"):
+            continue
+        header, _, payload = result["data"].partition(",")
+        data = base64.b64decode(payload) if ";base64" in header else payload.encode()
+        if not data or len(data) > MAX_MEDIA_BYTES:
+            continue
+        kind_type = (result.get("type") or "").split(";")[0].strip().lower()
+        files.append((data, EXTENSIONS.get(kind_type, ".ogg" if kind == "audio" else ".jpg")))
+    return files
 
 
 def last_outgoing(page) -> str:
@@ -306,6 +315,20 @@ def attach_image(page, image: Path) -> None:
     page.wait_for_timeout(4000)
 
 
+def focus_composer(page):
+    """Focus an empty composer; a click first, the element's own focus when something covers it."""
+    composer = page.locator(COMPOSER).first
+    try:
+        composer.click(timeout=8000)
+    except Exception:
+        composer.evaluate("(element) => { element.scrollIntoView({block: 'center'}); "
+                          "element.focus(); }")
+    if composer.inner_text().strip():
+        page.keyboard.press("Control+A")
+        page.keyboard.press("Delete")
+    return composer
+
+
 def deliver(page, text: str, pacing: Pacing, delay: float | None = None,
             image: Path | None = None, link_wait: float = 0.0, timing: dict | None = None,
             confirm_timeout: float = 8.0) -> str:
@@ -320,9 +343,12 @@ def deliver(page, text: str, pacing: Pacing, delay: float | None = None,
     before = _outgoing_ids(page)
     if image is not None:
         attach_image(page, image)
-    composer = page.locator(COMPOSER).first
-    composer.click()
+    composer = focus_composer(page)
     human_type(page, text, pacing)
+    if text.strip()[:20] not in composer.inner_text().replace("\n", " "):
+        page.keyboard.press("Control+A")
+        page.keyboard.press("Delete")
+        raise RuntimeError("the text did not reach the composer; nothing was sent")
     typed = time.monotonic()
     page.wait_for_timeout(150)
     ready = start + interval
@@ -367,9 +393,24 @@ def journal_state(path: Path, key: str) -> str | None:
     return None
 
 
+def debug_screenshot(page, folder: Path | None) -> str:
+    """Private screenshot of a failed send (it shows the chat: kept under .local only)."""
+    if folder is None or page is None:
+        return ""
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        folder.chmod(0o700)
+        path = folder / f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-send-error.png"
+        page.screenshot(path=str(path))
+        path.chmod(0o600)
+        return str(path)
+    except Exception:
+        return ""
+
+
 def send_sequence(page, to: str, items: list[dict], pacing: Pacing, journal_path: Path,
                   extra: dict | None = None, link_wait: float = 0.0,
-                  deliver_fn=None) -> list[dict]:
+                  deliver_fn=None, debug_dir: Path | None = None) -> list[dict]:
     """Send several messages in the chat already open, one journaled step each.
 
     Each item is {key, text, delay}. A key already `sent` is skipped, an uncertain key stops
@@ -394,7 +435,9 @@ def send_sequence(page, to: str, items: list[dict], pacing: Pacing, journal_path
             state = deliver_fn(page, item["text"], pacing, delay=item.get("delay"),
                                link_wait=link_wait, timing=timing)
         except Exception as error:
-            journal(journal_path, {**entry, "state": "error", "error": str(error)[:300],
+            shot = debug_screenshot(page, debug_dir)
+            journal(journal_path, {**entry, "state": "error", "error": str(error)[:1200],
+                                   "screenshot": shot,
                                    "at": datetime.now().isoformat(timespec="seconds")})
             results.append({"key": item["key"], "state": "error", "error": str(error)[:300]})
             break

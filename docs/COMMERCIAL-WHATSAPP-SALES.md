@@ -194,8 +194,8 @@ one reminder. `sales ficha --lead L…` rebuilds a folder on demand.
 
 When the agent opens a chat to answer, it reads every bubble since its last message:
 
-- Images (`data-testid="image-thumb"`) are saved from their full-resolution `blob:` image; the
-  caption is the message text. Outside the quote stage an image without caption is `media`
+- Images (`data-testid="image-thumb"`) are saved from their full-resolution `blob:` image; an
+  album (several photos in one bubble) saves every photo; the caption is the message text. Outside the quote stage an image without caption is `media`
   (hand-off); during it, it is material.
 - Voice messages are captured through a hook installed only on the bot's page
   (`sender.MEDIA_HOOK`: records the media WhatsApp plays or turns into object URLs, muted), then
@@ -204,6 +204,16 @@ When the agent opens a chat to answer, it reads every bubble since its last mess
   answered and stored as "Cliente (áudio transcrito)". The voice never leaves the PC.
 - If the audio cannot be read or transcribed, it falls back to the `audio` hand-off.
 - Videos and documents are noted as `[vídeo]` / `[documento]` and handed to the owner.
+
+## Typing safety
+
+Before typing, the composer gets focus by a click (8 s) or, when something covers it (a new
+message banner while the chat scrolls), by focusing the element itself; a leftover draft is
+cleared. After typing, the composer must contain the text, or it is cleared and the send fails
+before Send is pressed. Any failure is journaled with the full error and a private screenshot
+in `.local/commercial/whatsapp/sales/debug/`, the lead becomes `unconfirmed` and the run stops.
+After checking the chat, `sales resolve --state engaged|qualifying` hands it back; messages that
+arrived meanwhile are answered on the next cycle.
 
 ## Owner test reset
 

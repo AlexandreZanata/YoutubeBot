@@ -159,6 +159,32 @@ class ClientDossierTests(unittest.TestCase):
         self.assertEqual(len(record["arquivos"]), 1)
         self.assertEqual(self.notes[-1]["reason"], "Cliente mandou mais material para o orçamento")
 
+    def test_album_saves_every_photo(self):
+        channel = FakeChannel(self.store.journal_path,
+                              media={"m1": [(JPEG, ".jpg"), (JPEG + b"2", ".jpg"),
+                                            (JPEG + b"3", ".jpg")]})
+        agent = self.qualifying(channel)
+        channel.bubbles = [{"dir": "out", "text": "Ótimo!", "id": "o1"},
+                           {"dir": "in", "text": "", "id": "m1", "media": "image"}]
+        agent.ingest([self.event("Photo", "e3")])
+        agent.reply_pending()
+        record = json.loads((dossier.client_dir(self.store.root, self.lead) / "ficha.json")
+                            .read_text(encoding="utf-8"))
+        self.assertEqual(len(record["arquivos"]), 3)
+
+    def test_owner_resolve_resumes_the_collection_with_pending_messages(self):
+        from tools.ytbot.commercial.whatsapp.sales.agent import owner_resolve
+        channel = FakeChannel(self.store.journal_path)
+        agent = self.qualifying(channel)
+        self.store.update_lead(self.lead["id"], state="unconfirmed", awaiting=None)
+        agent.ingest([self.event("Barbearia Navalha, corte e barba", "e3")])
+        self.assertEqual(agent.reply_pending(), [])
+        owner_resolve(self.store, self.lead["id"], "qualifying")
+        sent = len(channel.sent)
+        agent.reply_pending()
+        self.assertGreater(len(channel.sent), sent)
+        self.assertEqual(channel.sent[-1]["text"], self.rules.brief["fallback_question"])
+
     def test_owner_test_reset_sends_the_opening_again(self):
         channel = FakeChannel(self.store.journal_path)
         agent = self.agent(channel)
