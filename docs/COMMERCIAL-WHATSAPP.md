@@ -54,13 +54,18 @@ The 2026 web client is a React app without `#main` or `footer`. The stable ancho
 | Chat by number | `https://web.whatsapp.com/send?phone=<55DDDNUMBER>` | Opens a chat with an unsaved number |
 | Number without WhatsApp | text `Phone number shared via url is invalid` | Localized; the sales agent marks `invalid-number` |
 | Chat row | `[data-testid="cell-frame-container"]` | One per conversation |
+| Row title | `[data-testid="cell-frame-title"] span[title]` | Saved name or formatted number; a contact without photo also shows its initial as a text line |
+| Row time | `[data-testid="chat-list-timestamp"]` | `3:15 PM`, `Sunday`, `8/20/2026` |
+| Row preview | `[data-testid="last-msg-status"]` | Groups prefix `You:` / sender name |
+| Our last message | `svg title` `wds-ic-delivered` / `wds-ic-read` in the row | 1:1 chats show no `You:` prefix |
+| Unread badge | `[data-testid="icon-unread-count"]` | aria-label `2 unread messages` |
 | Composer | `div[data-testid="conversation-compose-box-input"]` | `contenteditable`, `aria-label="Type a message to ..."` |
 | Send button | `button[aria-label="Send"]` | Appears after the composer has text |
 | Attach button | `button[aria-label="Attach"]` | Opens the attach menu |
 | Attach menu | `Document`, `Photos & videos`, `Camera`, `Audio`, `Contact`, `Poll`, `Pix`, `Event`, `New sticker` | Localized labels |
 | Image input | `input[type=file][accept="image/*"]` | Accepts a local file directly |
 | Messages | `[data-testid="msg-container"]` | One per bubble |
-| Bubble direction | closest `[data-id]` starting with `true_` (ours) or `false_` | Primary signal |
+| Bubble direction | closest `[data-id]` starting with `true_` (ours) or `false_` | Older clients; in 2026 `data-id` is the bare message id, still used to confirm a new bubble |
 | Outgoing bubble | `[data-testid="msg-container"]:has(span[data-icon="tail-out"])` | Fallback; only the first bubble of a group has a tail |
 | Incoming bubble | `[data-testid="msg-container"]:has(span[data-icon="tail-in"])` | Fallback; untailed bubbles continue the group |
 | Message text | `span.selectable-text` inside the bubble | Read for verification |
@@ -90,15 +95,16 @@ start
 1. `open_chat`: load the web app, wait for the chat list, fill the search input, wait two
    seconds, press Enter, wait for the composer, pause 1-3 seconds.
 2. `dry_run`: log the computed interval and stop without typing.
-3. `live`: sleep a random interval between `--min-interval` and `--max-interval` (default
-   8 to 25 seconds), the same shape as the Telegram publisher's minimum/maximum interval.
+3. `live`: the interval since the previous send (or since the chat opened) is a random value
+   between `--min-interval` and `--max-interval` (default 8 to 25 seconds) and includes the
+   typing; the sales agent passes its own per-message intervals.
 4. Optional image: set the image input, wait for the preview, click Send in the preview.
 5. Type the message in small chunks, 35 to 95 ms per character, extra 150 to 450 ms after
    `.`, `,`, `?` and `!`. Never paste the whole text.
 6. Click Send (or press Enter when the button is absent).
-7. Verify that the newest outgoing bubble is new (its `data-id` was not there before typing)
-   and contains the first characters of the message. A message with a link first waits for
-   the preview card (sales agent: 4 s).
+7. Poll for up to 8 s until the newest outgoing bubble is new (its `data-id` was not there
+   before typing) and contains the first characters of the message. A message with a link
+   waits at least 3 s after typing for the preview card.
 8. Journal `sent` or `unconfirmed`. `sent` is final; `unconfirmed` is never retried blindly.
 
 ## Incoming event listener
@@ -128,7 +134,9 @@ Event schema in `.local/commercial/whatsapp/events.jsonl`:
 - `allowed` comes from `rules.json`: `mode: allow` replies only to listed contacts; `mode:
   block` replies to everyone except them. Matching is case-insensitive and accepts partial
   names. The default is `allow` with an empty list, so nothing is auto-approved.
-- Previews that start with `You:`/`Você:` are the owner's own messages and are skipped.
+- Rows are read through the test ids above; a row whose last message carries the delivered or
+  read check, or a preview that starts with `You:`/`Você:`, is the owner's own message and is
+  skipped. Older layouts fall back to the row text, where the title is the line before the time.
 
 Limits: the listener sees only the newest preview per chat, so it does not backfill history;
 media show as labels (`Photo`, `Sticker`, `Audio`); an edited message can re-emit if its

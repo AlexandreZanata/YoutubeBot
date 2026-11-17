@@ -126,6 +126,12 @@ class SalesRules:
         texts = [text.replace("{greeting}", greeting) for text in self.raw["opening"]["messages"]]
         return texts + list(self.raw["opening"]["links"])
 
+    def opening_delays(self) -> list[float]:
+        """Seconds before each opening message, aligned with `opening_messages`."""
+        opening = self.raw["opening"]
+        return ([float(value) for value in opening["delays"]]
+                + [float(opening["link_delay"])] * len(opening["links"]))
+
     def followup_messages(self) -> list[str]:
         return list(self.raw["followup"]["messages"])
 
@@ -184,7 +190,7 @@ def build(raw: dict) -> SalesRules:
     _require(raw, "llm", ("base_url", "model", "api_key_env", "temperature",
                           "max_output_tokens", "timeout_seconds"))
     _require(raw, "greetings", ("morning", "afternoon", "evening"))
-    _require(raw, "opening", ("messages", "links"))
+    _require(raw, "opening", ("messages", "links", "delays", "link_delay"))
     _require(raw, "followup", ("messages",))
     _require(raw, "handoff", ("messages",))
     _require(raw, "context", ("offer_question", "affirmative", "negative"))
@@ -206,6 +212,11 @@ def build(raw: dict) -> SalesRules:
     for kind in ("opening", "reply"):
         _clock(raw["hours"][f"{kind}_start"], f"hours.{kind}_start")
         _clock(raw["hours"][f"{kind}_end"], f"hours.{kind}_end")
+    delays = raw["opening"]["delays"]
+    if len(delays) != len(raw["opening"]["messages"]):
+        raise RulesError("opening.delays needs one value per opening message")
+    if not all(0 < float(value) <= 60 for value in [*delays, raw["opening"]["link_delay"]]):
+        raise RulesError("opening delays must be between 0 and 60 seconds")
     for link in raw["opening"]["links"]:
         if not str(link).startswith("https://"):
             raise RulesError(f"opening link must use https: {link}")

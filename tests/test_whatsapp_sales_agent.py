@@ -59,10 +59,29 @@ class SalesAgentTests(unittest.TestCase):
         rules = listener.load_rules(self.store.contact_rules_path)
         self.assertTrue(listener.contact_allowed("+55 65 90000-0001", rules))
 
-    def test_typing_delay_follows_message_length(self):
+    def test_opening_uses_the_owner_intervals(self):
         _, _, channel = self.opened_lead()
-        delays = {item["text"]: item["delay"] for item in channel.sent}
-        self.assertLess(delays["Bom dia"], delays[self.rules.opening_messages(MONDAY)[2]])
+        self.assertEqual([item["delay"] for item in channel.sent], [4, 2, 8, 8, 4, 4, 4, 4])
+
+    def test_reply_delay_follows_message_length(self):
+        _, agent, channel = self.opened_lead()
+        agent.llm = FakeModel({"intent": "site_institutional", "messages": [
+            "Fica em média R$ 500.",
+            "Um site institucional é a vitrine da sua empresa na internet: mostra quem vocês "
+            "são, os serviços, fotos, endereço, horário e um botão para chamar no WhatsApp."]})
+        agent.ingest([self.event("Quanto fica um site para a minha barbearia?")])
+        agent.reply_pending()
+        short, long = channel.sent[-2]["delay"], channel.sent[-1]["delay"]
+        pacing = agent.pacing
+        self.assertLessEqual(short, pacing.max_seconds + pacing.reading_max)
+        self.assertGreater(long, pacing.min_seconds)
+        self.assertLessEqual(long, pacing.max_seconds)
+
+    def test_chat_list_echo_of_our_message_is_not_an_incoming_message(self):
+        lead, agent, channel = self.opened_lead()
+        agent.ingest([self.event("https://abastevo.com.br")])
+        self.assertIsNone(self.store.lead(lead["id"])["awaiting"])
+        self.assertEqual(agent.reply_pending(), [])
 
     def test_opening_is_never_repeated(self):
         lead, agent, channel = self.opened_lead()

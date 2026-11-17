@@ -15,6 +15,27 @@ from pathlib import Path
 from . import CHAT_LIST, LOGIN_URL
 
 ROW = '[data-testid="cell-frame-container"]'
+TIME = re.compile(r"^(\d{1,2}:\d{2}( ?[ap]\.? ?m\.?)?|\d{1,2}/\d{1,2}/\d{2,4}|yesterday|ontem|"
+                  r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+                  r"segunda-feira|terça-feira|quarta-feira|quinta-feira|sexta-feira|sábado|domingo)$",
+                  re.IGNORECASE)
+# 2026 chat list: title, time and preview have their own test ids; a delivered/read/sent check
+# icon in the row means the last message is ours (1:1 chats show no "You:" prefix).
+READ_ROW = """(row) => {
+  const pick = (id) => row.querySelector(`[data-testid="${id}"]`);
+  const clean = (node) => node ? node.innerText.replace(/\\u00a0/g, ' ').trim() : '';
+  const titleNode = pick('cell-frame-title');
+  const named = titleNode ? titleNode.querySelector('span[title]') : null;
+  const icons = Array.from(row.querySelectorAll('svg title, [data-icon]'))
+    .map((node) => node.textContent || node.getAttribute('data-icon') || '');
+  return {
+    title: named && named.getAttribute('title') ? named.getAttribute('title').trim() : clean(titleNode),
+    stamp: clean(pick('chat-list-timestamp')),
+    preview: clean(pick('last-msg-status')),
+    outgoing: icons.some((name) => /(delivered|-read$|-sent$|pending|msg-time|dblcheck|-check$)/.test(name)),
+    unread: Boolean(pick('icon-unread-count')),
+  };
+}"""
 UNREAD = ('[aria-label*="unread"]', '[aria-label*="não lida"]', '[aria-label*="não lidas"]')
 OUTGOING_PREFIXES = ("you:", "you :", "você:", "você :", "voce:")
 DEFAULT_RULES = {"mode": "allow", "contacts": []}
@@ -117,19 +138,40 @@ def unread(page, row) -> bool:
     return any(row.locator(selector).count() for selector in UNREAD)
 
 
+def looks_like_time(value: str) -> bool:
+    return bool(TIME.match(value.strip()))
+
+
+def _preview(lines: list[str]) -> str:
+    return " ".join(lines).replace(" :", ":").strip()
+
+
 def parse_row(text: str) -> dict:
+    """Text fallback: the title is the line before the time (an avatar initial may come first)."""
     lines = [line.replace("\xa0", " ").strip() for line in text.splitlines()]
     lines = [line for line in lines if line]
     if len(lines) < 3:
         return {}
-    title, stamp = lines[0], lines[1]
-    preview = " ".join(lines[2:]).replace(" :", ":").strip()
-    return {"title": title, "preview": preview, "stamp": stamp}
+    index = next((position for position, line in enumerate(lines)
+                  if position and looks_like_time(line)), 1)
+    return {"title": lines[index - 1], "preview": _preview(lines[index + 1:]),
+            "stamp": lines[index]}
 
 
-def looks_like_time(value: str) -> bool:
-    value = value.strip()
-    return bool(value) and (value[:1].isdigit() or value.casefold() in ("yesterday", "ontem"))
+def read_row(row) -> dict:
+    """Structured row (2026 test ids) or the text fallback; `outgoing` marks our last message."""
+    try:
+        data = row.evaluate(READ_ROW)
+    except Exception:
+        data = {}
+    if data.get("title") and data.get("stamp"):
+        lines = [line.strip() for line in str(data.get("preview", "")).splitlines() if line.strip()]
+        return {"title": data["title"], "stamp": data["stamp"], "preview": _preview(lines),
+                "outgoing": bool(data.get("outgoing")), "unread": bool(data.get("unread"))}
+    parsed = parse_row(row.inner_text())
+    if parsed:
+        parsed["outgoing"] = False
+    return parsed
 
 
 def stamped(value: str) -> bool:
@@ -144,10 +186,10 @@ def scan_once(page, seen: set[str], rules: dict, limit: int = 30) -> list[dict]:
     rows = page.locator(ROW)
     for index in range(min(rows.count(), limit)):
         row = rows.nth(index)
-        parsed = parse_row(row.inner_text())
+        parsed = read_row(row)
         if not parsed.get("title") or not parsed.get("preview"):
             continue
-        if parsed["preview"].casefold().startswith(OUTGOING_PREFIXES):
+        if parsed.get("outgoing") or parsed["preview"].casefold().startswith(OUTGOING_PREFIXES):
             continue
         key = event_id(parsed["title"], parsed["preview"], parsed["stamp"])
         if key in seen:
@@ -159,7 +201,7 @@ def scan_once(page, seen: set[str], rules: dict, limit: int = 30) -> list[dict]:
             "message_at": parsed["stamp"],
             "chat": parsed["title"],
             "text": parsed["preview"][:1000],
-            "unread": unread(page, row),
+            "unread": parsed.get("unread") or unread(page, row),
             "allowed": contact_allowed(parsed["title"], rules),
         })
     return events

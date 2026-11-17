@@ -25,6 +25,15 @@ class SalesRulesTests(unittest.TestCase):
             "https://abastevo.com.br",
         ])
 
+    def test_opening_intervals_are_the_owner_values(self):
+        self.assertEqual(self.rules.opening_delays(), [4, 2, 8, 8, 4, 4, 4, 4])
+
+    def test_opening_delays_must_match_the_messages(self):
+        raw = copy.deepcopy(self.raw)
+        raw["opening"]["delays"] = [4, 2]
+        with self.assertRaises(sales_rules.RulesError):
+            sales_rules.build(raw)
+
     def test_greeting_follows_the_local_hour(self):
         self.assertEqual(self.rules.greeting(MONDAY.replace(hour=14)), "Boa tarde")
         self.assertEqual(self.rules.greeting(MONDAY.replace(hour=19)), "Boa noite")

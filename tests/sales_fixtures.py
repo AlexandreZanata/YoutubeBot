@@ -76,7 +76,7 @@ class FakeChannel:
         return list(self.bubbles)
 
     def send(self, lead, items, extra):
-        def deliver(page, text, pacing, delay=None, link_wait=0.0):
+        def deliver(page, text, pacing, delay=None, link_wait=0.0, **kwargs):
             state = self.states.pop(0) if self.states else "sent"
             if state == "sent":
                 self.sent.append({"lead": lead["id"], "text": text, "delay": delay})

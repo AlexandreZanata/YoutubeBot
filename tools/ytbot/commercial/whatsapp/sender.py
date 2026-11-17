@@ -203,19 +203,30 @@ def attach_image(page, image: Path) -> None:
 
 
 def deliver(page, text: str, pacing: Pacing, delay: float | None = None,
-            image: Path | None = None, link_wait: float = 0.0) -> str:
-    """Type and send one message in the open chat; `sent` only when the bubble is seen."""
-    time.sleep(pacing.between_messages() if delay is None else max(0.0, delay))
+            image: Path | None = None, link_wait: float = 0.0, timing: dict | None = None,
+            confirm_timeout: float = 8.0) -> str:
+    """Type and send one message in the open chat; `sent` only when the bubble is seen.
+
+    `delay` is the interval since the previous send (or since the call when there is none) and
+    already includes the typing; a link also waits at least `link_wait` after being typed.
+    """
+    timing = timing if timing is not None else {}
+    start = timing.get("last_send", time.monotonic())
+    interval = pacing.between_messages() if delay is None else max(0.0, delay)
     before = _outgoing_ids(page)
     if image is not None:
         attach_image(page, image)
     composer = page.locator(COMPOSER).first
     composer.click()
     human_type(page, text, pacing)
+    typed = time.monotonic()
+    page.wait_for_timeout(150)
+    ready = start + interval
     if link_wait and URL_IN_TEXT.search(text):
-        page.wait_for_timeout(int(link_wait * 1000))
-    page.wait_for_timeout(600)
-    page.wait_for_timeout(random.randint(400, 1200))
+        ready = max(ready, typed + link_wait)
+    remaining = ready - time.monotonic()
+    if remaining > 0:
+        time.sleep(remaining)
     for label in SEND_BUTTONS:
         button = page.get_by_role("button", name=label)
         if button.count():
@@ -223,8 +234,14 @@ def deliver(page, text: str, pacing: Pacing, delay: float | None = None,
             break
     else:
         page.keyboard.press("Enter")
-    page.wait_for_timeout(2500)
-    return "sent" if confirmed(page, text, before) else "unconfirmed"
+    timing["last_send"] = time.monotonic()
+    deadline = timing["last_send"] + confirm_timeout
+    while True:
+        page.wait_for_timeout(300)
+        if confirmed(page, text, before):
+            return "sent"
+        if time.monotonic() >= deadline:
+            return "unconfirmed"
 
 
 def send_message(page, to: str, text: str, image: Path | None, pacing: Pacing,
@@ -256,6 +273,7 @@ def send_sequence(page, to: str, items: list[dict], pacing: Pacing, journal_path
     confirmed stops the rest.
     """
     deliver_fn = deliver_fn or deliver
+    timing: dict = {}
     results = []
     for item in items:
         prior = journal_state(journal_path, item["key"])
@@ -270,7 +288,7 @@ def send_sequence(page, to: str, items: list[dict], pacing: Pacing, journal_path
                                "at": datetime.now().isoformat(timespec="seconds")})
         try:
             state = deliver_fn(page, item["text"], pacing, delay=item.get("delay"),
-                               link_wait=link_wait)
+                               link_wait=link_wait, timing=timing)
         except Exception as error:
             journal(journal_path, {**entry, "state": "error", "error": str(error)[:300],
                                    "at": datetime.now().isoformat(timespec="seconds")})

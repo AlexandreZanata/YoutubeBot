@@ -144,8 +144,9 @@ class SalesAgent:
                    if (opened := self._parse(lead.get("opened_at")))
                    and opened.astimezone(self.zone).date() == today)
 
-    def _items(self, lead: dict, tag: str, messages: list[str], incoming: str | None) -> list:
-        delays = self.pacing.plan(messages, incoming, self.rng)
+    def _items(self, lead: dict, tag: str, messages: list[str], incoming: str | None,
+               delays: list[float] | None = None) -> list:
+        delays = delays or self.pacing.plan(messages, incoming, self.rng)
         return [{"key": sender.message_key(lead["id"], f"{tag}#{index}", None), "text": text,
                  "delay": delay} for index, (text, delay) in enumerate(zip(messages, delays))]
 
@@ -182,6 +183,10 @@ class SalesAgent:
             history = self.store.history(lead["id"])
             if any(entry.get("event") == event.get("id") for entry in history):
                 continue
+            sent = [normalize(entry.get("text", "")) for entry in history[-40:]
+                    if entry.get("dir") == "out"]
+            if normalize(event["text"]) in sent:
+                continue  # the chat list echoing our own last message
             now = stamp(self.now())
             self.store.remember(lead["id"], {"at": now, "dir": "in", "text": event["text"],
                                              "kind": "incoming", "event": event.get("id"),
@@ -363,7 +368,7 @@ class SalesAgent:
         messages = self.rules.opening_messages(now)
         if not self.live:
             return {**result, "state": "planned", "messages": messages}
-        items = self._items(lead, "opening", messages, None)
+        items = self._items(lead, "opening", messages, None, self.rules.opening_delays())
         if any(sender.journal_state(self.store.journal_path, item["key"]) for item in items):
             self.store.update_lead(lead["id"], state="unconfirmed", opened_at=stamp(now))
             return {**result, "state": "already-opened"}

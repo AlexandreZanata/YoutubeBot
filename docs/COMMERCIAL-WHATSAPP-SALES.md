@@ -175,11 +175,23 @@ the model using only the facts.
 
 ## Pacing
 
-One conversation at a time, with 20–60 s between two chats. Before each message the agent
-waits the time a person needs to type it (6 characters per second, ±20 %, clamped to 3–45 s);
-before the first message of a reply it also waits the reading time of the received text
-(18 characters per second, 2–15 s). A message with a link waits 4 s for the preview card.
-Typing itself stays the sender's chunked typing, never a paste.
+Every interval is counted from the previous send and already includes the typing, so the
+contact sees the messages arrive at these gaps. Owner values (2026-11-17):
+
+| Message | Interval |
+| --- | --- |
+| Greeting ("Bom dia" / "Boa tarde") | 4 s |
+| "Tudo bem?" | 2 s |
+| Introduction | 8 s |
+| "Nós temos alguns exemplos…" | 8 s |
+| Each link | 4 s (at least 3 s after typing it, for the preview card) |
+| Reply message | its length at 20 characters per second, ±15 %, clamped to 2–10 s |
+| First message of a reply | plus reading time, 40 characters per second, 1–4 s |
+| Between two chats | 10–30 s |
+
+The send is confirmed as soon as the new bubble appears (polled for up to 8 s). One
+conversation at a time; typing stays the sender's chunked typing, never a paste. All values
+live in `[opening]` and `[pacing]` of the rules file.
 
 ## Safeguards
 
@@ -236,6 +248,9 @@ Automated tests use fixtures only; these steps need the owner's WhatsApp and a s
   opened to answer. In dry-run the decision uses the preview.
 - WhatsApp may restrict accounts that message many unknown numbers; the daily limit and the
   pacing reduce the risk but do not remove it. Stop at the first warning banner.
-- The link preview wait is fixed (4 s); a slow site may still send without its card.
-- Bubble direction depends on `data-id`, tails or row classes; re-check them after a WhatsApp
-  Web update.
+- The link preview wait is at least 3 s inside the 4 s interval; a slow site may still send
+  without its card.
+- Bubble direction comes from tails or row classes (in the 2026 client `data-id` is the bare
+  message id); re-check them after a WhatsApp Web update.
+- A contact saved in the owner's phone shows its saved name as the chat title; the lead must
+  carry that name (the CSV `name`) for its replies to be matched.

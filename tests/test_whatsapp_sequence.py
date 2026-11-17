@@ -19,7 +19,7 @@ class SequenceTests(unittest.TestCase):
     def send(self, states):
         sent = []
 
-        def deliver(page, text, pacing, delay=None, link_wait=0.0):
+        def deliver(page, text, pacing, delay=None, link_wait=0.0, **kwargs):
             state = states.pop(0)
             if state == "sent":
                 sent.append(text)
@@ -42,7 +42,7 @@ class SequenceTests(unittest.TestCase):
         self.assertEqual(sent, [])
 
     def test_exception_is_journaled_as_error(self):
-        def deliver(page, text, pacing, delay=None, link_wait=0.0):
+        def deliver(page, text, pacing, delay=None, link_wait=0.0, **kwargs):
             raise RuntimeError("composer missing")
         results = sender.send_sequence(None, "Empresa", ITEMS, sender.Pacing(), self.journal,
                                        deliver_fn=deliver)
@@ -102,6 +102,111 @@ class SequenceTests(unittest.TestCase):
 
         with self.assertRaises(sender.InvalidNumber):
             sender.open_chat(Page(), "Empresa", sender.Pacing(), phone="5565900000001")
+
+
+class FakeClock:
+    def __init__(self, now):
+        self.now = now
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += max(0.0, seconds)
+
+
+class DeliverPage:
+    """Composer, Send button and bubbles; clicking Send adds our bubble."""
+
+    def __init__(self, clock):
+        self.clock = clock
+        self.typed = ""
+        self.bubbles = [{"dir": "out", "text": "anterior", "id": "old"}]
+        self.sent_at = None
+        page = self
+
+        class Keyboard:
+            def insert_text(self, chunk):
+                page.typed += chunk
+
+            def press(self, key):
+                raise AssertionError("the Send button exists")
+
+        self.keyboard = Keyboard()
+
+    def locator(self, selector):
+        page = self
+
+        class Node:
+            first = None
+
+            def click(self):
+                pass
+
+            def count(self):
+                return 1
+        node = Node()
+        node.first = node
+        return node
+
+    def get_by_role(self, role, name):
+        page = self
+
+        class Button:
+            first = None
+
+            def count(self):
+                return 1 if name == "Send" else 0
+
+            def click(self):
+                page.sent_at = page.clock.now
+                page.bubbles.append({"dir": "out", "text": page.typed, "id": "new"})
+        button = Button()
+        button.first = button
+        return button
+
+    def evaluate(self, script, limit):
+        return list(self.bubbles)
+
+    def wait_for_timeout(self, ms):
+        self.clock.now += ms / 1000
+
+
+class DeliverTimingTests(unittest.TestCase):
+    def deliver(self, text, delay, last_send, start, link_wait=0.0):
+        clock = FakeClock(start)
+        page = DeliverPage(clock)
+        timing = {"last_send": last_send}
+        with patch.object(sender.time, "monotonic", clock.monotonic), \
+                patch.object(sender.time, "sleep", clock.sleep):
+            state = sender.deliver(page, text, sender.Pacing(), delay=delay,
+                                   link_wait=link_wait, timing=timing)
+        return state, page, timing
+
+    def test_interval_counts_from_the_previous_send_and_includes_typing(self):
+        state, page, timing = self.deliver("Tudo bem?", 2.0, last_send=100.0, start=100.6)
+        self.assertEqual(state, "sent")
+        self.assertAlmostEqual(page.sent_at, 102.0, delta=0.01)
+        self.assertEqual(timing["last_send"], page.sent_at)
+
+    def test_link_waits_for_the_preview_inside_the_interval(self):
+        _, page, _ = self.deliver("https://zaflas.com.br", 4.0, last_send=50.0, start=50.4,
+                                  link_wait=3.0)
+        self.assertAlmostEqual(page.sent_at, 54.0, delta=0.01)
+        _, page, _ = self.deliver("https://zaflas.com.br", 1.0, last_send=50.0, start=50.4,
+                                  link_wait=3.0)
+        self.assertGreaterEqual(page.sent_at, 53.4)
+
+    def test_missing_bubble_is_unconfirmed_after_the_bounded_wait(self):
+        clock = FakeClock(10.0)
+        page = DeliverPage(clock)
+        page.get_by_role = lambda role, name: type("B", (), {
+            "count": lambda self: 1, "first": property(lambda self: self),
+            "click": lambda self: None})()
+        with patch.object(sender.time, "monotonic", clock.monotonic), \
+                patch.object(sender.time, "sleep", clock.sleep):
+            state = sender.deliver(page, "Bom dia", sender.Pacing(), delay=1.0)
+        self.assertEqual(state, "unconfirmed")
 
 
 class ContactRuleTests(unittest.TestCase):

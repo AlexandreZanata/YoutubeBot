@@ -35,18 +35,19 @@ reply_start = "07:00"
 reply_end = "21:00"
 
 [pacing]
-# Wait before each message = typing time of that message (+ reading time of the received one
-# before the first reply), clamped and jittered. One conversation at a time.
-typing_chars_per_second = 6.0
-min_seconds = 3.0
-max_seconds = 45.0
-reading_chars_per_second = 18.0
-reading_min_seconds = 2.0
-reading_max_seconds = 15.0
-jitter = 0.2
-link_preview_seconds = 4.0          # wait for the WhatsApp link card before sending a link
-between_chats_min_seconds = 20.0
-between_chats_max_seconds = 60.0
+# Interval between two messages of a reply = typing time of the message (+ reading time of the
+# received one before the first message), clamped and jittered. The interval includes the
+# typing itself. Calibrated on the owner's opening (8 s for ~150 characters), 2026-11-17.
+typing_chars_per_second = 20.0
+min_seconds = 2.0
+max_seconds = 10.0
+reading_chars_per_second = 40.0
+reading_min_seconds = 1.0
+reading_max_seconds = 4.0
+jitter = 0.15
+link_preview_seconds = 3.0          # minimum wait after typing a link, for the preview card
+between_chats_min_seconds = 10.0
+between_chats_max_seconds = 30.0
 
 [llm]
 # Owner decision 2026-11-17: OpenCode Go plan, DeepSeek V4.1 Flash only (see
@@ -65,6 +66,10 @@ evening = "Boa noite"      # from 18:00
 
 [opening]
 # Sent once per number, one message per bubble, in this order. Never repeated.
+# `delays` is the owner's interval in seconds before each message (greeting 4 s, "Tudo bem?"
+# 2 s, introduction 8 s, examples 8 s); each link waits `link_delay` (owner, 2026-11-17).
+delays = [4, 2, 8, 8]
+link_delay = 4
 messages = [
   "{greeting}",
   "Tudo bem?",
