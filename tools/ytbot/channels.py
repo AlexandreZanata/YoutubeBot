@@ -81,7 +81,7 @@ CHANNELS = {
             "Reduce the narration to at most 70,000 characters, about 10,000 words. Cut "
             "whole sections instead of summarizing. Keep one theme and the quiet ending."
         ),
-        max_article_chars=95000,
+        max_article_chars=130000,
         slots=(0,),
         interval_days=2,
     ),
