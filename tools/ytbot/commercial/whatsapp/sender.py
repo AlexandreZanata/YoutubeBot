@@ -13,8 +13,8 @@ from pathlib import Path
 
 from . import CHAT_LIST, COMPOSER, LOGIN_URL, SEARCH
 
-ATTACH_BUTTONS = ("Anexar", "Attach", "Anexar arquivo")
-SEND_BUTTONS = ("Enviar", "Send")
+ATTACH_BUTTONS = ("Attach", "Anexar", "Anexar arquivo")
+SEND_BUTTONS = ("Send", "Enviar")
 
 
 def log(message: str) -> None:
@@ -86,36 +86,41 @@ def open_chat(page, to: str, pacing: Pacing) -> None:
     page.wait_for_selector(CHAT_LIST, timeout=90000)
     search = page.locator(SEARCH).first
     search.click()
-    page.keyboard.press("Control+A")
-    page.keyboard.press("Backspace")
-    page.keyboard.insert_text(to)
-    page.wait_for_timeout(1500)
+    search.fill(to)
+    page.wait_for_timeout(2000)
     page.keyboard.press("Enter")
+    page.wait_for_selector(COMPOSER, state="attached", timeout=30000)
     page.wait_for_timeout(1200)
-    page.wait_for_selector(COMPOSER, timeout=30000)
     time.sleep(pacing.open_chat_pause())
 
 
 def last_outgoing(page) -> str:
-    bubbles = page.locator("div.message-out div.selectable-text")
+    bubbles = page.locator(
+        '[data-testid="msg-container"]:has(span[data-icon="tail-out"]) span.selectable-text')
     if not bubbles.count():
         return ""
     return bubbles.last.inner_text().strip()
 
 
 def attach_image(page, image: Path) -> None:
-    for label in ATTACH_BUTTONS:
-        button = page.get_by_role("button", name=label)
-        if button.count():
-            button.first.click()
-            break
-    else:
-        page.locator('span[data-icon="plus"], span[data-icon="attach-menu-plus"]').first.click()
-    page.wait_for_timeout(1200)
     field = page.locator('input[type=file][accept*="image"]')
+    if not field.count():
+        for label in ATTACH_BUTTONS:
+            button = page.get_by_role("button", name=label)
+            if button.count():
+                button.first.click()
+                break
+        page.wait_for_timeout(1200)
+        field = page.locator('input[type=file][accept*="image"]')
     if not field.count():
         raise RuntimeError("WhatsApp image input was not found")
     field.last.set_input_files(str(image.resolve()))
+    page.wait_for_timeout(5000)
+    for label in SEND_BUTTONS:
+        button = page.get_by_role("button", name=label)
+        if button.count():
+            button.last.click()
+            break
     page.wait_for_timeout(4000)
 
 
@@ -131,6 +136,7 @@ def send_message(page, to: str, text: str, image: Path | None, pacing: Pacing,
     composer = page.locator(COMPOSER).first
     composer.click()
     human_type(page, text, pacing)
+    page.wait_for_timeout(600)
     page.wait_for_timeout(random.randint(400, 1200))
     for label in SEND_BUTTONS:
         button = page.get_by_role("button", name=label)

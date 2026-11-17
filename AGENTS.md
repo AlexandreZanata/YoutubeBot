@@ -128,7 +128,9 @@ hub, never invent prices, commissions or links, and never commit browser state.
 
 WhatsApp Web in the commercial module is owner-operated: manual QR login in the visible
 browser, hidden sending, one chat at a time, human intervals, a `--live` gate and a journal
-that blocks repeats. It never broadcasts to lists and never feeds the Procurali pipeline.
+that blocks repeats. It never broadcasts to lists and never feeds the Procurali pipeline. The
+DOM map, state machine and troubleshooting are in
+[WhatsApp Web](docs/COMMERCIAL-WHATSAPP.md).
 
 When delivering captured products from this workstation to the remote Procurali VPS (database,
 site, Telegram offers group queue, and WhatsApp Web assisted drafts), never copy VPS origin IPs,
@@ -177,7 +179,11 @@ large reach. The comment defends a contrarian but defensible thesis that invites
 never a personal attack, a false claim, politics, violence or a bait phrase. One project link
 maximum, after the argument, with no invented number. If fewer than fifteen pass the bar,
 report the gap. Drafts stay local until the owner gives the publish command. The daily cap is 25 replies
-(ten contextual plus fifteen polemic). This rule never applies to YouTube or to Community posts.
+(ten contextual plus fifteen polemic). Publishing follows the pacing protocol in
+[X publishing](docs/SOCIAL-POSTING.md): one action at a time, 2 to 5 minutes apart, never two
+at the same time, and stop on unconfirmed or rate limit. Simulating keystrokes or rotating
+identities to evade platform detection is forbidden. This rule never applies to YouTube or
+to Community posts.
 
 ## Intelligent distribution
 
