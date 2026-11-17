@@ -93,10 +93,15 @@ def open_upload(context, run_dir: Path, meta: dict, require_id: bool = True):
     page.goto(config.STUDIO_UPLOAD, timeout=90000)
     runtime.select_channel(page)
     upload_guard.page_blocked(page)
-    try:
-        page.get_by_role("button", name="Criar", exact=True).first.click()
-    except Exception:
-        page.get_by_role("button", name="Create", exact=True).first.click()
+    opened = False
+    for name in ("Criar", "Create"):
+        button = page.get_by_role("button", name=name, exact=True)
+        if button.count():
+            button.first.evaluate("el => el.click()")
+            opened = True
+            break
+    if not opened:
+        raise RuntimeError("Studio Create button was not found")
     page.wait_for_timeout(1200)
     click_text(page, ["Enviar vídeos", "Upload videos"])
     page.wait_for_timeout(1500)
