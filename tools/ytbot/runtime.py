@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 import time
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 from . import browser_install, config
 
@@ -82,6 +83,40 @@ def stop_hidden_chrome() -> None:
         if not chrome_running():
             break
         time.sleep(0.5)
+
+
+def record_login_request(url: str, reason: str, profile: Path) -> dict:
+    entry = {"profile": str(profile), "name": profile.name, "url": url,
+             "reason": reason, "at": datetime.now().isoformat(timespec="seconds")}
+    marker = config.DATA / "needs-login.json"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(json.dumps(entry, indent=2), encoding="utf-8")
+    marker.chmod(0o600)
+    return entry
+
+
+def request_login(url: str, reason: str) -> dict:
+    """Only for an expired session: stop the hidden browser and open a visible window."""
+    profile = config.PROFILE
+    try:
+        stop_hidden_chrome()
+    except RuntimeError:
+        pass
+    entry = record_login_request(url, reason, profile)
+    subprocess.Popen(
+        [browser_install.executable(), *browser_install.arguments(),
+         f"--user-data-dir={profile}", "--profile-directory=Default",
+         "--no-first-run", "--no-default-browser-check", "--new-window", url],
+        env=browser_install.environment(), start_new_session=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        subprocess.run(["notify-send", "YoutubeBot",
+                        f"Sessão expirada ({profile.name}). Faça login na janela aberta."],
+                       timeout=5, check=False)
+    except Exception:
+        pass
+    print(f"[login] {reason}: a visible window opened for {profile}", flush=True)
+    return entry
 
 
 def chrome_running() -> bool:

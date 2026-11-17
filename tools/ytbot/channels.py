@@ -65,7 +65,7 @@ CHANNELS = {
             "Target narration length: 4,500 to 6,000 English words, about 32 to 43 "
             "minutes at a measured pace. Each story must use a unique world and cast."
         ),
-        max_article_chars=45000,
+        max_article_chars=85000,
         slots=(12,),
     ),
     "vocal-pages": Channel(

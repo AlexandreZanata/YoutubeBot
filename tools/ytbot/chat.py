@@ -113,10 +113,25 @@ def clean_article(text: str) -> str:
     return text.strip()
 
 
+def ensure_logged_in(page) -> None:
+    """Only fires when the ChatGPT session is really gone."""
+    url = page.url if isinstance(page.url, str) else ""
+    try:
+        body = page.locator("body").inner_text()
+    except Exception:
+        body = ""
+    body = body[:600] if isinstance(body, str) else ""
+    if url.startswith("https://chatgpt.com/auth") or "Log in" in body or "Entrar" in body:
+        from . import runtime
+        runtime.request_login("https://chatgpt.com/auth/login", "ChatGPT session expired")
+        raise RuntimeError("ChatGPT session expired; finish the sign-in in the window that opened")
+
+
 def generate_article(page, topic: str, run_dir: Path, extra_header: str = "") -> str:
     page.goto(config.GPT_URL, timeout=90000)
     page.wait_for_timeout(7000)
     dismiss_notice(page)
+    ensure_logged_in(page)
     header = config.prompt("article_header.txt")
     context = run_dir / "context.txt"
     if context.is_file():
@@ -272,6 +287,7 @@ def generate_short(page, topic: str, run_dir: Path) -> str:
     page.goto(config.GPT_URL, timeout=90000)
     page.wait_for_timeout(7000)
     dismiss_notice(page)
+    ensure_logged_in(page)
     header = config.prompt("shorts.txt")
     header += ("\n\nIDIOMA OBRIGATÓRIO: português do Brasil. Escreva todo o texto falado nesse "
                "idioma, sem nenhuma palavra em inglês, independentemente da interface ou da "

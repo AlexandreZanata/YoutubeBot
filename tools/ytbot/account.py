@@ -7,6 +7,13 @@ import re
 from . import config
 
 
+def clear_login_marker() -> None:
+    try:
+        (config.DATA / "needs-login.json").unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def log(message: str) -> None:
     print(f"[account] {message}", flush=True)
 
@@ -30,6 +37,7 @@ def ensure_channel(context, name: str | None = None) -> None:
             page.goto("https://studio.youtube.com/", timeout=90000)
             page.wait_for_timeout(7000)
             verify_channel_identity(page.url, config.CHANNEL_ID)
+            clear_login_marker()
             log(f"active channel: {name}")
             return
         switcher = None
@@ -58,6 +66,7 @@ def ensure_channel(context, name: str | None = None) -> None:
         if name not in body:
             raise RuntimeError(
                 f"could not switch to channel {name!r}; sign in or add it to the bot profile")
+        clear_login_marker()
         log(f"active channel: {name}")
     finally:
         page.close()

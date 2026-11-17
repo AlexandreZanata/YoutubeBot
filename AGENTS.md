@@ -56,6 +56,12 @@ uses the owner's visible browser and consent; do not bypass challenges or copy a
 profile while in use. Browser automation remains the upload path; optional OAuth only
 helps discover and verify account/channel identity. Never silently switch channels.
 
+When a session actually expires, the bot records `.local/ytbot/needs-login.json`, notifies the
+desktop, opens the profile in a visible window on the sign-in page and stops the batch. The
+owner completes the login or two-step verification by hand; the marker clears after the next
+successful channel check. Never reopen a profile that is merely idle and never retry the
+expired step in a loop. See [accounts](docs/ACCOUNTS.md).
+
 The service CLI is typed and bounded. Never expose a general shell, arbitrary subprocess
 arguments or account secrets to ZaturoBot. Real generation/upload/Google consent tests
 are opt-in; CI uses fixtures. Read [accounts](docs/ACCOUNTS.md), [service](docs/SERVICE.md)
