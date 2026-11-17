@@ -116,7 +116,10 @@ export component CentralPage inherits VerticalLayout {
         spacing: Theme.space-4;
         vertical-stretch: 1;
 
+        // Equal preferred widths: the stretch factors decide, never the length of a message.
         Panel {
+            preferred-width: 1px;
+            min-width: 420px;
             horizontal-stretch: 3;
             vertical-stretch: 1;
             title: "Precisa de você";
@@ -205,6 +208,8 @@ export component CentralPage inherits VerticalLayout {
         }
 
         Panel {
+            preferred-width: 1px;
+            min-width: 240px;
             horizontal-stretch: 2;
             vertical-stretch: 1;
             title: "Mensagens recentes";
