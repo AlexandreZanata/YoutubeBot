@@ -72,7 +72,8 @@ def rehearse(rules: SalesRules, scenarios: dict[str, list[str]], model=None) -> 
                 record["turns"].append({
                     "customer": text, "bot": channel.sent[before:],
                     "intent": result.get("intent"), "action": result.get("action"),
-                    "source": result.get("source"), "state": store.lead(lead_id)["state"]})
+                    "source": result.get("source"), "model": result.get("model", ""),
+                    "state": store.lead(lead_id)["state"]})
             transcripts.append(record)
     return transcripts
 
@@ -87,7 +88,8 @@ def render(transcripts: list[dict]) -> str:
             if turn["intent"] is None:
                 lines.append(f"     (sem resposta automática; estado {turn['state']})")
             else:
-                lines.append(f"     [{turn['intent']}/{turn['action']}/{turn['source']} -> "
+                model = f" · {turn['model']}" if turn.get("model") else ""
+                lines.append(f"     [{turn['intent']}/{turn['action']}/{turn['source']}{model} -> "
                              f"{turn['state']}]")
         for entry in record["handoffs"]:
             lines.append(f"  >> {entry['priority_label']} | {entry['reason']} | "

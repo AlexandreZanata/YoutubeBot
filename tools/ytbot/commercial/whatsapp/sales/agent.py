@@ -459,7 +459,8 @@ class SalesAgent:
         self.store.log_decision({"at": stamp(self.now()), "lead": lead["id"],
                                  "live": self.live, "text": text, **decision.record()})
         result.update({"intent": decision.intent, "action": decision.action,
-                       "source": decision.source, "messages": decision.messages})
+                       "source": decision.source, "messages": decision.messages,
+                       "model": decision.model})
         if not self.live:
             return {**result, "state": "planned"}
         return self._apply(lead, decision, text, result, replies, today)

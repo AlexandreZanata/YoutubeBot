@@ -136,8 +136,10 @@ The Zaflas Inova Simples sales agent is the only list use (owner decision 2026-1
 one-to-one conversations only with businesses from the owner's reviewed Google Maps CSV (never
 scraped), at most 10 first contacts per day in business hours, never repeats an opening and
 sends at most one follow-up. It answers funnel leads by
-`tools/ytbot/commercial/whatsapp/sales/sales_rules.toml`, through OpenCode Go
-`deepseek-v4.1-flash` only; a price, deadline, link or promise outside that file falls back to
+`tools/ytbot/commercial/whatsapp/sales/sales_rules.toml`, through OpenCode Go: free models
+first (zero price in the live catalog, rotating, paused on timeout or no credits), then only
+`deepseek-v4.1-flash` and `muse-spark-1.3-contributor` as paid fallback; a price, deadline, link
+or promise outside that file falls back to
 its fixed text or goes to the owner. A refusal is a permanent do-not-contact entry, the robot
 question gets an honest answer, the OpenCode key stays in `.local/`, and `--live` stays
 required. The rules' values are of the static institutional site only; apps and systems are

@@ -36,6 +36,7 @@ def _context(args, store_factory):
 
 
 def _model(rules, store, enabled: bool):
+    """The free-first model router, or None (fixed texts, unknown cases to the owner)."""
     if not enabled:
         return None
     key = sales_llm.load_api_key(rules.llm["api_key_env"], store.key_path)
@@ -44,7 +45,8 @@ def _model(rules, store, enabled: bool):
               f"{store.key_path.name}; fixed texts only, unknown cases go to the owner",
               flush=True)
         return None
-    return sales_llm.OpenCodeGo(rules.llm, key)
+    return sales_llm.ModelRouter(rules.llm, key, cache_path=store.root / "models.json",
+                                 log=lambda message: print(f"[sales] {message}", flush=True))
 
 
 def _public(lead: dict, show_phone: bool = False) -> dict:
@@ -167,7 +169,8 @@ def command_check(args, store_factory) -> None:
     key = sales_llm.load_api_key(rules.llm["api_key_env"], store.key_path)
     report = {
         "rules_version": rules.raw["version"], "intents": len(rules.intents),
-        "model": rules.llm["model"], "model_key_present": bool(key),
+        "models": "free first, then " + " → ".join(rules.llm["fallback"]),
+        "model_key_present": bool(key),
         "daily_openings": rules.limits["daily_openings"],
         "opening_window_open": rules.in_window(now, "opening"),
         "reply_window_open": rules.in_window(now, "reply"),
@@ -178,16 +181,28 @@ def command_check(args, store_factory) -> None:
     if args.ping:
         if not key:
             raise SystemExit("[sales] no OpenCode Go key to ping with")
-        client = sales_llm.OpenCodeGo(rules.llm, key)
+        router = _model(rules, store, True)
         try:
-            reply = client.complete([{"role": "system", "content": "Responda somente JSON."},
-                                     {"role": "user", "content": 'Responda {"pong": true}'}],
+            reply = router.complete(sales_llm.PROBE,
                                     session_id=f"zaflas-sales-ping-{int(now.timestamp())}")
         except sales_llm.LlmError as error:
             raise SystemExit(f"[sales] ping failed: {error}")
         report["ping"] = {"model": reply.model, "content": reply.content[:80],
                           "cost_usd": reply.cost_usd, "duration_ms": reply.duration_ms}
     _print(report)
+
+
+def command_models(args, store_factory) -> None:
+    """The live catalog's free models, their privacy flags and health (parallel probe)."""
+    rules, store, _ = _context(args, store_factory)
+    router = _model(rules, store, True)
+    if router is None:
+        raise SystemExit("[sales] no OpenCode Go key")
+    started = __import__("time").monotonic()
+    router.refresh(force=True)
+    _print({"free_models": router.free_models(), "fallback": rules.llm["fallback"],
+            "probe_seconds": round(__import__("time").monotonic() - started, 1),
+            "models": router.status()})
 
 
 def command_simulate(args, store_factory) -> None:
@@ -326,6 +341,8 @@ def add_parser(actions, store_factory, page_factory) -> None:
                    partial(command_reset, store_factory=store_factory))
     reset.add_argument("--lead", required=True)
     reset.add_argument("--yes", action="store_true")
+    action("models", "list the free models, privacy flags and health (parallel probe)",
+           partial(command_models, store_factory=store_factory))
     contacts = action("contacts", "write the vCard of every lead to save on the phone",
                       partial(command_contacts, store_factory=store_factory))
     contacts.set_defaults()

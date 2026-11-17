@@ -91,9 +91,15 @@ class SalesRulesTests(unittest.TestCase):
             reload_if_changed(agent, path, seen)
             self.assertEqual(agent.rules.limits["daily_openings"], 5)
 
-    def test_only_deepseek_flash_is_accepted(self):
+    def test_only_the_owner_fallback_models_are_accepted(self):
+        self.assertEqual(self.rules.llm["fallback"],
+                         ["deepseek-v4.1-flash", "muse-spark-1.3-contributor"])
         raw = copy.deepcopy(self.raw)
-        raw["llm"]["model"] = "glm-5.3"
+        raw["llm"]["fallback"] = ["glm-5.3"]
+        with self.assertRaises(sales_rules.RulesError):
+            sales_rules.build(raw)
+        raw = copy.deepcopy(self.raw)
+        raw["llm"]["models_url"] = "https://example.com/v1/models"
         with self.assertRaises(sales_rules.RulesError):
             sales_rules.build(raw)
 

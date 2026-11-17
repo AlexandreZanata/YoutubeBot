@@ -10,8 +10,9 @@ from datetime import datetime, time
 from pathlib import Path
 
 RULES_PATH = Path(__file__).with_name("sales_rules.toml")
-# Owner decision 2026-11-17: only DeepSeek V4.1 Flash through OpenCode Go.
-ALLOWED_MODELS = ("deepseek-v4.1-flash",)
+# Owner decision 2026-11-17: OpenCode Go free models first (from the live catalog), then only
+# these paid models as fallback.
+ALLOWED_MODELS = ("deepseek-v4.1-flash", "muse-spark-1.3-contributor")
 ACTIONS = ("reply", "qualify", "quote", "collect", "close", "block", "handoff", "ignore", "won",
            "buy", "refer")
 REQUIRED_INTENTS = ("opt_out", "refusal", "auto_reply", "bot_question", "unknown",
@@ -211,8 +212,10 @@ def build(raw: dict) -> SalesRules:
                              "reading_chars_per_second", "reading_min_seconds",
                              "reading_max_seconds", "jitter", "link_preview_seconds",
                              "between_chats_min_seconds", "between_chats_max_seconds"))
-    _require(raw, "llm", ("base_url", "model", "api_key_env", "temperature",
-                          "max_output_tokens", "timeout_seconds"))
+    _require(raw, "llm", ("base_url", "models_url", "api_key_env", "fallback", "exclude",
+                          "temperature", "max_output_tokens", "timeout_seconds",
+                          "free_timeout_seconds", "probe_timeout_seconds", "cooldown_seconds",
+                          "no_credit_cooldown_seconds", "catalog_refresh_seconds"))
     _require(raw, "greetings", ("morning", "afternoon", "evening"))
     _require(raw, "opening", ("messages", "links", "delays", "link_delay"))
     _require(raw, "followup", ("messages",))
@@ -233,10 +236,12 @@ def build(raw: dict) -> SalesRules:
             raise RulesError(f"brief.done_patterns: bad pattern ({error})") from error
     if not isinstance(raw.get("facts"), dict) or not raw["facts"]:
         raise RulesError("missing [facts]")
-    if raw["llm"]["model"] not in ALLOWED_MODELS:
-        raise RulesError(f"llm.model must be one of {', '.join(ALLOWED_MODELS)}")
-    if not str(raw["llm"]["base_url"]).startswith("https://"):
-        raise RulesError("llm.base_url must use https")
+    fallback = raw["llm"]["fallback"]
+    if not fallback or any(model not in ALLOWED_MODELS for model in fallback):
+        raise RulesError(f"llm.fallback may only use {', '.join(ALLOWED_MODELS)}")
+    for key in ("base_url", "models_url"):
+        if not str(raw["llm"][key]).startswith("https://opencode.ai/"):
+            raise RulesError(f"llm.{key} must be an https://opencode.ai/ address")
     limits = raw["limits"]
     if not 0 < int(limits["daily_openings"]) <= 50:
         raise RulesError("limits.daily_openings must be between 1 and 50")

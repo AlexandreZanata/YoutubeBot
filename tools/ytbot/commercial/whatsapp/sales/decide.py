@@ -50,13 +50,14 @@ class Decision:
     brief: dict | None = None
     collect_turns: int = 0
     referred: str = ""
+    model: str = ""
 
     def record(self) -> dict:
         return {"intent": self.intent, "action": self.action, "source": self.source,
                 "hint": self.hint, "reason": self.reason, "violations": self.violations,
                 "error": self.error, "messages": self.messages, "cost_usd": self.cost_usd,
                 "priority": self.priority, "owner_reason": self.owner_reason,
-                "brief": bool(self.brief)}
+                "brief": bool(self.brief), "model": self.model}
 
 
 def _fixed(rules: SalesRules, intent_id: str, hint: str, source: str) -> Decision:
@@ -125,6 +126,10 @@ def decide(rules: SalesRules, lead: dict, history: list[dict], text: str, llm=No
         intent_id = "refusal"
     elif _stronger_handoff(rules, hint, intent_id):
         intent_id = hint
+    elif intent_id == "unknown" and hint != "unknown" and rules.intent(hint).fixed \
+            and rules.intent(hint).action in MODEL_TEXT_ACTIONS:
+        # The owner's fixed answer for what the local classifier recognized beats "unknown".
+        intent_id = hint
     intent = rules.intent(intent_id)
     reason = str(data.get("reason", ""))[:300]
     if intent.action in MODEL_TEXT_ACTIONS and data.get("handoff") is True:
@@ -147,4 +152,5 @@ def decide(rules: SalesRules, lead: dict, history: list[dict], text: str, llm=No
         decision.messages = honest + [item for item in decision.messages if item not in honest]
     decision.violations = problems
     decision.cost_usd = reply.cost_usd
+    decision.model = reply.model
     return decision

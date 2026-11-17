@@ -140,6 +140,11 @@ class SalesDecisionTests(unittest.TestCase):
                                          "Como faço pra pagar a entrada?", answer)
             self.assertEqual((decision.intent, decision.priority), ("ready_to_buy", "hot"))
 
+    def test_fixed_owner_answer_beats_a_model_unknown(self):
+        decision, _ = self.run_model("E aplicativo?", {"intent": "unknown", "messages": []})
+        self.assertEqual((decision.intent, decision.action), ("system_request", "reply"))
+        self.assertEqual(decision.messages, list(self.rules.intent("system_request").messages))
+
     def test_short_decisive_messages_never_call_the_model(self):
         decision, model = self.run_model("Não, obrigado", {"intent": "interested"})
         self.assertEqual(model.calls, [])

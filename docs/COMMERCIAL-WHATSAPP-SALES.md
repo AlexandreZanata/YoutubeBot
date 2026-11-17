@@ -11,7 +11,7 @@ and the journal in [WhatsApp Web](COMMERCIAL-WHATSAPP.md); there is no second se
 | --- | --- |
 | First contact | One-to-one prospecting, only to numbers from a list the owner approved. No broadcast. |
 | Lead source | A CSV the owner builds by reviewing Google Maps. No scraping, no Places API. |
-| Replies | OpenCode Go plan, model `deepseek-v4.1-flash` only, called like OpenTatu's client. |
+| Replies | OpenCode Go free models first in rotation, then `deepseek-v4.1-flash` → `muse-spark-1.3-contributor` (updated the same evening). |
 | Daily limit | 10 first contacts per day. |
 
 ## Files
@@ -22,7 +22,7 @@ and the journal in [WhatsApp Web](COMMERCIAL-WHATSAPP.md); there is no second se
 | `tools/ytbot/commercial/whatsapp/sales/context.md` | Context model sent to the model (pt-BR instructions) |
 | `sales/rules.py` | Loads and validates the rules; derives the allowed values |
 | `sales/classifier.py` | Local Portuguese intent classifier with conversation context |
-| `sales/llm.py` | OpenCode Go client (Bearer key, `x-opencode-session`, JSON mode, no retries) |
+| `sales/llm.py` | Free-first model router (live catalog, parallel probe, rotation, pauses, fallback) and the OpenCode Go client |
 | `sales/decide.py` | Classifier + model + guard + fixed texts into one decision |
 | `sales/guard.py` | Rejects model text with values, links, terms or claims outside the rules |
 | `sales/pacing.py` | Wait proportional to message length |
@@ -108,6 +108,7 @@ commands work offline.
 
 ```bash
 python3 -m tools.ytbot commercial sales check    --network whatsapp [--ping]
+python3 -m tools.ytbot commercial sales models   --network whatsapp
 python3 -m tools.ytbot commercial sales import   --network whatsapp --csv ~/leads.csv
 python3 -m tools.ytbot commercial sales leads    --network whatsapp [--state opened]
 python3 -m tools.ytbot commercial sales contacts --network whatsapp
@@ -421,19 +422,51 @@ live in `[opening]` and `[pacing]` of the rules file.
 - Only leads in the funnel get automated replies, and only when `rules.json` allows them
   (opening a lead adds its number in `allow` mode; a `block` entry always wins).
 
-## Model and privacy
+## Models: free first, rotation, fallback (owner, 2026-11-17)
 
-- Endpoint `https://opencode.ai/inference/go/openai/v1/chat/completions`, `Authorization:
-  Bearer`, `User-Agent: YoutubeBot-Sales/1.0`, `x-opencode-session: zaflas-sales-<lead>`, JSON
-  mode, temperature 0.3, no redirects or automatic retries. Research and limits: OpenTatu
-  `docs/opencode-go.md`.
-- Only `deepseek-v4.1-flash` is accepted; the rules loader and the client refuse any other.
-- The key is read from `OPENCODE_GO_API_KEY` or `.local/commercial/whatsapp/sales/llm.env`;
-  it never appears in logs, errors or records.
-- The model receives the business name, category and city, the conversation and the rules.
-  Phone numbers never leave the PC. DeepSeek on OpenCode Go is zero-retention under an
-  agreement renewed monthly (valid through 2026-11-30 at the OpenTatu research); re-check it.
-- Each call costs about US$ 0.0005 on the Go plan; `llm-usage.jsonl` records the charge.
+`sales/llm.py` (`ModelRouter`) decides which OpenCode Go model answers each call:
+
+1. **Discovery.** The live catalog `https://opencode.ai/inference/go/v1/models` (cached in
+   `sales/models.json`, refreshed every hour) marks a model as free when its input and output
+   prices are 0 and it speaks chat-completions. On 2026-11-17: `longcat-2.5-free`,
+   `hy4-flash-free`, `beam-free`, `iceman-contributor-free`. A free model added later is used
+   automatically; a paid model is never used unless it is in `llm.fallback`.
+2. **Fast health check.** When the router starts and at every refresh, all free models get a
+   tiny prompt in parallel (`probe_timeout_seconds` 8; measured 3.1 s for all four); a failing
+   one is paused before any client waits on it.
+3. **Rotation.** Calls go round-robin over the healthy free models. A free model has
+   `free_timeout_seconds` (20) to answer; a timeout or an error pauses it `cooldown_seconds`
+   (120), "no credits" or a rate limit (402, 429, quota) pauses it
+   `no_credit_cooldown_seconds` (1800), and a reply that is not a JSON object moves on.
+4. **Fallback.** With no free model answering: `deepseek-v4.1-flash`, then
+   `muse-spark-1.3-contributor` (the only paid models the code accepts).
+5. Models without JSON mode (`iceman-contributor-free` rejects `response_format`) are called
+   without it; the prompts already demand JSON and the guard still checks every text.
+6. A model "unknown" never overrides an owner fixed answer the local classifier recognized.
+
+`sales models` prints the free models, their privacy flags and pauses after a fresh probe;
+`sales check --ping` makes one routed call. Each decision records the model that answered.
+
+Measured on the owner's key (2026-11-17): every free model answered `{"pong": true}` at
+cost 0 in 0.8–2.7 s; the fallbacks in 1.3 s (DeepSeek) and 5 s (Muse).
+
+### Privacy
+
+The model receives the business name, category and city, the conversation and the rules; phone
+numbers never leave the PC. Per the catalog:
+
+| Model | Trains on prompts | Zero retention |
+| --- | --- | --- |
+| `longcat-2.5-free`, `hy4-flash-free`, `deepseek-v4.1-flash` | no | yes |
+| `beam-free` | no | no |
+| `iceman-contributor-free`, `muse-spark-1.3-contributor` | **yes** | no |
+
+The owner chose the free tier including the contributor models. To keep client conversations
+out of training, add them to `llm.exclude` (free) or remove Muse from `llm.fallback`.
+
+The key is read from `OPENCODE_GO_API_KEY` or `.local/commercial/whatsapp/sales/llm.env`, is
+sent only in the Authorization header with `User-Agent: YoutubeBot-Sales/1.0` and one
+`x-opencode-session` per conversation, and never appears in logs, errors or records.
 
 ## Physical test checklist (owner account)
 
