@@ -1,8 +1,7 @@
 # Community posts
 
 The bot checks the selected channel's Community tab after the asset stage. The rule is one
-post per calendar day, counted after 00:00 in the channel timezone. If the newest post is
-from today, it changes nothing. If the tab is empty or the newest post is from an earlier
+post per rolling 24 hours: if the newest post is younger than 24 hours, it changes nothing. If the tab is empty or the newest post is from an earlier
 day, it publishes one question post that always carries a dedicated square art generated for
 that post in the channel's visual style, a link to the related video and, on Zaflas, the site
 https://zaflas.com.br/. The automatic flow generates that art with Codex; it never crops a

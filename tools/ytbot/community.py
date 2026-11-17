@@ -147,7 +147,8 @@ def latest_post_label(page) -> str:
     return label.first.inner_text().strip()
 
 
-def posted_today(page, now: datetime | None = None) -> bool:
+def posted_recently(page, now: datetime | None = None, hours: int = 24) -> bool:
+    """One post per rolling 24 hours, not per calendar day."""
     current = now or datetime.now()
     label = latest_post_label(page)
     minutes = relative_minutes(label)
@@ -158,9 +159,9 @@ def posted_today(page, now: datetime | None = None) -> bool:
         except (OSError, ValueError):
             entry = {}
         if entry.get("state") == "posted" and entry.get("at"):
-            return datetime.fromisoformat(entry["at"]).date() == current.date()
+            return current - datetime.fromisoformat(entry["at"]) < timedelta(hours=hours)
         return False
-    return (current - timedelta(minutes=minutes)).date() == current.date()
+    return minutes <= hours * 60
 
 
 def has_posts(page) -> bool:
@@ -310,8 +311,8 @@ def ensure_post(context, topics: list[str]) -> dict:
         open_community(page)
         sort_recent(page)
         if has_posts(page):
-            if posted_today(page):
-                log("community already has a post today; nothing to do")
+            if posted_recently(page):
+                log("community already has a post in the last 24 hours; nothing to do")
                 return {"state": "present"}
             log("community has no post today; publishing a new one")
         topic, _thumbnail = _topic_image(topics)
