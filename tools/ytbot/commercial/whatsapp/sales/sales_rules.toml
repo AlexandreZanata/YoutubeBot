@@ -129,6 +129,24 @@ quote_promises = [
   'entao (eu )?faco',
 ]
 
+[brief]
+# After the client accepts the quote the bot collects the project details, then writes the
+# client folder (ficha.md, ficha.json, conversa.md, midia/) and hands the quote to the owner.
+# It asks for at most two missing items per message and stops after `max_collect_turns`
+# answers or when the client says it is done.
+max_collect_turns = 4
+required = [
+  "nome da empresa",
+  "o que o site deve mostrar (serviços ou produtos)",
+  "contato para o site (WhatsApp, endereço ou horário de atendimento)",
+]
+optional = ["logo", "fotos", "nome do site ou domínio desejado", "cores ou estilo"]
+done_patterns = [
+  '\be isso\b', '\bso isso\b', 'mandei tudo', 'pode (fazer|montar|mandar) o orcamento', 'por enquanto e isso',
+  'acho que e isso', 'ta bom assim', 'era isso', '^(obrigad[oa]|valeu|ok|blz|beleza)[!. ]*$',
+]
+fallback_question = "Anotei! Se tiver mais alguma informação, como nome do site, logo, fotos, endereço ou horário, pode mandar por aqui. Quando terminar, é só me falar."
+
 [context]
 # Short answers are read against the last question we asked. After the offer question, an
 # affirmative answer is `quote_accept` and a negative one is `refusal`. While the lead is in
@@ -148,6 +166,7 @@ messages = ["Certo! Vou verificar direitinho e já te respondo."]
 #   reply   send the messages and keep the conversation going
 #   qualify send the messages and wait for the project details (state qualifying)
 #   quote   send the messages, then the owner prepares the quote (state quote-requested)
+#   collect gather the project details for the client folder, then hand the quote over
 #   close   send the messages and stop without follow-up (state closed)
 #   block   send the fixed messages, then never contact again (do-not-contact list)
 #   handoff send the messages, then the owner answers (state needs-owner)
@@ -276,7 +295,7 @@ fixed = true
 priority = "needed"
 reason = "Mandou áudio"
 when = "Mandou áudio ou mensagem de voz."
-patterns = ['^(audio|voice message|mensagem de voz|ptt)$', '^\W*\d{1,2}:\d{2}$']
+patterns = ['^\[?(audio|voice message|mensagem de voz|ptt)\]?$', '^\W*\d{1,2}:\d{2}$']
 messages = [
   "Recebi seu áudio! Agora não consigo ouvir, consegue me mandar por escrito? Se não der, eu ouço assim que puder e te respondo.",
 ]
@@ -296,7 +315,7 @@ fixed = true
 priority = "needed"
 reason = "Mandou foto, vídeo ou documento"
 when = "Mandou foto, imagem, vídeo, documento, localização ou contato."
-patterns = ['^(photo|foto|image|imagem|video|document|documento|location|localizacao|contact|contato)$']
+patterns = ['^\[?(photo|foto|image|imagem|video|document|documento|location|localizacao|contact|contato)\]?$']
 messages = ["Recebi, obrigado! Vou dar uma olhada e já te respondo."]
 
 [[intents]]
@@ -460,14 +479,14 @@ fixed = false
 when = "Aceita o orçamento ('sim', 'pode', 'quero', 'pode fazer') logo depois da pergunta sobre orçamento."
 patterns = []
 messages = [
-  "Ótimo! Para montar o orçamento, me conta um pouco: qual é o ramo da empresa e o que você gostaria que o site ou sistema tivesse?",
+  "Ótimo! Para montar o orçamento, me conta: qual o nome da empresa e o que você gostaria que o site mostrasse? Se tiver logo e fotos, pode mandar por aqui também.",
 ]
 
 [[intents]]
 id = "quote_details"
-action = "quote"
+action = "collect"
 fixed = true
-when = "Depois de aceitar o orçamento, descreve o que precisa (ramo, funcionalidades, exemplos)."
+when = "Depois de aceitar o orçamento, manda o que precisa: nome, serviços, contato, logo, fotos, áudio ou exemplos."
 patterns = []
 priority = "hot"
 reason = "Orçamento: o cliente descreveu o projeto"

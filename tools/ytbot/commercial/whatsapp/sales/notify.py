@@ -43,14 +43,15 @@ def recent(history: list[dict], agent_name: str, limit: int = 6) -> list[str]:
 
 
 def handoff_entry(lead: dict, history: list[dict], reason: str, priority: str, intent: str,
-                  text: str, now: datetime, agent_name: str = "Alexandre") -> dict:
+                  text: str, now: datetime, agent_name: str = "Alexandre",
+                  ficha: str = "") -> dict:
     priority = priority if priority in LABELS else "needed"
     return {
         "at": now.isoformat(timespec="seconds"), "lead": lead["id"], "name": lead["name"],
         "phone": format_phone(lead.get("phone", "")), "wa_link": wa_link(lead.get("phone", "")),
         "priority": priority, "label": LABELS[priority], "reason": reason, "intent": intent,
         "state": lead.get("state"), "last_message": text,
-        "recent": recent(history, agent_name),
+        "recent": recent(history, agent_name), "ficha": ficha,
     }
 
 
@@ -62,6 +63,8 @@ def message(entry: dict) -> tuple[str, str]:
         lines.append(f"“{entry['last_message'][:140]}”")
     if entry.get("wa_link"):
         lines.append(entry["wa_link"])
+    if entry.get("ficha"):
+        lines.append(f"Ficha: {entry['ficha']}")
     return title, "\n".join(lines)
 
 

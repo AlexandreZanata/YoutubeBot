@@ -190,12 +190,17 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(self.store.lead(lead["id"])["state"], "qualifying")
         agent.ingest([self.event("Barbearia, quero agenda online com lembrete", event_id="e3")])
         agent.reply_pending()
+        self.assertEqual(self.store.lead(lead["id"])["state"], "qualifying")
+        self.assertEqual(channel.sent[-1]["text"], self.rules.brief["fallback_question"])
+        agent.ingest([self.event("É isso", event_id="e4")])
+        agent.reply_pending()
         self.assertEqual(self.store.lead(lead["id"])["state"], "quote-requested")
-        self.assertTrue(any(note["intent"] == "quote_details" and note["priority"] == "hot"
-                            for note in self.notes))
+        note = next(note for note in self.notes if note["intent"] == "quote_details")
+        self.assertEqual(note["priority"], "hot")
+        self.assertTrue(note["ficha"].endswith("ficha.md"))
         sent = len(channel.sent)
-        agent.ingest([self.event("Alguma novidade?", event_id="e4")])
-        self.assertEqual(agent.reply_pending(), [])
+        agent.ingest([self.event("Alguma novidade?", event_id="e5")])
+        agent.reply_pending()
         self.assertEqual(len(channel.sent), sent)
 
     def test_robot_question_gets_the_honest_answer(self):
@@ -240,7 +245,7 @@ class SalesAgentTests(unittest.TestCase):
         agent.reply_pending()
         prompt = model.calls[0]["messages"][1]["content"] if model.calls else ""
         history = self.store.history(lead["id"])
-        self.assertTrue(any(entry.get("replaces") == "e1" for entry in history))
+        self.assertTrue(any("e1" in (entry.get("replaces") or []) for entry in history))
         self.assertEqual(channel.sent[-1]["text"], "Você gostaria que eu fizesse um orçamento?")
         self.assertNotIn("queria…", prompt)
 

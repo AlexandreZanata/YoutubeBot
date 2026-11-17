@@ -19,19 +19,23 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from .. import listener, sender
+from . import dossier
 from . import notify as owner_notify
 from .context import effective
 from .decide import Decision, decide, stuck
 from .pacing import SalesPacing
 from .rules import SalesRules, normalize
 from .store import SalesStore, stamp
+from .transcribe import local_transcriber
 
 REPLYABLE = ("engaged", "qualifying")
 # On a new incoming message these states move to `engaged`; others only record it.
 REOPENS = ("new", "opened", "followed-up", "closed", "no-response", "engaged")
 OWNER_STATES = ("needs-owner", "quote-requested", "owner", "unconfirmed")
-NEXT_STATE = {"qualify": "qualifying", "quote": "quote-requested", "close": "closed",
-              "block": "do-not-contact", "handoff": "needs-owner"}
+NEXT_STATE = {"qualify": "qualifying", "collect": "qualifying", "quote": "quote-requested",
+              "close": "closed", "block": "do-not-contact", "handoff": "needs-owner"}
+MEDIA_TEXT = {"image": "[imagem]", "video": "[vídeo]", "document": "[documento]",
+              "audio": "[áudio]"}
 
 
 def _ours(text: str, sent: list[str]) -> bool:
@@ -59,6 +63,10 @@ class WhatsAppChannel:
         self.pacing = pacing
         self.journal_path = journal_path
         self.typing = sender.Pacing()
+        try:
+            page.add_init_script(sender.MEDIA_HOOK)
+        except Exception:
+            pass
 
     def open(self, lead: dict) -> str:
         try:
@@ -70,6 +78,9 @@ class WhatsAppChannel:
     def read_recent(self) -> list[dict]:
         return sender.read_bubbles(self.page, 30)
 
+    def fetch_media(self, bubble: dict) -> tuple[bytes, str] | None:
+        return sender.fetch_media(self.page, bubble.get("id", ""), bubble.get("media", ""))
+
     def send(self, lead: dict, items: list[dict], extra: dict) -> list[dict]:
         return sender.send_sequence(self.page, lead["name"], items, self.typing,
                                     self.journal_path, extra=extra,
@@ -79,7 +90,7 @@ class WhatsAppChannel:
 class SalesAgent:
     def __init__(self, rules: SalesRules, store: SalesStore, channel=None, llm=None,
                  live: bool = False, clock=None, sleep=time.sleep, rng=random,
-                 notify=owner_notify.desktop_notify, log=None):
+                 notify=owner_notify.desktop_notify, log=None, transcriber=None):
         self.rules = rules
         self.store = store
         self.channel = channel
@@ -92,6 +103,7 @@ class SalesAgent:
         self.notify = notify
         self.log = log or (lambda message: print(f"[sales] {message}", flush=True))
         self.pacing = SalesPacing.from_rules(rules)
+        self.transcriber = transcriber or local_transcriber
         self._chats = 0
         self._planned: set[tuple[str, str]] = set()
         if live and channel is None:
@@ -130,12 +142,12 @@ class SalesAgent:
         return any(listener.contact_allowed(name, rules) for name in names)
 
     def _handoff(self, lead: dict, reason: str, text: str = "", priority: str = "alert",
-                 intent: str = "") -> dict:
+                 intent: str = "", ficha: str = "") -> dict:
         """Record and notify a conversation the owner must take over, with the contact."""
         lead = self.store.lead(lead["id"]) or lead
         entry = owner_notify.handoff_entry(
             lead, self.store.history(lead["id"]), reason, priority, intent, text, self.now(),
-            self.rules.raw.get("agent_name", "Alexandre"))
+            self.rules.raw.get("agent_name", "Alexandre"), ficha or lead.get("ficha") or "")
         self.store.log_handoff(entry)
         self.notify(entry)
         self.log(f"owner needed for {lead['name']} ({priority}): {reason}")
@@ -159,7 +171,9 @@ class SalesAgent:
     def _items(self, lead: dict, tag: str, messages: list[str], incoming: str | None,
                delays: list[float] | None = None) -> list:
         delays = delays or self.pacing.plan(messages, incoming, self.rng)
-        return [{"key": sender.message_key(lead["id"], f"{tag}#{index}", None), "text": text,
+        cycle = f"c{lead['cycle']}:" if lead.get("cycle") else ""
+        return [{"key": sender.message_key(lead["id"], f"{cycle}{tag}#{index}", None),
+                 "text": text,
                  "delay": delay} for index, (text, delay) in enumerate(zip(messages, delays))]
 
     def _remember_sent(self, lead: dict, items: list[dict], results: list[dict], kind: str,
@@ -213,6 +227,12 @@ class SalesAgent:
                                            self._contact_entry(lead))
             elif lead["state"] == "qualifying":
                 changes["awaiting"] = event.get("id")
+            elif lead["state"] == "quote-requested":
+                # Late material (logo, photos, audio) still goes into the client folder.
+                changes["awaiting"] = event.get("id")
+                if self._remind(lead):
+                    self._handoff(lead, "Cliente mandou mais material para o orçamento",
+                                  event["text"], "hot", "quote_details")
             elif lead["state"] == "do-not-contact":
                 self._handoff(lead, "Contato bloqueado voltou a escrever", event["text"])
             elif lead["state"] in OWNER_STATES and self._remind(lead):
@@ -225,7 +245,7 @@ class SalesAgent:
     # Replies -------------------------------------------------------------------------
     def pending(self) -> list[dict]:
         leads = [lead for lead in self.store.leads().values()
-                 if lead.get("awaiting") and lead["state"] in REPLYABLE]
+                 if lead.get("awaiting") and lead["state"] in REPLYABLE + ("quote-requested",)]
         return sorted(leads, key=lambda lead: lead.get("last_in_at") or "")
 
     def reply_pending(self) -> list[dict]:
@@ -237,29 +257,106 @@ class SalesAgent:
         return [self.reply(lead) for lead in self.pending()]
 
     def _merge_chat(self, lead: dict, bubbles: list[dict]) -> str | None:
-        """Add full incoming texts read in the chat; detect a reply the owner typed."""
+        """Store what the contact sent since our last message, as read in the open chat.
+
+        Texts replace the chat-list previews, images and voice messages are downloaded into
+        the client folder and audio is transcribed. Returns the text the owner typed when the
+        last bubble is an outgoing message the bot did not send.
+        """
         history = self.store.history(lead["id"])
         ours = [normalize(entry.get("text", "")) for entry in history if entry.get("dir") == "out"]
         last_out = max((index for index, bubble in enumerate(bubbles) if bubble["dir"] == "out"),
                        default=-1)
-        if bubbles and bubbles[-1]["dir"] == "out" and not _ours(bubbles[-1]["text"], ours):
+        if (bubbles and bubbles[-1]["dir"] == "out" and not bubbles[-1].get("media")
+                and not _ours(bubbles[-1]["text"], ours)):
             return bubbles[-1]["text"]
         _, unanswered = split_pending(history)
-        known = {normalize(entry.get("text", "")).rstrip(".… ") for entry in unanswered}
-        previews = [entry for entry in unanswered if entry.get("source") == "preview"]
-        now = stamp(self.now())
+        seen = {entry.get("message_id") for entry in history if entry.get("message_id")}
+        previews = [entry["event"] for entry in unanswered
+                    if entry.get("source") == "preview" and entry.get("event")]
+        entries = []
         for bubble in bubbles[last_out + 1:]:
-            plain = normalize(bubble["text"])
-            if bubble["dir"] != "in" or not plain or plain in known:
+            if bubble["dir"] != "in" or (bubble.get("id") and bubble["id"] in seen):
                 continue
-            entry = {"at": now, "dir": "in", "text": bubble["text"], "kind": "incoming",
-                     "source": "chat"}
-            for preview in previews:
-                head = normalize(preview.get("text", "")).rstrip(".… ")
-                if head and plain.startswith(head):
-                    entry["replaces"] = preview.get("event")
+            entry = self._from_bubble(lead, bubble)
+            if entry is not None:
+                entries.append(entry)
+        if entries and previews:
+            entries[0]["replaces"] = previews
+        for entry in entries:
             self.store.remember(lead["id"], entry)
         return None
+
+    def _from_bubble(self, lead: dict, bubble: dict) -> dict | None:
+        now = self.now()
+        text = bubble.get("text", "")
+        media = bubble.get("media", "")
+        entry = {"at": stamp(now), "dir": "in", "kind": "incoming", "source": "chat",
+                 "message_id": bubble.get("id", ""), "text": text}
+        if not media:
+            return entry if normalize(text) else None
+        entry["media"] = media
+        if text:
+            entry["caption"] = text
+        path = None
+        if media in ("image", "audio"):
+            try:
+                fetched = self.channel.fetch_media(bubble)
+            except Exception:
+                fetched = None
+            if fetched:
+                folder = dossier.client_dir(self.store.root, lead)
+                path = dossier.save_media(folder, fetched[0], fetched[1], media, now)
+                entry["file"] = str(path.relative_to(folder))
+        if media == "audio":
+            transcript = ""
+            if path is not None:
+                try:
+                    transcript = self.transcriber(path)
+                except Exception as error:
+                    entry["transcription_error"] = str(error)[:200]
+            entry["text"] = transcript or MEDIA_TEXT["audio"]
+            if transcript:
+                entry["transcript"] = transcript
+                self.log(f"{lead['name']}: voice message transcribed ({len(transcript)} chars)")
+        elif not text:
+            entry["text"] = MEDIA_TEXT.get(media, "[mídia]")
+        return entry
+
+    def _write_dossier(self, lead: dict, brief: dict | None, status: str) -> str:
+        lead = self.store.lead(lead["id"]) or lead
+        history = self.store.history(lead["id"])
+        if brief is None:
+            brief, _ = dossier.extract(self.rules, lead, history, self.llm, self.now(),
+                                       usage=self.store.log_usage)
+        path = dossier.write(self.store.root, lead, history, brief, status, self.now(),
+                             self.rules.raw.get("agent_name", "Alexandre"))
+        return str(path)
+
+    def _collect(self, lead: dict, decision: Decision, text: str) -> Decision:
+        """Gather the project details; finish the brief when complete or the client is done."""
+        history = self.store.history(lead["id"])
+        brief, error = dossier.extract(self.rules, lead, history, self.llm, self.now(),
+                                       usage=self.store.log_usage)
+        turns = lead.get("collect_turns", 0) + 1
+        model_ready = self.llm is not None and not error
+        done = (dossier.client_said_done(self.rules, text) or brief.get("cliente_terminou")
+                or turns >= int(self.rules.brief["max_collect_turns"])
+                or (not model_ready and turns >= 2)
+                or (model_ready and not brief.get("faltando")
+                    and not brief.get("proxima_pergunta")))
+        decision.brief = brief
+        decision.collect_turns = turns
+        if done:
+            intent = self.rules.intent("quote_details")
+            decision.action, decision.source = "quote", "fixed"
+            decision.messages = list(intent.messages)
+            decision.priority, decision.owner_reason = intent.priority, intent.reason
+        else:
+            question = brief.get("proxima_pergunta") or ""
+            decision.messages = [question or self.rules.brief["fallback_question"]]
+            decision.source = "model" if question else "fixed"
+        return decision
 
     def reply(self, lead: dict) -> dict:
         result = {"lead": lead["id"], "name": lead["name"]}
@@ -300,6 +397,12 @@ class SalesAgent:
                 self.store.update_lead(lead["id"], state="owner", awaiting=None)
                 self.log(f"{lead['name']}: the owner already answered; automation paused")
                 return {**result, "state": "owner"}
+        if lead["state"] == "quote-requested":
+            if not self.live:
+                return {**result, "state": "planned", "action": "refresh-ficha"}
+            ficha = self._write_dossier(lead, None, "orçamento com o dono")
+            self.store.update_lead(lead["id"], awaiting=None, ficha=ficha)
+            return {**result, "state": "quote-requested", "ficha": ficha}
         prior, unanswered = split_pending(self.store.history(lead["id"]))
         text = "\n".join(entry.get("text", "") for entry in unanswered).strip()
         if not text:
@@ -308,6 +411,8 @@ class SalesAgent:
         decision = decide(self.rules, lead, prior, text, self.llm, self.now(),
                           usage=self.store.log_usage)
         decision = self._check_progress(lead, decision)
+        if decision.action == "collect":
+            decision = self._collect(lead, decision, text)
         self.store.log_decision({"at": stamp(self.now()), "lead": lead["id"],
                                  "live": self.live, "text": text, **decision.record()})
         result.update({"intent": decision.intent, "action": decision.action,
@@ -353,10 +458,16 @@ class SalesAgent:
             listener.revoke_contact(self.store.contact_rules_path, self._contact_entry(lead))
         if decision.action in ("handoff", "quote"):
             changes["handoff_reason"] = decision.intent
+        ficha = ""
+        if decision.brief is not None:
+            status = "pronta para orçamento" if decision.action == "quote" else "coletando dados"
+            ficha = self._write_dossier(lead, decision.brief, status)
+            changes.update(ficha=ficha, collect_turns=decision.collect_turns)
+            result["ficha"] = ficha
         self.store.update_lead(lead["id"], **changes)
         if decision.action in ("handoff", "quote"):
             self._handoff(lead, decision.owner_reason or decision.intent, text,
-                          decision.priority or "needed", decision.intent)
+                          decision.priority or "needed", decision.intent, ficha)
         return {**result, "state": state}
 
     # Openings and follow-ups ---------------------------------------------------------
@@ -492,6 +603,26 @@ def owner_resolve(store: SalesStore, lead_id: str, state: str) -> dict:
                              intents=[], bot_replies=0)
 
 
+def owner_reset(store: SalesStore, lead_id: str) -> dict:
+    """Owner test only: archive the conversation and make the lead new again.
+
+    Never used by the automation. A number on the do-not-contact list cannot be reset.
+    """
+    lead = store.lead(lead_id)
+    if lead is None:
+        raise KeyError(lead_id)
+    if store.is_dnc(lead["phone"]):
+        raise ValueError("the number is on the do-not-contact list")
+    cycle = int(lead.get("cycle", 0)) + 1
+    history = store.history_path(lead_id)
+    if history.exists():
+        history.rename(history.with_name(f"{lead_id}.cycle{cycle - 1}.jsonl"))
+    return store.update_lead(lead_id, state="new", opened_at=None, followups=0,
+                             last_out_at=None, last_in_at=None, awaiting=None, replies={},
+                             handoff_reason=None, intents=[], bot_replies=0, collect_turns=0,
+                             ficha=None, cycle=cycle)
+
+
 def owner_block(store: SalesStore, lead_id: str, now: datetime) -> dict:
     lead = store.lead(lead_id)
     if lead is None:
@@ -501,4 +632,5 @@ def owner_block(store: SalesStore, lead_id: str, now: datetime) -> dict:
     return store.update_lead(lead_id, state="do-not-contact", awaiting=None)
 
 
-__all__ = ["SalesAgent", "WhatsAppChannel", "owner_block", "owner_resolve", "split_pending"]
+__all__ = ["SalesAgent", "WhatsAppChannel", "owner_block", "owner_reset", "owner_resolve",
+           "split_pending"]

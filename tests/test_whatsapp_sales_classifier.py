@@ -82,7 +82,8 @@ class SalesClassifierTests(unittest.TestCase):
                    state="qualifying")
         self.check("Photo\nEstúdio de fotos, atendo segunda a sexta", "quote_details",
                    state="qualifying")
-        self.check("Photo", "media", state="qualifying")
+        self.check("Photo", "quote_details", state="qualifying")
+        self.check("[imagem]", "media", state="engaged")
         self.check("é robô?", "bot_question", state="qualifying")
 
     def test_only_short_messages_are_decided_locally(self):

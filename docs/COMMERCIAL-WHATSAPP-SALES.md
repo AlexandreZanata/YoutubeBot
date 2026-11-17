@@ -165,6 +165,53 @@ the model using only the facts.
 | The owner typed in the chat | — | — | Detected when the chat opens; state `owner`, automation pauses |
 | A refused contact writes again | — | — | No automated answer; owner notified |
 
+## Client folder (ficha) and quote collection
+
+After the contact accepts the quote (`quote_accept` → `qualifying`), every message is project
+material (`quote_details`, action `collect`): text, photos (logo, place, work) and voice
+messages. Each round the model extracts the brief from the client's own words
+(`sales/dossier.md`; empty fields stay empty) and asks for at most two missing items
+(`[brief] required`, then `optional` once), checked by the guard. The collection ends when the
+client says it is done ("é isso", "só isso", "pode fazer o orçamento"), when nothing required
+is missing, or after `max_collect_turns` (4). The bot then sends "Perfeito, anotei tudo! Vou
+preparar o orçamento e te mando por aqui.", the lead becomes `quote-requested` and the owner
+gets a 🔥 notification with the ficha path.
+
+`.local/commercial/whatsapp/sales/clientes/<empresa>-<lead>/` (0700, files 0600):
+
+| File | Content |
+| --- | --- |
+| `ficha.md` | Status, contact, summary, company, the site (type, name/domain, pages, features, services, style, references), contact for the site, received materials with links, open items |
+| `ficha.json` | The same brief as data, plus the lead and the file list |
+| `conversa.md` | Whole conversation; audio shows its transcript, media its file |
+| `midia/` | Images and voice messages the client sent (`20261117-155800-image.jpg`) |
+
+Material that arrives after the hand-off (a forgotten logo) is still downloaded and the ficha
+is rebuilt (status "orçamento com o dono") without any message to the client; the owner gets
+one reminder. `sales ficha --lead L…` rebuilds a folder on demand.
+
+## Images and voice messages
+
+When the agent opens a chat to answer, it reads every bubble since its last message:
+
+- Images (`data-testid="image-thumb"`) are saved from their full-resolution `blob:` image; the
+  caption is the message text. Outside the quote stage an image without caption is `media`
+  (hand-off); during it, it is material.
+- Voice messages are captured through a hook installed only on the bot's page
+  (`sender.MEDIA_HOOK`: records the media WhatsApp plays or turns into object URLs, muted), then
+  transcribed locally by faster-whisper large-v3-turbo on the GPU, Portuguese
+  (`src/core/ai_transcriber.py`, ~5 s per note). The transcript is the message: classified,
+  answered and stored as "Cliente (áudio transcrito)". The voice never leaves the PC.
+- If the audio cannot be read or transcribed, it falls back to the `audio` hand-off.
+- Videos and documents are noted as `[vídeo]` / `[documento]` and handed to the owner.
+
+## Owner test reset
+
+`sales reset --lead L… --yes` archives the conversation to
+`conversations/<lead>.cycle<N>.jsonl` and makes the lead `new` again, with journal keys of a
+new cycle, so the opening can be tested again on the owner's own test number. The automation
+never resets; a number on the do-not-contact list cannot be reset; the daily limit applies.
+
 ## Hand-off to the owner
 
 The bot stops at the first moment it cannot move the sale forward on its own. It sends one
@@ -174,7 +221,7 @@ conversations on the real model (2026-11-17).
 
 | Priority | When | Intents and triggers |
 | --- | --- | --- |
-| 🔥 hot — answer within minutes | Buying signal | `quote_details` (project described), `ready_to_buy` ("quero fechar", "como pago a entrada"), `human_request` ("quero falar com o Alexandre/com gente"), `call_request`, `callback_later` ("me chama amanhã") |
+| 🔥 hot — answer within minutes | Buying signal | `quote_details` (project collected, ficha ready), `ready_to_buy` ("quero fechar", "como pago a entrada"), `human_request` ("quero falar com o Alexandre/com gente"), `call_request`, `callback_later` ("me chama amanhã") |
 | ⚠️ needed — the bot lacks information or authority | The answer is not in the rules or needs a person | `negotiation` (caro, desconto, "faz por 300", parcelar), `trust_concern` ("é golpe?"), `unknown` (cidade, contrato, nota fiscal, domínio, tecnologia, e-mail), `audio`, `media`, the model's own `handoff`, `stuck` |
 | 🛑 alert — something went wrong | Operational | send not confirmed, refused contact wrote again, outside `rules.json`, daily reply limit |
 

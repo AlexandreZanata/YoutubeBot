@@ -47,12 +47,15 @@ class Decision:
     cost_usd: float | None = None
     priority: str = ""
     owner_reason: str = ""
+    brief: dict | None = None
+    collect_turns: int = 0
 
     def record(self) -> dict:
         return {"intent": self.intent, "action": self.action, "source": self.source,
                 "hint": self.hint, "reason": self.reason, "violations": self.violations,
                 "error": self.error, "messages": self.messages, "cost_usd": self.cost_usd,
-                "priority": self.priority, "owner_reason": self.owner_reason}
+                "priority": self.priority, "owner_reason": self.owner_reason,
+                "brief": bool(self.brief)}
 
 
 def _fixed(rules: SalesRules, intent_id: str, hint: str, source: str) -> Decision:

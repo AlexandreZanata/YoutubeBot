@@ -112,7 +112,7 @@ class SalesDecisionTests(unittest.TestCase):
         model = FakeModel({"intent": "media", "messages": []})
         decision = decide(self.rules, lead, [], "Photo\nEstúdio de fotos, atendo de segunda a "
                           "sexta das 10h às 18h e queria agendamento online", model, MONDAY)
-        self.assertEqual((decision.intent, decision.action), ("quote_details", "quote"))
+        self.assertEqual((decision.intent, decision.action), ("quote_details", "collect"))
         self.assertEqual(model.calls, [])
 
     def test_caption_reaches_the_model_as_text(self):

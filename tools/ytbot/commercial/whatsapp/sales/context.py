@@ -19,7 +19,10 @@ MAX_HISTORY = 300
 
 def effective(history: list[dict]) -> list[dict]:
     """Memory entries in order, dropping list previews later replaced by the full text."""
-    replaced = {entry.get("replaces") for entry in history if entry.get("replaces")}
+    replaced: set[str] = set()
+    for entry in history:
+        value = entry.get("replaces")
+        replaced.update(value if isinstance(value, list) else [value] if value else [])
     return [entry for entry in history
             if not (entry.get("event") and entry.get("event") in replaced)]
 
@@ -32,6 +35,10 @@ def render_history(history: list[dict], agent_name: str) -> str:
         if entry.get("dir") == "out" and entry.get("state", "sent") != "sent":
             continue
         speaker = agent_name if entry["dir"] == "out" else "Cliente"
+        if entry.get("media") == "audio":
+            speaker += " (áudio transcrito)"
+        elif entry.get("media"):
+            speaker += f" (enviou {entry['media']})"
         when = str(entry.get("at", ""))[:16].replace("T", " ")
         lines.append(f"[{when}] {speaker}: {entry.get('text', '')}")
     return "\n".join(lines) or "(sem mensagens anteriores)"

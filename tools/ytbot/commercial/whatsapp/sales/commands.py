@@ -11,7 +11,8 @@ from zoneinfo import ZoneInfo
 from .. import listener as whatsapp_listener
 from . import llm as sales_llm
 from . import rehearsal
-from .agent import SalesAgent, WhatsAppChannel, owner_block, owner_resolve, split_pending
+from .agent import (SalesAgent, WhatsAppChannel, owner_block, owner_reset, owner_resolve,
+                    split_pending)
 from .decide import decide
 from .pacing import SalesPacing
 from .rules import RULES_PATH, RulesError, load
@@ -99,6 +100,33 @@ def command_resolve(args, store_factory) -> None:
     _, store, _ = _context(args, store_factory)
     try:
         _print(_public(owner_resolve(store, args.lead, args.state)))
+    except KeyError:
+        raise SystemExit(f"[sales] unknown lead {args.lead}")
+    except ValueError as error:
+        raise SystemExit(f"[sales] {error}")
+
+
+def command_ficha(args, store_factory) -> None:
+    """Rebuild a client's folder (ficha.md, ficha.json, conversa.md) from the memory."""
+    rules, store, _ = _context(args, store_factory)
+    lead = store.lead(args.lead)
+    if lead is None:
+        raise SystemExit(f"[sales] unknown lead {args.lead}")
+    agent = SalesAgent(rules, store, None, _model(rules, store, not args.no_llm))
+    status = {"qualifying": "coletando dados"}.get(lead["state"], "orçamento com o dono")
+    ficha = agent._write_dossier(lead, None, status)
+    store.update_lead(lead["id"], ficha=ficha)
+    _print({"lead": lead["id"], "ficha": ficha})
+
+
+def command_reset(args, store_factory) -> None:
+    """Owner test only: archive the conversation and allow the opening again."""
+    _, store, _ = _context(args, store_factory)
+    if not args.yes:
+        raise SystemExit("[sales] reset archives the conversation and allows a new opening; "
+                         "confirm with --yes (test numbers only)")
+    try:
+        _print(_public(owner_reset(store, args.lead)))
     except KeyError:
         raise SystemExit(f"[sales] unknown lead {args.lead}")
     except ValueError as error:
@@ -262,6 +290,14 @@ def add_parser(actions, store_factory, page_factory) -> None:
     resolve.add_argument("--lead", required=True)
     resolve.add_argument("--state", choices=("engaged", "closed", "opened", "do-not-contact"),
                          default="engaged")
+    ficha = action("ficha", "rebuild a client's folder and brief from the conversation",
+                   partial(command_ficha, store_factory=store_factory))
+    ficha.add_argument("--lead", required=True)
+    ficha.add_argument("--no-llm", action="store_true")
+    reset = action("reset", "owner test only: archive a conversation and allow a new opening",
+                   partial(command_reset, store_factory=store_factory))
+    reset.add_argument("--lead", required=True)
+    reset.add_argument("--yes", action="store_true")
     check = action("check", "validate the rules, key presence and counters",
                    partial(command_check, store_factory=store_factory))
     check.add_argument("--ping", action="store_true", help="one tiny paid model call")

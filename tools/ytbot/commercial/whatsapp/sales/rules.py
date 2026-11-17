@@ -12,7 +12,7 @@ from pathlib import Path
 RULES_PATH = Path(__file__).with_name("sales_rules.toml")
 # Owner decision 2026-11-17: only DeepSeek V4.1 Flash through OpenCode Go.
 ALLOWED_MODELS = ("deepseek-v4.1-flash",)
-ACTIONS = ("reply", "qualify", "quote", "close", "block", "handoff", "ignore")
+ACTIONS = ("reply", "qualify", "quote", "collect", "close", "block", "handoff", "ignore")
 REQUIRED_INTENTS = ("opt_out", "refusal", "auto_reply", "bot_question", "unknown",
                     "quote_accept", "quote_details", "system_request", "site_institutional",
                     "human_request", "stuck")
@@ -102,6 +102,10 @@ class SalesRules:
     @property
     def context(self) -> dict:
         return self.raw["context"]
+
+    @property
+    def brief(self) -> dict:
+        return self.raw["brief"]
 
     @property
     def company(self) -> str:
@@ -200,6 +204,13 @@ def build(raw: dict) -> SalesRules:
     _require(raw, "handoff", ("messages",))
     _require(raw, "context", ("offer_question", "affirmative", "negative"))
     _require(raw, "guard", ("forbidden", "human_claims", "quote_promises"))
+    _require(raw, "brief", ("max_collect_turns", "required", "optional", "done_patterns",
+                            "fallback_question"))
+    for pattern in raw["brief"]["done_patterns"]:
+        try:
+            re.compile(pattern)
+        except re.error as error:
+            raise RulesError(f"brief.done_patterns: bad pattern ({error})") from error
     if not isinstance(raw.get("facts"), dict) or not raw["facts"]:
         raise RulesError("missing [facts]")
     if raw["llm"]["model"] not in ALLOWED_MODELS:
@@ -244,7 +255,7 @@ def build(raw: dict) -> SalesRules:
         priority = item.get("priority", "needed")
         if priority not in PRIORITIES:
             raise RulesError(f"intent {intent_id}: priority must be one of {', '.join(PRIORITIES)}")
-        if item["action"] in ("handoff", "quote") and not item.get("reason"):
+        if item["action"] in ("handoff", "quote", "collect") and not item.get("reason"):
             raise RulesError(f"intent {intent_id}: a hand-off needs a reason for the owner")
         intents.append(Intent(intent_id, item["action"], bool(item.get("fixed", False)),
                               item.get("when", ""), patterns, messages, priority,

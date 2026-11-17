@@ -12,8 +12,9 @@ from .rules import SalesRules, normalize
 
 SAFETY = ("opt_out", "refusal", "auto_reply")
 # While qualifying, these still win over "the text is the project description".
+# Media and short thanks while qualifying are part of the project details (logo, photos, "ok").
 QUALIFYING_OVERRIDES = ("human_request", "bot_question", "how_got_number", "trust_concern",
-                        "call_request", "callback_later", "audio", "sticker", "media", "thanks")
+                        "call_request", "callback_later", "sticker")
 # Intents the local classifier decides alone for short messages (no model call).
 DECISIVE = ("opt_out", "refusal", "auto_reply", "bot_question", "sticker", "thanks",
             "audio", "media", "human_request", "trust_concern", "callback_later")

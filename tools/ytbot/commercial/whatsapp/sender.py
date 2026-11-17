@@ -40,10 +40,93 @@ READ_BUBBLES = """(limit) => {
     }
     const text = Array.from(node.querySelectorAll('span.selectable-text'))
       .map((span) => span.innerText).join('\\n').trim();
-    rows.push({dir: dir || 'unknown', text, id: holder ? holder.dataset.id : ''});
+    const labels = Array.from(node.querySelectorAll('button,[role=button]'))
+      .map((button) => button.getAttribute('aria-label') || '').join(' ');
+    const ids = Array.from(node.querySelectorAll('[data-testid]'))
+      .map((item) => item.getAttribute('data-testid')).join(' ');
+    let media = '';
+    if (/image-thumb/.test(ids)) media = 'image';
+    else if (/video/i.test(ids) || /video|vídeo/i.test(labels)) media = 'video';
+    else if (node.querySelector('audio') || /audio|ptt|voice/i.test(ids)
+             || /voice|áudio|audio|play|reproduzir/i.test(labels)) media = 'audio';
+    else if (/document/i.test(ids) || /document|download/i.test(labels)) media = 'document';
+    rows.push({dir: dir || 'unknown', text, id: holder ? holder.dataset.id : '', media});
   }
   return rows.slice(-limit);
 }"""
+
+
+# Installed on the bot's own page before navigation: remembers the media WhatsApp plays or
+# turns into object URLs, so a voice message can be read without depending on its DOM, and
+# mutes playback in the hidden browser.
+MEDIA_HOOK = """(() => {
+  if (window.__ytbotHooked) return;
+  window.__ytbotHooked = true;
+  window.__ytbotBlobs = [];
+  window.__ytbotPlayed = [];
+  const create = URL.createObjectURL.bind(URL);
+  URL.createObjectURL = (object) => {
+    const url = create(object);
+    try {
+      if (object && object.type) {
+        window.__ytbotBlobs.push({url, type: object.type, blob: object});
+        if (window.__ytbotBlobs.length > 60) window.__ytbotBlobs.shift();
+      }
+    } catch (error) {}
+    return url;
+  };
+  const play = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function () {
+    try { this.muted = true; window.__ytbotPlayed.push(this); } catch (error) {}
+    return play.apply(this, arguments);
+  };
+})();"""
+FETCH_MEDIA = """async ({id, kind}) => {
+  const holders = Array.from(document.querySelectorAll('[data-id]'))
+    .filter((holder) => holder.dataset.id === id);
+  const node = holders.length ? holders[holders.length - 1] : null;
+  if (!node) return null;
+  const read = (blob) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({type: blob.type, data: reader.result});
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(blob);
+  });
+  const fromUrl = async (url) => read(await (await fetch(url)).blob());
+  if (kind === 'image') {
+    const images = Array.from(node.querySelectorAll('img')).filter((img) => img.src.startsWith('blob:'));
+    images.sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight);
+    return images.length ? fromUrl(images[0].src) : null;
+  }
+  if (kind !== 'audio') return null;
+  const inline = node.querySelector('audio[src^="blob:"]');
+  if (inline) return fromUrl(inline.src);
+  const blobs = (window.__ytbotBlobs || []).length;
+  const played = (window.__ytbotPlayed || []).length;
+  const button = Array.from(node.querySelectorAll('button,[role=button]'))
+    .find((item) => /play|reproduzir|voice|áudio|audio/i.test(item.getAttribute('aria-label') || ''));
+  if (!button) return null;
+  button.click();
+  for (let step = 0; step < 60; step += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const element = (window.__ytbotPlayed || []).slice(played)
+      .find((item) => (item.currentSrc || item.src || '').startsWith('blob:'));
+    if (element) {
+      try { element.pause(); } catch (error) {}
+      return fromUrl(element.currentSrc || element.src);
+    }
+    const hooked = (window.__ytbotBlobs || []).slice(blobs)
+      .find((item) => /^audio\\//.test(item.type) || /ogg|opus/.test(item.type));
+    if (hooked) return read(hooked.blob);
+    const tag = node.querySelector('audio[src^="blob:"]') || document.querySelector('audio[src^="blob:"]');
+    if (tag) { try { tag.pause(); } catch (error) {} return fromUrl(tag.src); }
+  }
+  return null;
+}"""
+EXTENSIONS = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
+              "image/gif": ".gif", "audio/ogg": ".ogg", "audio/mpeg": ".mp3",
+              "audio/mp4": ".m4a", "audio/webm": ".webm", "audio/wav": ".wav"}
+MAX_MEDIA_BYTES = 25 * 1024 * 1024
 
 
 class InvalidNumber(RuntimeError):
@@ -154,7 +237,28 @@ def read_bubbles(page, limit: int = 30) -> list[dict]:
     except Exception:
         return []
     return [{"dir": row.get("dir", "unknown"), "text": str(row.get("text", "")).strip(),
-             "id": row.get("id", "")} for row in rows or []]
+             "id": row.get("id", ""), "media": row.get("media", "")} for row in rows or []]
+
+
+def fetch_media(page, message_id: str, kind: str) -> tuple[bytes, str] | None:
+    """Bytes and file extension of an image or voice message in the open chat."""
+    if not message_id or kind not in ("image", "audio"):
+        return None
+    try:
+        result = page.evaluate(FETCH_MEDIA, {"id": message_id, "kind": kind})
+    except Exception:
+        return None
+    if not result or not str(result.get("data", "")).startswith("data:"):
+        return None
+    import base64
+
+    header, _, payload = result["data"].partition(",")
+    data = base64.b64decode(payload) if ";base64" in header else payload.encode()
+    if not data or len(data) > MAX_MEDIA_BYTES:
+        return None
+    kind_type = (result.get("type") or "").split(";")[0].strip().lower()
+    extension = EXTENSIONS.get(kind_type, ".ogg" if kind == "audio" else ".jpg")
+    return data, extension
 
 
 def last_outgoing(page) -> str:

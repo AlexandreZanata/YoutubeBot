@@ -1,0 +1,233 @@
+"""Client folder and brief (ficha) for a lead that accepted a quote.
+
+`.local/commercial/whatsapp/sales/clientes/<empresa>-<lead>/` holds:
+- `ficha.md` / `ficha.json`: exactly what the client asked for, organized, plus open items;
+- `conversa.md`: the whole conversation, with audio transcripts and media links;
+- `midia/`: the images and voice messages the client sent.
+
+The brief is extracted by the same model, from the client's own words only: a field the
+client did not mention stays empty and goes to `pendencias`. Without a model the brief keeps
+the raw conversation and the media list.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import unicodedata
+from datetime import datetime
+from pathlib import Path
+from string import Template
+
+from . import guard
+from .context import effective
+from .notify import format_phone
+from .rules import SalesRules, normalize
+
+PROMPT_PATH = Path(__file__).with_name("dossier.md")
+EMPTY_BRIEF = {
+    "empresa": {"nome": None, "segmento": None, "cidade": None},
+    "pedido": {"tipo": None, "nome_do_site_ou_dominio": None, "objetivo": None, "paginas": [],
+               "funcionalidades": [], "servicos_ou_produtos": [], "estilo_e_cores": None,
+               "referencias": []},
+    "contato_no_site": {"whatsapp": None, "telefone": None, "email": None, "endereco": None,
+                        "horario": None, "redes_sociais": []},
+    "materiais_citados": [], "observacoes": [], "resumo": "", "faltando": [],
+    "cliente_terminou": False, "proxima_pergunta": "",
+}
+
+
+def slug(text: str) -> str:
+    plain = unicodedata.normalize("NFKD", text or "")
+    plain = "".join(char for char in plain if not unicodedata.combining(char)).lower()
+    return re.sub(r"[^a-z0-9]+", "-", plain).strip("-")[:40] or "cliente"
+
+
+def client_dir(root: Path, lead: dict) -> Path:
+    return root / "clientes" / f"{slug(lead.get('name', ''))}-{lead['id']}"
+
+
+def save_media(folder: Path, data: bytes, extension: str, kind: str, now: datetime) -> Path:
+    media = folder / "midia"
+    media.mkdir(parents=True, exist_ok=True)
+    for directory in (folder.parent.parent, folder.parent, folder, media):
+        if directory.exists():
+            directory.chmod(0o700)
+    base = f"{now.strftime('%Y%m%d-%H%M%S')}-{kind}"
+    path = media / f"{base}{extension}"
+    counter = 1
+    while path.exists():
+        counter += 1
+        path = media / f"{base}-{counter}{extension}"
+    path.write_bytes(data)
+    path.chmod(0o600)
+    return path
+
+
+def media_files(history: list[dict]) -> list[dict]:
+    return [{"tipo": entry.get("media"), "arquivo": entry["file"],
+             "legenda": entry.get("caption", ""), "em": entry.get("at", "")}
+            for entry in history if entry.get("dir") == "in" and entry.get("file")]
+
+
+def transcript(history: list[dict], agent_name: str) -> list[str]:
+    lines = []
+    for entry in effective(history):
+        if entry.get("dir") not in ("in", "out") or entry.get("state", "sent") != "sent":
+            continue
+        speaker = agent_name if entry["dir"] == "out" else "Cliente"
+        when = str(entry.get("at", ""))[:16].replace("T", " ")
+        text = entry.get("text", "")
+        if entry.get("media") == "audio":
+            speaker += " (áudio transcrito)"
+        if entry.get("file"):
+            text = f"{text} [{entry['media']}: {entry['file']}]"
+        lines.append(f"[{when}] {speaker}: {text}")
+    return lines
+
+
+def _merge(base: dict, data: dict) -> dict:
+    merged = json.loads(json.dumps(base))
+    for key, value in (data or {}).items():
+        if key not in merged:
+            continue
+        if isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = _merge(merged[key], value)
+        elif isinstance(merged[key], list):
+            merged[key] = [str(item) for item in value] if isinstance(value, list) else merged[key]
+        elif isinstance(merged[key], bool):
+            merged[key] = value is True
+        else:
+            merged[key] = None if value in (None, "") else str(value)
+    return merged
+
+
+def extract(rules: SalesRules, lead: dict, history: list[dict], llm, now: datetime,
+            usage=None) -> tuple[dict, str]:
+    """The brief from the conversation; ("", error) never raises."""
+    if llm is None:
+        return dict(EMPTY_BRIEF), "no model"
+    template = Template(PROMPT_PATH.read_text(encoding="utf-8"))
+    system = template.safe_substitute(
+        company=rules.company, required="\n".join(f"- {item}" for item in rules.brief["required"]),
+        optional="\n".join(f"- {item}" for item in rules.brief["optional"]),
+        schema=json.dumps(EMPTY_BRIEF, ensure_ascii=False, indent=1))
+    agent_name = rules.raw.get("agent_name", "Alexandre")
+    user = "\n".join([f"EMPRESA NO GOOGLE MAPS: {lead.get('name', '')} — {lead.get('category', '')}"
+                      f" — {lead.get('city', '')}", "", "CONVERSA:",
+                      *transcript(history, agent_name)])
+    try:
+        reply = llm.complete([{"role": "system", "content": system},
+                              {"role": "user", "content": user}],
+                             session_id=f"zaflas-brief-{lead['id']}")
+    except Exception as error:  # the brief must never stop the conversation
+        return dict(EMPTY_BRIEF), str(error)[:300]
+    if usage is not None:
+        usage({"at": now.isoformat(timespec="seconds"), "lead": lead["id"], "kind": "brief",
+               "model": reply.model, "input_tokens": reply.input_tokens,
+               "output_tokens": reply.output_tokens, "cost_usd": reply.cost_usd})
+    try:
+        text = reply.content.strip()
+        data = json.loads(text[text.find("{"):text.rfind("}") + 1])
+    except ValueError:
+        return dict(EMPTY_BRIEF), "invalid brief output"
+    brief = _merge(EMPTY_BRIEF, data)
+    question = brief.get("proxima_pergunta") or ""
+    if question and guard.violations(rules, [question]):
+        brief["proxima_pergunta"] = ""
+    return brief, ""
+
+
+def client_said_done(rules: SalesRules, text: str) -> bool:
+    plain = normalize(text)
+    return any(re.search(pattern, plain) for pattern in rules.brief["done_patterns"])
+
+
+def _value(value) -> str:
+    if value in (None, "", []):
+        return "—"
+    if isinstance(value, list):
+        return "; ".join(str(item) for item in value)
+    return str(value)
+
+
+def render(lead: dict, brief: dict, files: list[dict], status: str, now: datetime) -> str:
+    company, order, contact = brief["empresa"], brief["pedido"], brief["contato_no_site"]
+    lines = [
+        f"# Ficha do cliente — {company.get('nome') or lead.get('name', '')}",
+        "",
+        f"- Status: **{status}**",
+        f"- Gerada em: {now.strftime('%d/%m/%Y %H:%M')}",
+        f"- WhatsApp do contato: {format_phone(lead.get('phone', ''))}",
+        f"- Origem: Google Maps ({lead.get('maps_url') or 'sem link'}) · lead {lead['id']}",
+        "",
+        "## Resumo do que o cliente quer",
+        "",
+        brief.get("resumo") or "—",
+        "",
+        "## Empresa",
+        "",
+        f"- Nome: {_value(company.get('nome') or lead.get('name'))}",
+        f"- Segmento: {_value(company.get('segmento') or lead.get('category'))}",
+        f"- Cidade: {_value(company.get('cidade') or lead.get('city'))}",
+        "",
+        "## O site",
+        "",
+        f"- Tipo: {_value(order.get('tipo'))}",
+        f"- Nome do site / domínio: {_value(order.get('nome_do_site_ou_dominio'))}",
+        f"- Objetivo: {_value(order.get('objetivo'))}",
+        f"- Páginas: {_value(order.get('paginas'))}",
+        f"- Funcionalidades: {_value(order.get('funcionalidades'))}",
+        f"- Serviços ou produtos: {_value(order.get('servicos_ou_produtos'))}",
+        f"- Estilo e cores: {_value(order.get('estilo_e_cores'))}",
+        f"- Referências: {_value(order.get('referencias'))}",
+        "",
+        "## Contato que vai no site",
+        "",
+        f"- WhatsApp: {_value(contact.get('whatsapp'))}",
+        f"- Telefone: {_value(contact.get('telefone'))}",
+        f"- E-mail: {_value(contact.get('email'))}",
+        f"- Endereço: {_value(contact.get('endereco'))}",
+        f"- Horário: {_value(contact.get('horario'))}",
+        f"- Redes sociais: {_value(contact.get('redes_sociais'))}",
+        "",
+        "## Materiais recebidos",
+        "",
+    ]
+    lines += [f"- {item['tipo']}: [{item['arquivo']}]({item['arquivo']})"
+              + (f" — {item['legenda']}" if item.get("legenda") else "") for item in files]
+    if not files:
+        lines.append("- Nenhum arquivo recebido ainda.")
+    if brief.get("materiais_citados"):
+        lines.append(f"- Citados na conversa: {_value(brief['materiais_citados'])}")
+    lines += ["", "## Pendências (perguntar ao cliente)", ""]
+    lines += [f"- {item}" for item in brief.get("faltando") or []] or ["- Nenhuma."]
+    if brief.get("observacoes"):
+        lines += ["", "## Observações", ""] + [f"- {item}" for item in brief["observacoes"]]
+    lines += ["", "Conversa completa: [conversa.md](conversa.md)", ""]
+    return "\n".join(lines)
+
+
+def write(root: Path, lead: dict, history: list[dict], brief: dict, status: str,
+          now: datetime, agent_name: str = "Alexandre") -> Path:
+    """Write ficha.md, ficha.json and conversa.md; return the ficha.md path."""
+    folder = client_dir(root, lead)
+    folder.mkdir(parents=True, exist_ok=True)
+    for directory in (folder.parent, folder):
+        directory.chmod(0o700)
+    files = media_files(history)
+    record = {"gerada_em": now.isoformat(timespec="seconds"), "status": status,
+              "lead": {key: lead.get(key) for key in ("id", "name", "city", "category",
+                                                      "maps_url")},
+              "whatsapp": format_phone(lead.get("phone", "")), "ficha": brief,
+              "arquivos": files}
+    outputs = {
+        "ficha.json": json.dumps(record, ensure_ascii=False, indent=2) + "\n",
+        "ficha.md": render(lead, brief, files, status, now),
+        "conversa.md": "# Conversa\n\n" + "\n".join(transcript(history, agent_name)) + "\n",
+    }
+    for name, content in outputs.items():
+        path = folder / name
+        path.write_text(content, encoding="utf-8")
+        path.chmod(0o600)
+    return folder / "ficha.md"
