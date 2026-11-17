@@ -1,4 +1,4 @@
-// The seven pages. They only lay out what `Store` holds and call `Bridge`.
+// The eight pages. They only lay out what `Store` holds and call `Bridge`.
 
 import { LineEdit, ComboBox } from "std-widgets.slint";
 import { Theme } from "theme.slint";
@@ -91,6 +91,207 @@ component Panel inherits Card {
             action-text: root.notice.kind == 3 ? root.action-text : "";
             action => {
                 root.action();
+            }
+        }
+    }
+}
+
+// Home: what needs the owner first, then every state of the sales funnel and the latest
+// WhatsApp messages. Data comes from the agent's central.json.
+export component CentralPage inherits VerticalLayout {
+    spacing: Theme.space-4;
+
+    HorizontalLayout {
+        spacing: Theme.space-4;
+        for group in Store.central-groups: KpiCard {
+            label: group.label;
+            value: group.value;
+            caption: group.caption;
+            available: group.available;
+            loading: Store.loading && !Store.has-data;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: Theme.space-4;
+        vertical-stretch: 1;
+
+        Panel {
+            horizontal-stretch: 3;
+            vertical-stretch: 1;
+            title: "Precisa de você";
+            subtitle: Store.interventions-summary;
+            notice: Store.interventions-notice;
+            loading: Store.loading && !Store.has-data;
+            action-text: "Tentar novamente";
+            action => {
+                Bridge.refresh();
+            }
+
+            RowList {
+                vertical-stretch: 1;
+                label: "Conversas que precisam de você";
+                count: Store.interventions.length;
+                current: Store.intervention-current;
+                row-height: 96px;
+                for row[index] in Store.interventions: RowFrame {
+                    height: 96px;
+                    selected: index == Store.intervention-current;
+                    label: row.priority + ", " + row.who + ", " + row.reason + ", " + row.last;
+                    clicked => {
+                        Store.intervention-current = index;
+                    }
+                    HorizontalLayout {
+                        padding-left: Theme.space-4;
+                        padding-right: Theme.space-4;
+                        spacing: Theme.space-3;
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: Theme.space-1;
+                            HorizontalLayout {
+                                spacing: Theme.space-3;
+                                Cell {
+                                    text: row.who;
+                                    font-weight: 600;
+                                }
+                                Caption {
+                                    horizontal-stretch: 0;
+                                    text: row.when;
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: Theme.space-2;
+                                Badge {
+                                    text: row.priority;
+                                    tone: row.tone;
+                                }
+                                Body {
+                                    text: row.reason;
+                                    overflow: elide;
+                                }
+                            }
+                            Caption {
+                                text: row.phone + (row.last != "" ? "  ·  “" + row.last + "”" : "");
+                                overflow: elide;
+                            }
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 0;
+                            alignment: center;
+                            spacing: Theme.space-2;
+                            Btn {
+                                text: "Abrir conversa";
+                                kind: "primary";
+                                enabled: row.has-link;
+                                description: "Abre o WhatsApp do contato no navegador";
+                                clicked => {
+                                    Store.intervention-current = index;
+                                    Bridge.open-conversation(index);
+                                }
+                            }
+                            Btn {
+                                text: "Ficha do cliente";
+                                enabled: row.has-ficha;
+                                description: "Abre a ficha com o que o cliente pediu";
+                                clicked => {
+                                    Store.intervention-current = index;
+                                    Bridge.open-ficha(index);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Panel {
+            horizontal-stretch: 2;
+            vertical-stretch: 1;
+            title: "Mensagens recentes";
+            subtitle: Store.central-updated;
+            notice: Store.central-messages-notice;
+            loading: Store.loading && !Store.has-data;
+            action-text: "Tentar novamente";
+            action => {
+                Bridge.refresh();
+            }
+
+            RowList {
+                vertical-stretch: 1;
+                label: "Mensagens recentes de todos os contatos";
+                count: Store.central-messages.length;
+                current: -1;
+                row-height: 60px;
+                for row in Store.central-messages: RowFrame {
+                    height: 60px;
+                    label: (row.direction == "in" ? "Recebida de " : "Enviada para ") + row.who + ", " + row.text;
+                    VerticalLayout {
+                        padding-left: Theme.space-4;
+                        padding-right: Theme.space-4;
+                        alignment: center;
+                        spacing: Theme.space-1;
+                        HorizontalLayout {
+                            spacing: Theme.space-2;
+                            Cell {
+                                text: (row.direction == "in" ? "← " : "→ ") + row.who;
+                                font-weight: row.direction == "in" ? 600 : 400;
+                                color: row.needs-owner ? Theme.warning : Theme.text;
+                            }
+                            Caption {
+                                horizontal-stretch: 0;
+                                text: row.when;
+                            }
+                        }
+                        Body {
+                            text: row.text;
+                            color: Theme.text-muted;
+                            overflow: elide;
+                        }
+                    }
+                }
+            }
+        }
+
+        Card {
+            width: 248px;
+            vertical-stretch: 1;
+            VerticalLayout {
+                padding: Theme.space-4;
+                spacing: Theme.space-1;
+                SectionTitle {
+                    text: "Estados";
+                }
+                Caption {
+                    text: "Todos os estados possíveis de um contato";
+                    wrap: word-wrap;
+                }
+                RowList {
+                    vertical-stretch: 1;
+                    label: "Contatos por estado";
+                    count: Store.central-states.length;
+                    current: -1;
+                    row-height: 30px;
+                    for tile in Store.central-states: HorizontalLayout {
+                        height: 30px;
+                        spacing: Theme.space-2;
+                        accessible-role: AccessibleRole.list-item;
+                        accessible-label: tile.group + ", " + tile.label + ": " + tile.count;
+                        Badge {
+                            text: tile.label;
+                            tone: tile.owner && tile.count != "0" ? 2 : 0;
+                        }
+                        Rectangle {
+                            horizontal-stretch: 1;
+                        }
+                        Cell {
+                            horizontal-stretch: 0;
+                            text: tile.count;
+                            font-weight: tile.count != "0" ? 600 : 400;
+                            color: tile.count != "0" ? Theme.text : Theme.text-subtle;
+                            horizontal-alignment: right;
+                        }
+                    }
+                }
             }
         }
     }

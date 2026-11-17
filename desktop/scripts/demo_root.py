@@ -189,6 +189,7 @@ def networks(root: Path) -> None:
         for index, (chat, text, allowed, minutes) in enumerate(events)))
     write(whatsapp / "journal.jsonl", json.dumps({"key": "k1", "to": "Cliente Demo A", "state": "dry-run",
                                                   "at": stamp}) + "\n")
+    sales_central(root)
     write(root / ".local/commercial/mercadolivre/products.json", {
         "schema": 1, "query": "mouse sem fio", "captured_at": (NOW - timedelta(days=1)).isoformat(),
         "products": [
@@ -201,6 +202,58 @@ def networks(root: Path) -> None:
                 ("Hub USB-C 7 em 1", 139.5, "11%", "Linha Exemplo"),
             ])
         ],
+    })
+
+
+def sales_central(root: Path) -> None:
+    """Synthetic central.json of the sales agent (demo names and numbers only)."""
+    states = [
+        ("needs-owner", "Precisa de você", "Com você", True, 2),
+        ("quote-requested", "Orçamento a fazer", "Com você", True, 1),
+        ("unconfirmed", "Envio não confirmado", "Com você", True, 0),
+        ("owner", "Você está atendendo", "Com você", True, 0),
+        ("qualifying", "Coletando dados", "Em conversa", False, 1),
+        ("engaged", "Em conversa", "Em conversa", False, 3),
+        ("new", "Novo", "Prospecção", False, 6),
+        ("opening", "Abrindo conversa", "Prospecção", False, 0),
+        ("opened", "Abordado", "Prospecção", False, 8),
+        ("followed-up", "Follow-up enviado", "Prospecção", False, 2),
+        ("closed", "Encerrado", "Encerrados", False, 1),
+        ("no-response", "Sem resposta", "Encerrados", False, 2),
+        ("do-not-contact", "Não contatar", "Encerrados", False, 3),
+        ("invalid-number", "Número sem WhatsApp", "Encerrados", False, 1),
+    ]
+    people = [
+        ("barbearia-2", "Barbearia Demo Centro", "hot", "Orçamento: o cliente descreveu o projeto",
+         "quote-requested", "Orçamento a fazer", "Pode ser com agendamento online também", 12),
+        ("salao-de-beleza-1", "Salão Demo Flor", "hot", "Quer fechar: perguntou como começar ou pagar",
+         "needs-owner", "Precisa de você", "Gostei, como faço pra pagar a entrada?", 25),
+        ("oficina-3", "Oficina Demo Motor", "needed", "Negociação de preço ou pagamento",
+         "needs-owner", "Precisa de você", "Tá caro, consegue fazer por menos?", 70),
+    ]
+    interventions = [{
+        "lead": f"Ldemo{index}", "label": label, "name": name, "contact_name": f"{label} {name}",
+        "phone": f"+55 65 90000-00{index:02d}", "wa_link": f"https://wa.me/55659000000{index:02d}",
+        "state": state, "state_label": state_label, "priority": priority, "reason": reason,
+        "last_message": last, "at": (NOW - timedelta(minutes=minutes)).isoformat(), "ficha": ""}
+        for index, (label, name, priority, reason, state, state_label, last, minutes)
+        in enumerate(people, start=1)]
+    talk = [
+        ("barbearia-2", "Barbearia Demo Centro", "in", "Pode ser com agendamento online também", 12),
+        ("barbearia-2", "Barbearia Demo Centro", "out", "Perfeito, anotei tudo! Vou preparar o orçamento.", 11),
+        ("salao-de-beleza-1", "Salão Demo Flor", "in", "Gostei, como faço pra pagar a entrada?", 25),
+        ("padaria-1", "Padaria Demo Sol", "in", "Quanto custa um site simples?", 40),
+        ("padaria-1", "Padaria Demo Sol", "out", "Um site institucional fica em média R$ 500.", 39),
+        ("oficina-3", "Oficina Demo Motor", "in", "Tá caro, consegue fazer por menos?", 70),
+    ]
+    messages = [{"at": (NOW - timedelta(minutes=minutes)).isoformat(), "label": label, "name": name,
+                 "dir": direction, "text": text, "media": "", "needs_owner": direction == "in"}
+                for label, name, direction, text, minutes in sorted(talk, key=lambda item: item[4])]
+    write(root / ".local/commercial/whatsapp/sales/central.json", {
+        "generated_at": NOW.isoformat(), "interventions": interventions, "messages": messages,
+        "states": [{"state": state, "label": label, "group": group, "owner": owner, "count": count}
+                   for state, label, group, owner, count in states],
+        "leads": [{"label": f"demo-{index}"} for index in range(30)],
     })
 
 

@@ -21,7 +21,7 @@ desktop/
 │       ├── theme.slint           design tokens (colors, spacing, radii, type)
 │       ├── store.slint           view-model structs, Store and Bridge globals
 │       ├── controls.slint        buttons, nav, badges, cards, states, lists
-│       ├── pages.slint           the seven pages
+│       ├── pages.slint           the eight pages (Central first)
 │       └── app.slint             window, sidebar, header, shortcuts, footer
 ├── crates/reports/               pure aggregation, no UI
 │   ├── src/time.rs               America/Cuiaba clock, periods, pt-BR formatting
@@ -30,6 +30,7 @@ desktop/
 │   ├── src/community.rs          history with single-entry fallback
 │   ├── src/social.rs             X posts, replies, discovery
 │   ├── src/commercial.rs         WhatsApp events/rules, Mercado Livre capture
+│   ├── src/sales.rs              sales agent Central (central.json), safe wa.me/ficha targets
 │   ├── src/snapshot.rs           one read of every source
 │   ├── src/overview.rs           counts per period/channel, upcoming slots
 │   ├── examples/summary.rs       month summary in the terminal

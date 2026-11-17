@@ -1,7 +1,8 @@
 # Desktop manager
 
 `desktop/` is a Rust + Slint application: a read-only view of the bot's private records with
-monthly metrics, plus two bounded actions per network (open the visible login window, stop the
+monthly metrics and, on its home page (Central), every WhatsApp sales conversation that needs
+the owner, plus two bounded actions per network (open the visible login window, stop the
 hidden browser). Commands and layout of the code are in [desktop/README.md](../desktop/README.md).
 
 ## Contract
@@ -15,6 +16,10 @@ hidden browser). Commands and layout of the code are in [desktop/README.md](../d
   `python3 -m tools.ytbot commercial|social open|stop --network <key>` with a fixed argument
   list on a worker thread. No shell, no arbitrary command. YouTube profiles have no action
   here; their pipeline is `run`, `shorts` and `distribute`.
+- **Central links.** "Abrir conversa" and "Ficha do cliente" hand one validated target to
+  `xdg-open`: only `https://wa.me/<10 to 15 digits>` (the owner's own browser or WhatsApp
+  opens the chat) and only a `ficha.md` inside `.local/commercial/whatsapp/sales/clientes/`
+  (resolved, so `..` cannot leave it). Nothing else is opened and nothing is sent.
 - **Never invent data.** A missing file shows "sem registro" (or "não conectada" for a
   session), a broken one shows an error with "Tentar novamente". Unknown fields are ignored,
   a broken JSONL line or `upload.json` is skipped and counted in Configurações → Diagnóstico.
@@ -32,6 +37,7 @@ hidden browser). Commands and layout of the code are in [desktop/README.md](../d
 | X | `social/x/{account,posts,replies,discovery}.json`, post text from `promotion/agenda.json` |
 | WhatsApp | `commercial/whatsapp/{account.json,rules.json,events.jsonl,journal.jsonl}` |
 | Mercado Livre | `commercial/mercadolivre/{account,products}.json` |
+| Central (sales) | `commercial/whatsapp/sales/central.json`, written by the agent after every cycle (contract in [WhatsApp sales](COMMERCIAL-WHATSAPP-SALES.md)) |
 | Sessions | the account files above, `browser.pid` and Chrome's `SingletonLock` checked through `/proc` |
 
 ## Counting rules
@@ -58,13 +64,18 @@ All counts come from the `reports` crate; Slint only displays strings.
 
 | Section | Shortcut | Content |
 | --- | --- | --- |
-| Visão geral | Ctrl+1 | Period and channel filters, six month cards, upcoming slots |
-| Canais | Ctrl+2 | One card per channel (binding, published × scheduled × drafts, last, next, Community); Enter opens the video table |
-| Shorts | Ctrl+3 | Zaflas Shorts with thumbnail, slot and state |
-| Social (X) | Ctrl+4 | Posts, replies and discovery counters, session, posts of the period |
-| Comercial | Ctrl+5 | WhatsApp session, rules and latest message per contact; Mercado Livre session and last capture |
-| Sessões | Ctrl+6 | Every profile with live browser state (polled every 5 s) and the open/stop actions |
-| Configurações | Ctrl+7 | Theme, project root, refresh interval, read-only diagnostics, shortcuts |
+| Central | Ctrl+1 | Home. Funnel groups (Com você, Em conversa, Prospecção, Encerrados); "Precisa de você" with every conversation the owner must take over (priority, `barbearia-1 Nome`, reason, phone, last message, "Abrir conversa", "Ficha do cliente"); recent messages of every lead; the 14 states with counts |
+| Visão geral | Ctrl+2 | Period and channel filters, six month cards, upcoming slots |
+| Canais | Ctrl+3 | One card per channel (binding, published × scheduled × drafts, last, next, Community); Enter opens the video table |
+| Shorts | Ctrl+4 | Zaflas Shorts with thumbnail, slot and state |
+| Social (X) | Ctrl+5 | Posts, replies and discovery counters, session, posts of the period |
+| Comercial | Ctrl+6 | WhatsApp session, rules and latest message per contact; Mercado Livre session and last capture |
+| Sessões | Ctrl+7 | Every profile with live browser state (polled every 5 s) and the open/stop actions |
+| Configurações | Ctrl+8 | Theme, project root, refresh interval, read-only diagnostics, shortcuts |
+
+Central priorities: "Atender agora" (red) is a buying signal (quote collected, wants to close,
+asked for a person or a call), "Precisa de você" (amber) is a question or negotiation the bot
+may not answer, "Verificar" (accent) is a failed send or a blocked contact writing again.
 
 States: skeleton while the first load runs, "VAZIO" for an empty period, "SEM REGISTRO" for a
 missing source, "ERRO" with a retry action, and a page-wide notice when the root has no
@@ -76,9 +87,9 @@ missing source, "ERRO" with a retry action, and a page-wide notice when the root
 | --- | --- |
 | Ctrl+R | Reload every record |
 | Ctrl+K | Focus the search field (filters the current page, accent-insensitive) |
-| Ctrl+1 … Ctrl+7 | Go to a section |
+| Ctrl+1 … Ctrl+8 | Go to a section (Ctrl+1 is the Central) |
 | ↑ ↓ ← → PageUp PageDown Home End | Move in the page's list; the selection scrolls into view |
-| Enter | Open the selected channel |
+| Enter | Open the selected channel; on the Central, open the selected conversation |
 | Esc | Leave the channel detail, clear selection and search |
 | Tab / Shift+Tab | Next / previous control; every control draws a 2 px focus ring |
 
@@ -130,4 +141,5 @@ drives the app only through its keyboard shortcuts.
 - Mercado Livre has no capture history; a `captures.jsonl` written by the commercial module
   would make the monthly product count exact.
 - Community history starts with this version; earlier months only know the last post.
-- Links are shown as text: opening a browser would need a command outside the typed CLI.
+- Outside the Central, links are shown as text; only the Central's wa.me and ficha targets
+  are opened.

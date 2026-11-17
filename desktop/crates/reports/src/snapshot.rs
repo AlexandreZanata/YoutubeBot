@@ -9,6 +9,7 @@ use serde::Deserialize;
 use crate::catalog::{CHANNELS, ChannelInfo};
 use crate::commercial::{self, MercadoLivreReport, WhatsAppReport};
 use crate::community::{self, CommunityReport};
+use crate::sales::{self, SalesReport};
 use crate::social::{self, XReport};
 use crate::source::{SourceStatus, lenient, load_json};
 use crate::time;
@@ -50,6 +51,7 @@ pub struct Snapshot {
     pub x: XReport,
     pub whatsapp: WhatsAppReport,
     pub mercadolivre: MercadoLivreReport,
+    pub sales: SalesReport,
     pub login_request: Option<LoginRequest>,
     pub registry: SourceStatus,
 }
@@ -123,6 +125,7 @@ impl Snapshot {
             x: social::load_x(root),
             whatsapp: commercial::load_whatsapp(root),
             mercadolivre: commercial::load_mercadolivre(root),
+            sales: sales::load_sales(root),
             login_request,
             registry,
         }
@@ -147,6 +150,7 @@ impl Snapshot {
         sources.extend(self.x.sources.iter().cloned());
         sources.extend(self.whatsapp.sources.iter().cloned());
         sources.extend(self.mercadolivre.sources.iter().cloned());
+        sources.push(self.sales.source.clone());
         sources
     }
 }

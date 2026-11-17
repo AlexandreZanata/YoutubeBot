@@ -210,7 +210,9 @@ retry an unconfirmed publish blindly. See [community](docs/COMMUNITY.md).
 ## Desktop manager
 
 `desktop/` is a Rust + Slint manager that lists every profile and logged network from the
-private registries and exposes only open/stop actions through the typed CLI. Keep the domain
+private registries and exposes only open/stop actions through the typed CLI. Its home page,
+the Central, reads the sales agent's `central.json` and may only hand a validated
+`https://wa.me/<digits>` link or a client `ficha.md` to `xdg-open`. Keep the domain
 crate free of UI types. See [desktop](docs/DESKTOP.md) and
 [desktop/README.md](desktop/README.md).
 

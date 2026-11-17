@@ -2,7 +2,7 @@
 """Capture every page of the manager in one theme on a private Xvfb display.
 
 Drives the app only through its keyboard shortcuts (XTest through ctypes), so the capture
-also exercises Ctrl+1…7, the arrows and Enter. Requires Xvfb and ImageMagick `import`.
+also exercises Ctrl+1…8, the arrows and Enter. Requires Xvfb and ImageMagick `import`.
 
     python3 desktop/scripts/demo_root.py /tmp/ytbot-demo
     python3 desktop/scripts/capture.py --root /tmp/ytbot-demo --theme light --out docs/images/desktop
@@ -19,7 +19,8 @@ import tempfile
 import time
 from pathlib import Path
 
-PAGES = ["overview", "channels", "shorts", "social", "commercial", "sessions", "settings"]
+PAGES = ["central", "overview", "channels", "shorts", "social", "commercial", "sessions",
+         "settings"]
 SIZE = (1280, 800)
 
 
@@ -125,7 +126,7 @@ def main() -> int:
 
             for index, page in enumerate(PAGES, start=1):
                 keys.press(f"Control_L+{index}")
-                if page in ("overview", "sessions"):
+                if page in ("central", "overview", "sessions"):
                     keys.press("Down")
                 shot(page)
                 if page == "channels":

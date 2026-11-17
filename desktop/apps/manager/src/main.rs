@@ -38,6 +38,8 @@ struct App {
     session_rows: Vec<usize>,
     /// Visible card → channel slug (after search).
     channel_rows: Vec<&'static str>,
+    /// Visible Central intervention → (wa.me link, ficha path).
+    central_targets: Vec<(String, String)>,
     period: Period,
     channel: Option<&'static str>,
     search: String,
@@ -96,6 +98,17 @@ fn save_settings(app: &App) -> Result<(), String> {
         return Err("sem HOME: preferências não podem ser salvas".into());
     };
     app.settings.save(path).map_err(|error| error.to_string())
+}
+
+/// Opens a validated wa.me link or ficha path with the desktop's default application.
+fn open_external(target: &str) -> std::io::Result<()> {
+    std::process::Command::new("xdg-open")
+        .arg(target)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map(|_| ())
 }
 
 fn set_status(ui: &AppWindow, message: impl Into<slint::SharedString>) {
@@ -283,6 +296,21 @@ fn render_all(ui: &AppWindow, app: &mut App) {
         store.set_x_kpis(model(x.kpis));
         store.set_x_posts(model(x.rows));
         store.set_x_notice(x.notice);
+
+        let central = view::central(&context);
+        store.set_central_groups(model(central.groups));
+        store.set_central_states(model(central.states));
+        store.set_intervention_current(clamp(
+            store.get_intervention_current(),
+            central.interventions.len(),
+        ));
+        store.set_interventions(model(central.interventions));
+        store.set_interventions_notice(central.interventions_notice);
+        store.set_interventions_summary(central.summary.into());
+        store.set_central_messages(model(central.messages));
+        store.set_central_messages_notice(central.messages_notice);
+        store.set_central_updated(central.updated.into());
+        app.central_targets = central.targets;
 
         let whatsapp = view::whatsapp(&context);
         store.set_contact_current(clamp(store.get_contact_current(), whatsapp.rows.len()));
@@ -554,6 +582,7 @@ fn main() -> Result<(), slint::PlatformError> {
             sessions_error: None,
             session_rows: Vec::new(),
             channel_rows: Vec::new(),
+            central_targets: Vec::new(),
             period: Period::this_month(today),
             channel: None,
             search: String::new(),
@@ -592,7 +621,7 @@ fn main() -> Result<(), slint::PlatformError> {
         let store = ui.global::<Store>();
         store.set_page(page);
         store.set_search_text("".into());
-        if page == 1 {
+        if page == 2 {
             store.set_channel_open(false);
         }
         with_app(|app| {
@@ -695,6 +724,39 @@ fn main() -> Result<(), slint::PlatformError> {
         if let Some(ui) = weak.upgrade() {
             run_action(&ui, row, false);
         }
+    });
+
+    let weak = ui.as_weak();
+    bridge.on_open_conversation(move |row| {
+        let Some(ui) = weak.upgrade() else { return };
+        let target = with_app(|app| app.central_targets.get(row as usize).cloned()).flatten();
+        let message = match target {
+            Some((link, _)) if reports::sales::safe_wa_link(&link) => match open_external(&link) {
+                Ok(()) => format!("Abrindo a conversa ({link})"),
+                Err(error) => format!("Não foi possível abrir o navegador: {error}"),
+            },
+            _ => "Este contato não tem um link de WhatsApp válido".to_owned(),
+        };
+        set_status(&ui, message);
+    });
+
+    let weak = ui.as_weak();
+    bridge.on_open_ficha(move |row| {
+        let Some(ui) = weak.upgrade() else { return };
+        let target = with_app(|app| {
+            app.central_targets
+                .get(row as usize)
+                .and_then(|(_, ficha)| reports::sales::safe_ficha(&app.root, ficha))
+        })
+        .flatten();
+        let message = match target {
+            Some(path) => match open_external(&path.to_string_lossy()) {
+                Ok(()) => format!("Abrindo a ficha {}", home_relative(&path)),
+                Err(error) => format!("Não foi possível abrir a ficha: {error}"),
+            },
+            None => "A ficha deste contato ainda não existe".to_owned(),
+        };
+        set_status(&ui, message);
     });
 
     let weak = ui.as_weak();

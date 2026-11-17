@@ -90,6 +90,36 @@ export struct ProductRow {
     brand: string,
 }
 
+export struct InterventionRow {
+    who: string,
+    phone: string,
+    reason: string,
+    last: string,
+    when: string,
+    state: string,
+    priority: string,
+    // 3 danger (hot), 2 warning (needed), 4 accent (alert)
+    tone: int,
+    has-link: bool,
+    has-ficha: bool,
+}
+
+export struct StateTile {
+    label: string,
+    group: string,
+    count: string,
+    owner: bool,
+}
+
+export struct MessageRow {
+    when: string,
+    who: string,
+    text: string,
+    // "in" from the contact, "out" from the bot or the owner
+    direction: string,
+    needs-owner: bool,
+}
+
 export struct SourceRow {
     label: string,
     path: string,
@@ -125,6 +155,17 @@ export global Store {
     in property <string> login-banner: "";
     in property <Notice> root-notice;
     in-out property <string> search-text: "";
+
+    // Central (sales agent: who needs the owner, every state, recent messages)
+    in property <[Kpi]> central-groups;
+    in property <[StateTile]> central-states;
+    in property <[InterventionRow]> interventions;
+    in property <Notice> interventions-notice;
+    in property <string> interventions-summary: "";
+    in-out property <int> intervention-current: -1;
+    in property <[MessageRow]> central-messages;
+    in property <Notice> central-messages-notice;
+    in property <string> central-updated: "";
 
     // Overview
     in-out property <int> period-index: 0;
@@ -205,4 +246,6 @@ export global Bridge {
     callback refresh-interval-picked(int);
     callback apply-root(string);
     callback reset-root();
+    callback open-conversation(int);
+    callback open-ficha(int);
 }

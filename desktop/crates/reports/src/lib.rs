@@ -9,6 +9,7 @@ pub mod catalog;
 pub mod commercial;
 pub mod community;
 pub mod overview;
+pub mod sales;
 pub mod search;
 pub mod snapshot;
 pub mod social;

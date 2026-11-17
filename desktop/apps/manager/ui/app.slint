@@ -1,5 +1,5 @@
 // YoutubeBot Manager window: sidebar navigation, header with breadcrumb and search, the
-// active page and a status footer. Keyboard: Ctrl+R refresh, Ctrl+K search, Ctrl+1…7
+// active page and a status footer. Keyboard: Ctrl+R refresh, Ctrl+K search, Ctrl+1…8
 // sections, arrows/Home/End move in the page list, Enter opens, Esc clears.
 
 import { LineEdit, Palette } from "std-widgets.slint";
@@ -7,7 +7,8 @@ import { Theme } from "theme.slint";
 import { Store, Bridge } from "store.slint";
 import { Btn, NavItem, Caption, Badge, Body, NoticeView } from "controls.slint";
 import {
-    OverviewPage, ChannelsPage, ShortsPage, SocialPage, CommercialPage, SessionsPage, SettingsPage,
+    CentralPage, OverviewPage, ChannelsPage, ShortsPage, SocialPage, CommercialPage, SessionsPage,
+    SettingsPage,
 } from "pages.slint";
 
 export { Theme } from "theme.slint";
@@ -32,7 +33,8 @@ export component AppWindow inherits Window {
 
     in-out property <bool> dark <=> Theme.dark;
     property <[string]> titles: [
-        "Visão geral", "Canais", "Shorts", "Social (X)", "Comercial", "Sessões", "Configurações",
+        "Central", "Visão geral", "Canais", "Shorts", "Social (X)", "Comercial", "Sessões",
+        "Configurações",
     ];
 
     init => {
@@ -49,21 +51,24 @@ export component AppWindow inherits Window {
 
     function list-length() -> int {
         if (Store.page == 0) {
-            return Store.upcoming.length;
+            return Store.interventions.length;
         }
         if (Store.page == 1) {
-            return Store.channel-open ? Store.videos.length : Store.channels.length;
+            return Store.upcoming.length;
         }
         if (Store.page == 2) {
-            return Store.shorts.length;
+            return Store.channel-open ? Store.videos.length : Store.channels.length;
         }
         if (Store.page == 3) {
-            return Store.x-posts.length;
+            return Store.shorts.length;
         }
         if (Store.page == 4) {
-            return Store.wa-contacts.length;
+            return Store.x-posts.length;
         }
         if (Store.page == 5) {
+            return Store.wa-contacts.length;
+        }
+        if (Store.page == 6) {
             return Store.sessions.length;
         }
         return Store.sources.length;
@@ -71,21 +76,24 @@ export component AppWindow inherits Window {
 
     function list-current() -> int {
         if (Store.page == 0) {
-            return Store.upcoming-current;
+            return Store.intervention-current;
         }
         if (Store.page == 1) {
-            return Store.channel-open ? Store.video-current : Store.channel-current;
+            return Store.upcoming-current;
         }
         if (Store.page == 2) {
-            return Store.short-current;
+            return Store.channel-open ? Store.video-current : Store.channel-current;
         }
         if (Store.page == 3) {
-            return Store.x-current;
+            return Store.short-current;
         }
         if (Store.page == 4) {
-            return Store.contact-current;
+            return Store.x-current;
         }
         if (Store.page == 5) {
+            return Store.contact-current;
+        }
+        if (Store.page == 6) {
             return Store.session-current;
         }
         return Store.source-current;
@@ -93,18 +101,20 @@ export component AppWindow inherits Window {
 
     function set-current(value: int) {
         if (Store.page == 0) {
-            Store.upcoming-current = value;
-        } else if (Store.page == 1 && Store.channel-open) {
-            Store.video-current = value;
+            Store.intervention-current = value;
         } else if (Store.page == 1) {
-            Store.channel-current = value;
+            Store.upcoming-current = value;
+        } else if (Store.page == 2 && Store.channel-open) {
+            Store.video-current = value;
         } else if (Store.page == 2) {
-            Store.short-current = value;
+            Store.channel-current = value;
         } else if (Store.page == 3) {
-            Store.x-current = value;
+            Store.short-current = value;
         } else if (Store.page == 4) {
-            Store.contact-current = value;
+            Store.x-current = value;
         } else if (Store.page == 5) {
+            Store.contact-current = value;
+        } else if (Store.page == 6) {
             Store.session-current = value;
         } else {
             Store.source-current = value;
@@ -129,16 +139,20 @@ export component AppWindow inherits Window {
     }
 
     function activate() {
-        if (Store.page == 1 && !Store.channel-open && Store.channel-current >= 0) {
+        if (Store.page == 0 && Store.intervention-current >= 0) {
+            Bridge.open-conversation(Store.intervention-current);
+        }
+        if (Store.page == 2 && !Store.channel-open && Store.channel-current >= 0) {
             Bridge.open-channel(Store.channel-current);
         }
     }
 
     function clear-selection() {
-        if (Store.page == 1 && Store.channel-open) {
+        if (Store.page == 2 && Store.channel-open) {
             Store.channel-open = false;
             Store.video-current = -1;
         } else {
+            Store.intervention-current = -1;
             Store.upcoming-current = -1;
             Store.channel-current = -1;
             Store.short-current = -1;
@@ -211,6 +225,12 @@ export component AppWindow inherits Window {
             keys: @keys(Control + "7");
             activated => {
                 root.go(6);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "8");
+            activated => {
+                root.go(7);
             }
         }
         KeyBinding {
@@ -346,11 +366,11 @@ export component AppWindow inherits Window {
                             alignment: center;
                             spacing: Theme.space-1;
                             Caption {
-                                text: "YoutubeBot  /  " + root.titles[Store.page] + (Store.page == 1 && Store.channel-open ? "  /  " + Store.channel-detail.name : "");
+                                text: "YoutubeBot  /  " + root.titles[Store.page] + (Store.page == 2 && Store.channel-open ? "  /  " + Store.channel-detail.name : "");
                                 accessible-label: "Caminho: " + self.text;
                             }
                             Text {
-                                text: Store.page == 1 && Store.channel-open ? Store.channel-detail.name : root.titles[Store.page];
+                                text: Store.page == 2 && Store.channel-open ? Store.channel-detail.name : root.titles[Store.page];
                                 font-family: Theme.font;
                                 font-size: Theme.text-xl;
                                 font-weight: 700;
@@ -424,21 +444,22 @@ export component AppWindow inherits Window {
                         padding-top: Theme.space-2;
                         padding-bottom: Theme.space-6;
 
-                        if Store.root-notice.kind != 0 && Store.page != 6: NoticeView {
+                        if Store.root-notice.kind != 0 && Store.page != 7: NoticeView {
                             notice: Store.root-notice;
                             action-text: "Abrir configurações";
                             action => {
-                                root.go(6);
+                                root.go(7);
                             }
                         }
 
-                        if Store.root-notice.kind == 0 && Store.page == 0: OverviewPage { }
-                        if Store.root-notice.kind == 0 && Store.page == 1: ChannelsPage { }
-                        if Store.root-notice.kind == 0 && Store.page == 2: ShortsPage { }
-                        if Store.root-notice.kind == 0 && Store.page == 3: SocialPage { }
-                        if Store.root-notice.kind == 0 && Store.page == 4: CommercialPage { }
-                        if Store.root-notice.kind == 0 && Store.page == 5: SessionsPage { }
-                        if Store.page == 6: SettingsPage { }
+                        if Store.root-notice.kind == 0 && Store.page == 0: CentralPage { }
+                        if Store.root-notice.kind == 0 && Store.page == 1: OverviewPage { }
+                        if Store.root-notice.kind == 0 && Store.page == 2: ChannelsPage { }
+                        if Store.root-notice.kind == 0 && Store.page == 3: ShortsPage { }
+                        if Store.root-notice.kind == 0 && Store.page == 4: SocialPage { }
+                        if Store.root-notice.kind == 0 && Store.page == 5: CommercialPage { }
+                        if Store.root-notice.kind == 0 && Store.page == 6: SessionsPage { }
+                        if Store.page == 7: SettingsPage { }
                     }
                 }
 

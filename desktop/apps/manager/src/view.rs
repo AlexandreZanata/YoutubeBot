@@ -14,9 +14,11 @@ use reports::time::{self, format_datetime, format_relative, format_slot};
 use reports::{NaiveDateTime, Period, SourceState, SourceStatus, VideoKind, VideoState};
 use slint::{Image, ModelRc, SharedString, VecModel};
 
+use reports::sales::safe_wa_link;
+
 use crate::{
-    ChannelCard, ContactRow, Fact, Kpi, Notice, ProductRow, SessionRow, ShortRow, SourceRow,
-    UpcomingRow, VideoRow, XPostRow,
+    ChannelCard, ContactRow, Fact, InterventionRow, Kpi, MessageRow, Notice, ProductRow,
+    SessionRow, ShortRow, SourceRow, StateTile, UpcomingRow, VideoRow, XPostRow,
 };
 
 pub struct Context<'a> {
@@ -656,6 +658,178 @@ pub fn x(context: &Context) -> XView {
         kpis,
         rows,
         notice: state,
+    }
+}
+
+/// The four groups of the funnel, in Central order, with what each one means.
+const GROUPS: [(&str, &str); 4] = [
+    ("Com você", "conversas esperando você"),
+    ("Em conversa", "o bot está conversando"),
+    ("Prospecção", "abordados ou na fila"),
+    ("Encerrados", "recusas, sem resposta ou sem WhatsApp"),
+];
+
+pub struct CentralView {
+    pub groups: Vec<Kpi>,
+    pub states: Vec<StateTile>,
+    pub interventions: Vec<InterventionRow>,
+    /// Visible intervention → (wa.me link, ficha path), for the row buttons.
+    pub targets: Vec<(String, String)>,
+    pub interventions_notice: Notice,
+    pub summary: String,
+    pub messages: Vec<MessageRow>,
+    pub messages_notice: Notice,
+    pub updated: String,
+}
+
+fn priority_text(priority: &str) -> (&'static str, i32) {
+    match priority {
+        "hot" => ("Atender agora", 3),
+        "alert" => ("Verificar", 4),
+        _ => ("Precisa de você", 2),
+    }
+}
+
+fn who(label: &str, name: &str) -> String {
+    format!("{label} {name}").trim().to_owned()
+}
+
+pub fn central(context: &Context) -> CentralView {
+    let report = &context.snapshot.sales;
+    let missing = source_notice(&report.source, "vendas do WhatsApp");
+    let totals = report.groups();
+    let groups = GROUPS
+        .iter()
+        .map(|(group, meaning)| {
+            let value = report.available().then(|| {
+                totals
+                    .iter()
+                    .find(|(name, _)| name == group)
+                    .map_or(0, |(_, total)| *total)
+            });
+            kpi(
+                group,
+                value,
+                (*meaning).to_owned(),
+                source_caption(&report.source),
+            )
+        })
+        .collect();
+    let states = report
+        .states
+        .iter()
+        .map(|state| StateTile {
+            label: text(&state.label),
+            group: text(&state.group),
+            count: text(state.count.to_string()),
+            owner: state.owner,
+        })
+        .collect();
+
+    let mut targets = Vec::new();
+    let interventions: Vec<InterventionRow> = report
+        .interventions
+        .iter()
+        .filter(|item| {
+            matches(
+                context.search,
+                &[
+                    &item.label,
+                    &item.name,
+                    &item.reason,
+                    &item.last_message,
+                    &item.phone,
+                ],
+            )
+        })
+        .map(|item| {
+            targets.push((item.wa_link.clone(), item.ficha.clone()));
+            let (priority, tone) = priority_text(&item.priority);
+            InterventionRow {
+                who: text(who(&item.label, &item.name)),
+                phone: text(&item.phone),
+                reason: text(&item.reason),
+                last: text(excerpt(&item.last_message, 140)),
+                when: text(item.at.map(format_datetime).unwrap_or_default()),
+                state: text(&item.state_label),
+                priority: text(priority),
+                tone,
+                has_link: safe_wa_link(&item.wa_link),
+                has_ficha: !item.ficha.is_empty(),
+            }
+        })
+        .collect();
+    let hot = report
+        .interventions
+        .iter()
+        .filter(|item| item.priority == "hot")
+        .count();
+    let summary = match (report.interventions.len(), hot) {
+        (0, _) => String::new(),
+        (total, 0) => plural(total, "conversa", "conversas"),
+        (total, hot) => format!(
+            "{} · {hot} para atender agora",
+            plural(total, "conversa", "conversas")
+        ),
+    };
+    let interventions_notice = match &missing {
+        Some(problem) => problem.clone(),
+        None if !interventions.is_empty() => no_notice(),
+        None if !report.interventions.is_empty() => search_notice(context.search),
+        None => notice(
+            1,
+            "Nada esperando você",
+            "Quando o bot precisar de você, a conversa aparece aqui com o contato e o motivo.",
+        ),
+    };
+
+    let messages: Vec<MessageRow> = report
+        .messages
+        .iter()
+        .filter(|message| {
+            matches(
+                context.search,
+                &[&message.label, &message.name, &message.text],
+            )
+        })
+        .map(|message| MessageRow {
+            when: text(message.at.map(format_datetime).unwrap_or_default()),
+            who: text(who(&message.label, &message.name)),
+            text: text(excerpt(
+                &if message.media == "audio" {
+                    format!("Áudio: {}", message.text)
+                } else {
+                    message.text.clone()
+                },
+                160,
+            )),
+            direction: text(&message.dir),
+            needs_owner: message.needs_owner,
+        })
+        .collect();
+    let messages_notice = match &missing {
+        Some(problem) => problem.clone(),
+        None if !messages.is_empty() => no_notice(),
+        None if !report.messages.is_empty() => search_notice(context.search),
+        None => notice(
+            1,
+            "Nenhuma mensagem ainda",
+            "As conversas do bot de vendas aparecem aqui assim que começarem.",
+        ),
+    };
+    CentralView {
+        groups,
+        states,
+        interventions,
+        targets,
+        interventions_notice,
+        summary,
+        messages,
+        messages_notice,
+        updated: report
+            .generated_at
+            .map(|moment| format!("às {}", moment.format("%H:%M")))
+            .unwrap_or_default(),
     }
 }
 
