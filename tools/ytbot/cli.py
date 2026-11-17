@@ -58,6 +58,16 @@ def command_community(args) -> None:
         community.ensure_post(context, topics or ["What do you think?"])
 
 
+def command_faith_shorts(args) -> None:
+    from .faith_shorts import run
+    start = datetime.strptime(args.start_date, "%Y-%m-%d").date() if args.start_date else None
+    failures = run(args.channel, args.count, start, args.skip_slots)
+    print("[ytbot] faith shorts finished")
+    if failures:
+        print(f"[ytbot] {len(failures)} failure(s): {failures}")
+        raise SystemExit(1)
+
+
 def command_cleanup(args) -> None:
     from .cleanup import before_run
     before_run(args.dry_run)
@@ -148,6 +158,14 @@ def build_parser() -> argparse.ArgumentParser:
     shorts.add_argument("--skip-slots", type=int, default=0,
                         help="skip this many leading schedule slots")
     shorts.set_defaults(func=command_shorts)
+    faith = sub.add_parser("faith-shorts",
+                           help="religious Shorts with one generated background per short")
+    faith.add_argument("--channel", choices=("reflection", "whispers-from-heaven"), required=True)
+    faith.add_argument("--count", type=int, default=5)
+    faith.add_argument("--start-date", default=None, help="first schedule date (YYYY-MM-DD)")
+    faith.add_argument("--skip-slots", type=int, default=0,
+                       help="skip this many leading schedule slots")
+    faith.set_defaults(func=command_faith_shorts)
     clean = sub.add_parser("cleanup", help="free trash, staging and already scheduled media")
     clean.add_argument("--dry-run", action="store_true")
     clean.set_defaults(func=command_cleanup)
