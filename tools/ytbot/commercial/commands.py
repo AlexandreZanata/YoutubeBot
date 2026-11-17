@@ -66,8 +66,8 @@ def command_status(args) -> None:
         finally:
             page.close()
     if result["state"] == "logged-in":
-        store.save_account(args.network, handle="mercadolivre",
-                           display_name="Mercado Livre Afiliados")
+        label = "WhatsApp Web" if args.network == "whatsapp" else "Mercado Livre Afiliados"
+        store.save_account(args.network, handle=args.network, display_name=label)
         print(f"[commercial] {args.network} logged in")
     else:
         print(f"[commercial] {args.network} state: {result['state']}")
