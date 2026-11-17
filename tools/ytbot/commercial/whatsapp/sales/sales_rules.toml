@@ -1,0 +1,407 @@
+# Zaflas Inova Simples WhatsApp sales rules.
+#
+# Contract: docs/COMMERCIAL-WHATSAPP-SALES.md. This file is the only source of prices,
+# deadlines, links and promises. The model (OpenCode Go, deepseek-v4.1-flash) receives it as
+# context and every reply is checked against it: a money value, duration, percentage, link or
+# forbidden term that is not written here makes the reply fall back to the fixed text below or
+# go to the owner. Message texts are Brazilian Portuguese; comments stay in English.
+#
+# Patterns are Python regular expressions matched against the incoming text after lowercasing,
+# removing accents and collapsing spaces ("Não, obrigado!" -> "nao, obrigado!").
+
+version = 1
+company = "Zaflas Inova Simples"
+agent_name = "Alexandre"
+language = "pt-BR"
+timezone = "America/Cuiaba"
+
+[limits]
+daily_openings = 10                 # owner decision 2026-11-17
+max_replies_per_lead_per_day = 12   # stops loops with other bots; the owner takes over
+max_messages_per_reply = 4          # links in their own messages do not count
+max_message_chars = 600
+followup_after_hours = 72           # one follow-up when the opening got no answer
+max_followups = 1
+no_response_after_followup_hours = 96
+
+[hours]
+# Weekday numbers: 0 = Monday ... 6 = Sunday. Times are local (America/Cuiaba).
+opening_days = [0, 1, 2, 3, 4]
+opening_start = "08:30"
+opening_end = "17:30"
+# People who wrote are answered in this window; later messages wait for the next window.
+reply_days = [0, 1, 2, 3, 4, 5, 6]
+reply_start = "07:00"
+reply_end = "21:00"
+
+[pacing]
+# Wait before each message = typing time of that message (+ reading time of the received one
+# before the first reply), clamped and jittered. One conversation at a time.
+typing_chars_per_second = 6.0
+min_seconds = 3.0
+max_seconds = 45.0
+reading_chars_per_second = 18.0
+reading_min_seconds = 2.0
+reading_max_seconds = 15.0
+jitter = 0.2
+link_preview_seconds = 4.0          # wait for the WhatsApp link card before sending a link
+between_chats_min_seconds = 20.0
+between_chats_max_seconds = 60.0
+
+[llm]
+# Owner decision 2026-11-17: OpenCode Go plan, DeepSeek V4.1 Flash only (see
+# docs/COMMERCIAL-WHATSAPP-SALES.md). The code refuses any other model.
+base_url = "https://opencode.ai/inference/go/openai/v1"
+model = "deepseek-v4.1-flash"
+api_key_env = "OPENCODE_GO_API_KEY"
+temperature = 0.3
+max_output_tokens = 4096            # includes reasoning tokens
+timeout_seconds = 90
+
+[greetings]
+morning = "Bom dia"        # before 12:00
+afternoon = "Boa tarde"    # 12:00 to 17:59
+evening = "Boa noite"      # from 18:00
+
+[opening]
+# Sent once per number, one message per bubble, in this order. Never repeated.
+messages = [
+  "{greeting}",
+  "Tudo bem?",
+  "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e aplicativos. Eu vi que no Google Maps vocês não têm site.",
+  "Nós temos alguns exemplos de sistemas e sites que nós criamos:",
+]
+# Each link goes in its own message so WhatsApp loads the preview card.
+links = [
+  "https://sorrifit.com",
+  "https://zaflas.com.br",
+  "https://musicalizese.com.br",
+  "https://abastevo.com.br",
+]
+
+[followup]
+messages = [
+  "Oi, tudo bem? Só passando para saber se você conseguiu ver os exemplos que te mandei. Se tiver interesse em um site ou sistema, é só me falar.",
+]
+
+[facts]
+empresa = [
+  "Quem fala é o Alexandre, da Zaflas Inova Simples, que cria sistemas, sites e aplicativos.",
+  "O contato da empresa veio do perfil público dela no Google Maps, que não mostra site.",
+  "As mensagens são enviadas com ajuda de um assistente automático do Alexandre; ele acompanha todas as conversas e responde pessoalmente quando precisa.",
+  "Exemplos de trabalhos: https://sorrifit.com, https://zaflas.com.br, https://musicalizese.com.br e https://abastevo.com.br.",
+]
+site_institucional = [
+  "Site institucional é um site estático, só visual: funciona como a vitrine da empresa na internet, com quem são, serviços, fotos, endereço, horário e um botão para chamar no WhatsApp.",
+  "Ele não tem login, cadastro, agendamento nem pagamento online; por isso é mais simples e mais barato.",
+  "Valor médio do site institucional: R$ 500, com entrada de R$ 250.",
+  "Prazo médio de entrega do site institucional: 15 dias.",
+  "O servidor mantém o site no ar: R$ 39,90 por mês no boleto ou Pix, ou R$ 45 por mês no cartão.",
+]
+sistemas = [
+  "Sistemas, aplicativos e sites com muitas funcionalidades (login, cadastro, agendamento, pagamentos, estoque, painel, área do cliente) são feitos sob medida.",
+  "Preço e prazo de sistemas e aplicativos só existem depois do orçamento, que o Alexandre faz pessoalmente.",
+]
+
+[guard]
+# Terms the model may never write (checked after removing accents).
+forbidden = [
+  "desconto", "gratis", "gratuito", "de graca", "garantimos", "garantido", "garantia",
+  "promocao", "sem juros", "parcelamos", "parcelado", "chave pix", "pix copia", "senha",
+  "cpf", "cnpj", "cartao de credito numero", "100%",
+]
+# The model may never deny being automated.
+human_claims = [
+  'sou (um |uma )?(humano|pessoa de verdade|pessoa real)',
+  'nao sou (um |uma )?(robo|bot|ia|assistente)',
+]
+
+[context]
+# Short answers are read against the last question we asked. After the offer question, an
+# affirmative answer is `quote_accept` and a negative one is `refusal`. While the lead is in
+# `qualifying`, any other text is `quote_details`.
+offer_question = 'orcamento\?'
+affirmative = [
+  '^(sim|s|quero|queremos|pode|pode sim|pode ser|claro|com certeza|gostaria|gostaria sim|bora|vamos|manda|faz|faca|isso|aceito|por favor|pfv|ok,? pode|quero sim)\b',
+]
+negative = ['^(nao|n|nop|negativo)\b']
+
+[handoff]
+# Sent once when a case goes to the owner, so the contact is not left waiting.
+messages = ["Boa pergunta! Vou verificar direitinho e já te respondo."]
+
+# Intents. `action` decides what happens after the messages:
+#   reply   send the messages and keep the conversation going
+#   qualify send the messages and wait for the project details (state qualifying)
+#   quote   send the messages, then the owner prepares the quote (state quote-requested)
+#   close   send the messages and stop without follow-up (state closed)
+#   block   send the fixed messages, then never contact again (do-not-contact list)
+#   handoff send the messages, then the owner answers (state needs-owner)
+#   ignore  send nothing
+# `fixed = true` sends the messages verbatim; otherwise the model may reword them using only
+# the facts above. Order matters for the local classifier: the first matching pattern wins.
+
+[[intents]]
+id = "opt_out"
+action = "block"
+fixed = true
+when = "Pede para parar, remover o número, diz que é spam, ameaça denunciar ou bloquear."
+patterns = [
+  'para de (me )?(mandar|enviar)', 'pare de', 'nao (me )?(mande|mandem|envie)', 'remov[ae] (meu|o meu|esse) (numero|contato)',
+  '\bspam\b', 'denunci', '\bbloque(ar|ia|ei|io)\b', 'nao (me )?(chame|chama|procure|incomode)', 'sai fora',
+]
+messages = ["Desculpe o incômodo! Não vou mais entrar em contato. Obrigado pela atenção."]
+
+[[intents]]
+id = "refusal"
+action = "block"
+fixed = true
+when = "Recusa: 'nesse momento não estou precisando', 'não, obrigado', 'agora não', 'não tenho interesse', 'não preciso', ou 'não' em resposta à oferta de orçamento."
+patterns = [
+  'nao,? obrigad', 'nao (estou|to|estamos|tamo|tamos) precisando', 'nao (preciso|precisamos)',
+  'nao (tenho|temos) interesse', 'sem interesse', 'nao (quero|queremos)', 'agora nao',
+  'nesse momento nao', 'neste momento nao', 'no momento nao', 'nao me interessa', 'dispenso',
+  'obrigad[oa],? mas nao', 'nao,? valeu', 'nao e (do nosso|o nosso) interesse',
+]
+messages = ["Entendo, obrigado pela atenção! Tenha um ótimo dia."]
+
+[[intents]]
+id = "auto_reply"
+action = "ignore"
+fixed = true
+when = "Resposta automática de WhatsApp Business: saudação de ausência, horário de atendimento, 'em breve retornaremos', menu numérico."
+patterns = [
+  'esta e uma (mensagem|resposta) automatica', 'obrigad[oa] (por|pelo) (entrar em )?contato',
+  'retornaremos', 'em breve (responderemos|retornaremos|entraremos)', 'nosso horario de atendimento',
+  'digite (o numero|1|uma opcao)', 'no momento (nao estamos|estamos fora)', 'agradecemos (o|seu) contato',
+]
+messages = []
+
+[[intents]]
+id = "bot_question"
+action = "reply"
+fixed = true
+when = "Pergunta se é robô, bot, IA, mensagem automática ou se está falando com uma pessoa."
+patterns = [
+  '\brobo\b', '\bbot\b', '\be (uma )?ia\b', 'inteligencia artificial', '\bchatgpt\b', '\bautomatic[oa]\b',
+  '(e|eh) (uma )?pessoa', 'falando com (uma )?pessoa', 'e gente de verdade', 'e humano',
+]
+messages = [
+  "Essas mensagens são enviadas com ajuda de um assistente automático meu, mas eu acompanho todas as conversas e respondo pessoalmente quando precisa. Se preferir, é só pedir que eu mesmo continuo com você.",
+]
+
+[[intents]]
+id = "how_got_number"
+action = "reply"
+fixed = true
+when = "Pergunta como conseguiu o número, onde achou o contato ou quem passou."
+patterns = [
+  'como (voce |vc |vcs )?(conseguiu|achou|pegou|encontrou|teve)', 'onde (voce |vc )?(pegou|achou|conseguiu|encontrou)',
+  'quem (te )?passou', 'de onde (voce |vc )?(tirou|pegou)',
+]
+messages = [
+  "Encontrei a empresa de vocês no Google Maps; o número está no perfil público de vocês. Se preferir não receber mensagens, é só me avisar que não entro mais em contato.",
+]
+
+[[intents]]
+id = "who_are_you"
+action = "reply"
+fixed = false
+when = "Pergunta quem é, quem fala, de qual empresa, o que a empresa faz."
+patterns = ['quem (e|eh|fala|esta falando)', 'qual (e a )?empresa', 'quem seria', '^quem\??$', 'o que (voces|vcs) fazem']
+messages = [
+  "Sou o Alexandre, da Zaflas Inova Simples. A gente cria sites, sistemas e aplicativos para empresas.",
+]
+
+[[intents]]
+id = "call_request"
+action = "handoff"
+fixed = true
+when = "Pede ligação, chamada de vídeo, reunião ou visita."
+patterns = [
+  'me liga', 'pode ligar', 'liga pra mim', 'ligar para (mim|nos)', 'prefiro (ligacao|falar por telefone)',
+  'chamada de video', '\breuniao\b', 'pode vir aqui', 'passa aqui', 'visita',
+]
+messages = ["Claro! Qual o melhor horário para você?"]
+
+[[intents]]
+id = "audio"
+action = "handoff"
+fixed = true
+when = "Mandou áudio ou mensagem de voz."
+patterns = ['^(audio|voice message|mensagem de voz|ptt)\b', '^\W*\d{1,2}:\d{2}$']
+messages = [
+  "Recebi seu áudio! Agora não consigo ouvir, consegue me mandar por escrito? Se não der, eu ouço assim que puder e te respondo.",
+]
+
+[[intents]]
+id = "sticker"
+action = "ignore"
+fixed = true
+when = "Mandou só figurinha, GIF ou reação."
+patterns = ['^(sticker|figurinha|gif)$']
+messages = []
+
+[[intents]]
+id = "media"
+action = "handoff"
+fixed = true
+when = "Mandou foto, imagem, vídeo, documento, localização ou contato."
+patterns = ['^(photo|foto|image|imagem|video|document|documento|location|localizacao|contact|contato)\b']
+messages = ["Recebi, obrigado! Vou dar uma olhada e já te respondo."]
+
+[[intents]]
+id = "already_has_site"
+action = "close"
+fixed = false
+when = "Diz que já tem site, já tem alguém que faz ou já usa um sistema."
+patterns = [
+  'ja (temos|tenho|tem) (um )?(site|sistema|aplicativo|app)', 'ja (temos|tenho) (alguem|quem faca|programador)',
+  '(meu|nosso) sobrinho faz',
+]
+messages = [
+  "Que bom! Se em algum momento quiserem melhorar o site ou criar um sistema, é só me chamar.",
+  "Obrigado pela atenção!",
+]
+
+[[intents]]
+id = "later"
+action = "close"
+fixed = false
+when = "Adia sem recusar: 'vou pensar', 'mais pra frente', 'depois eu vejo', 'te aviso'."
+patterns = ['vou pensar', 'mais pra frente', 'mais para frente', 'depois (eu )?(vejo|te falo|falo)', 'te aviso', 'futuramente', 'outra hora']
+messages = ["Sem problema! Fico à disposição, é só me chamar quando quiser."]
+
+[[intents]]
+id = "system_request"
+action = "reply"
+fixed = true
+when = "Pede um sistema, aplicativo ou site com muitas funcionalidades: login, cadastro, agendamento, loja virtual, pagamento online, estoque, painel, área do cliente, integração."
+patterns = [
+  '\bsistema\b', '\baplicativo\b', '\bapp\b', 'agendamento', 'loja (virtual|online)', 'e-?commerce',
+  'pagamento online', '\bestoque\b', '\bpainel\b', 'area do cliente', 'integracao', '\blogin\b', '\bcadastro\b',
+  'controle de', '\bdelivery\b', '\bcardapio digital\b',
+]
+messages = ["Sim, nós podemos fazer isso.", "Você gostaria que eu fizesse um orçamento?"]
+
+[[intents]]
+id = "hosting"
+action = "reply"
+fixed = false
+when = "Pergunta sobre servidor, hospedagem, mensalidade ou domínio."
+patterns = ['servidor', 'hospedagem', 'mensalidade', 'por mes', 'dominio']
+messages = [
+  "O servidor é o que mantém o site no ar: fica R$ 39,90 por mês no boleto ou Pix, ou R$ 45 por mês no cartão.",
+]
+
+[[intents]]
+id = "site_institutional"
+action = "reply"
+fixed = false
+when = "Quer um site simples, só para mostrar a empresa, ou pergunta como funciona um site."
+patterns = ['\bsite\b', 'pagina', 'institucional', 'so para (mostrar|divulgar)', 'aparecer no google', 'como funciona']
+messages = [
+  "Um site institucional é a vitrine da sua empresa na internet: mostra quem vocês são, os serviços, fotos, endereço, horário e um botão para chamar no WhatsApp. Ele é só visual, sem login nem cadastro, por isso é mais simples.",
+  "O valor médio é R$ 500, com entrada de R$ 250, e fica pronto em média em 15 dias.",
+  "Depois tem o servidor, que mantém o site no ar: R$ 39,90 por mês no boleto ou Pix, ou R$ 45 no cartão.",
+  "Você gostaria que eu fizesse um orçamento?",
+]
+
+[[intents]]
+id = "price"
+action = "reply"
+fixed = false
+when = "Pergunta preço, valor, quanto custa, sem dizer se é site simples ou sistema."
+patterns = ['quanto (custa|fica|sai|e|eh|cobra)', '\bvalor', '\bpreco', 'qual o investimento', '\bcaro\b']
+messages = [
+  "Um site institucional, que é só visual, fica em média R$ 500, com entrada de R$ 250, mais o servidor de R$ 39,90 por mês no boleto ou Pix (ou R$ 45 no cartão).",
+  "Sistemas e aplicativos dependem do que você precisa, então faço um orçamento.",
+  "Você gostaria que eu fizesse um orçamento?",
+]
+
+[[intents]]
+id = "deadline"
+action = "reply"
+fixed = false
+when = "Pergunta prazo, quanto tempo demora, quando fica pronto."
+patterns = ['\bprazo', 'quanto tempo', 'demora', 'fica pronto', 'quando (fica|entrega)', 'quantos dias']
+messages = [
+  "Um site institucional fica pronto em média em 15 dias. Para sistemas e aplicativos, o prazo vem junto com o orçamento.",
+]
+
+[[intents]]
+id = "payment"
+action = "reply"
+fixed = false
+when = "Pergunta forma de pagamento, entrada, parcelamento, cartão, boleto ou Pix do projeto."
+patterns = ['pagamento', 'parcela', 'entrada', '\bboleto\b', '\bpix\b', 'cartao', 'como (eu )?pago']
+messages = [
+  "Para começar o site institucional a entrada é de R$ 250. As demais condições eu te passo junto com o orçamento.",
+]
+
+[[intents]]
+id = "examples"
+action = "reply"
+fixed = false
+when = "Pede exemplos, portfólio ou trabalhos feitos."
+patterns = ['exemplo', 'portfolio', 'trabalhos', 'o que (voces|vcs) ja fizeram', 'clientes']
+messages = [
+  "Claro! Alguns trabalhos nossos:",
+  "https://sorrifit.com",
+  "https://zaflas.com.br",
+  "https://musicalizese.com.br",
+  "https://abastevo.com.br",
+]
+
+[[intents]]
+id = "quote_accept"
+action = "qualify"
+fixed = false
+when = "Aceita o orçamento ('sim', 'pode', 'quero', 'pode fazer') logo depois da pergunta sobre orçamento."
+patterns = []
+messages = [
+  "Ótimo! Para montar o orçamento, me conta um pouco: qual é o ramo da empresa e o que você gostaria que o site ou sistema tivesse?",
+]
+
+[[intents]]
+id = "quote_details"
+action = "quote"
+fixed = true
+when = "Depois de aceitar o orçamento, descreve o que precisa (ramo, funcionalidades, exemplos)."
+patterns = []
+messages = ["Perfeito, anotei tudo! Vou preparar o orçamento e te mando por aqui."]
+
+[[intents]]
+id = "interested"
+action = "reply"
+fixed = false
+when = "Demonstra interesse sem pedir nada específico: 'tenho interesse', 'quero saber mais', 'gostei'."
+patterns = ['tenho interesse', 'temos interesse', 'quero saber mais', 'me interessa', '\bgostei\b', 'achei (legal|interessante|bonito)']
+messages = ["Que bom que gostou!", "Você gostaria que eu fizesse um orçamento?"]
+
+[[intents]]
+id = "greeting_reply"
+action = "reply"
+fixed = false
+when = "Só responde ao cumprimento: 'tudo bem e você?', 'oi', 'bom dia'."
+patterns = ['^(oi|ola|opa|bom dia|boa tarde|boa noite|tudo (bem|bom|otimo|certo|tranquilo|joia))\b', 'e (voce|vc|com voce)\??$', '^(sim|tudo),? (e )?(voce|vc)']
+messages = [
+  "Tudo ótimo também, obrigado!",
+  "Ficou com alguma dúvida sobre os exemplos? Posso te explicar como funcionaria um site para vocês.",
+]
+
+[[intents]]
+id = "thanks"
+action = "ignore"
+fixed = true
+when = "Só agradece ou se despede, sem pergunta: 'obrigado', 'valeu', 'ok', '👍'."
+patterns = ['^(obrigad[oa]|valeu|vlw|ok|beleza|blz|show|certo|tmj)[!. ]*$', '^\W+$']
+messages = []
+
+[[intents]]
+id = "unknown"
+action = "handoff"
+fixed = true
+when = "Qualquer pergunta ou pedido cuja resposta não está nos fatos: cidade, contrato, nota fiscal, prazo de sistema, tecnologia, reclamação ou mensagem ambígua."
+patterns = []
+messages = ["Boa pergunta! Vou verificar direitinho e já te respondo."]

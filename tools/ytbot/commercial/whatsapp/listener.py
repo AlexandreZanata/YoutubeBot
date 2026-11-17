@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -44,13 +45,45 @@ def save_rules(path: Path, mode: str, contacts: list[str]) -> dict:
     return rules
 
 
+def _digits(value: str) -> str:
+    return re.sub(r"\D", "", value or "")
+
+
+def _listed(item: str, name: str) -> bool:
+    """Phone entries match on the last eight digits; names keep the partial match."""
+    item_digits, name_digits = _digits(item), _digits(name)
+    if len(item_digits) >= 8 and len(name_digits) >= 8:
+        return item_digits[-8:] == name_digits[-8:]
+    return item.casefold() in name or name in item.casefold()
+
+
 def contact_allowed(contact: str, rules: dict) -> bool:
     name = contact.casefold().strip()
-    listed = any(item.casefold() in name or name in item.casefold()
-                 for item in rules.get("contacts", []))
+    listed = any(_listed(item, name) for item in rules.get("contacts", []))
     if rules.get("mode") == "block":
         return not listed
     return listed
+
+
+def allow_contact(path: Path, entry: str) -> dict:
+    """Let automated replies reach `entry`; an owner block in block mode is kept."""
+    rules = load_rules(path)
+    contacts = rules["contacts"]
+    if rules["mode"] == "allow" and not any(_listed(item, entry.casefold()) for item in contacts):
+        return save_rules(path, "allow", contacts + [entry])
+    return rules
+
+
+def revoke_contact(path: Path, entry: str) -> dict:
+    """Stop automated replies to `entry` (refusal or owner block)."""
+    rules = load_rules(path)
+    contacts = rules["contacts"]
+    if rules["mode"] == "allow":
+        kept = [item for item in contacts if not _listed(item, entry.casefold())]
+        return save_rules(path, "allow", kept) if kept != contacts else rules
+    if not any(_listed(item, entry.casefold()) for item in contacts):
+        return save_rules(path, "block", contacts + [entry])
+    return rules
 
 
 def event_id(chat: str, text: str, stamp: str) -> str:

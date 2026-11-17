@@ -128,9 +128,19 @@ hub, never invent prices, commissions or links, and never commit browser state.
 
 WhatsApp Web in the commercial module is owner-operated: manual QR login in the visible
 browser, hidden sending, one chat at a time, human intervals, a `--live` gate and a journal
-that blocks repeats. It never broadcasts to lists and never feeds the Procurali pipeline. The
+that blocks repeats. It never broadcasts and never feeds the Procurali pipeline. The
 DOM map, state machine and troubleshooting are in
 [WhatsApp Web](docs/COMMERCIAL-WHATSAPP.md).
+
+The Zaflas Inova Simples sales agent is the only list use (owner decision 2026-11-17): it opens
+one-to-one conversations only with businesses from the owner's reviewed Google Maps CSV (never
+scraped), at most 10 first contacts per day in business hours, never repeats an opening and
+sends at most one follow-up. It answers funnel leads by
+`tools/ytbot/commercial/whatsapp/sales/sales_rules.toml`, through OpenCode Go
+`deepseek-v4.1-flash` only; a price, deadline, link or promise outside that file falls back to
+its fixed text or goes to the owner. A refusal is a permanent do-not-contact entry, the robot
+question gets an honest answer, the OpenCode key stays in `.local/`, and `--live` stays
+required. See [sales agent](docs/COMMERCIAL-WHATSAPP-SALES.md).
 
 When delivering captured products from this workstation to the remote Procurali VPS (database,
 site, Telegram offers group queue, and WhatsApp Web assisted drafts), never copy VPS origin IPs,

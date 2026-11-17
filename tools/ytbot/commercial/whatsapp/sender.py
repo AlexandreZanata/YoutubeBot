@@ -15,6 +15,39 @@ from . import CHAT_LIST, COMPOSER, LOGIN_URL, SEARCH
 
 ATTACH_BUTTONS = ("Attach", "Anexar", "Anexar arquivo")
 SEND_BUTTONS = ("Send", "Enviar")
+INVALID_NUMBER = re.compile(r"(phone number shared via url is invalid|"
+                            r"n[uú]mero de telefone compartilhado (por|via) url [eé] inv[aá]lido)",
+                            re.IGNORECASE)
+URL_IN_TEXT = re.compile(r"https?://\S+")
+UNCERTAIN = ("started", "unconfirmed", "error")
+# Direction of every bubble: `data-id` starts with true_ for our messages; tails and the
+# message-in/out row classes are fallbacks; bubbles without a marker continue the group.
+READ_BUBBLES = """(limit) => {
+  const nodes = Array.from(document.querySelectorAll('[data-testid="msg-container"]'));
+  let dir = null;
+  const rows = [];
+  for (const node of nodes) {
+    const holder = node.closest('[data-id]') || node.querySelector('[data-id]');
+    const row = node.closest('.message-out, .message-in');
+    if (holder && /^(true|false)_/.test(holder.dataset.id || '')) {
+      dir = holder.dataset.id.startsWith('true_') ? 'out' : 'in';
+    } else if (node.querySelector('span[data-icon="tail-out"]')
+               || (row && row.classList.contains('message-out'))) {
+      dir = 'out';
+    } else if (node.querySelector('span[data-icon="tail-in"]')
+               || (row && row.classList.contains('message-in'))) {
+      dir = 'in';
+    }
+    const text = Array.from(node.querySelectorAll('span.selectable-text'))
+      .map((span) => span.innerText).join('\\n').trim();
+    rows.push({dir: dir || 'unknown', text, id: holder ? holder.dataset.id : ''});
+  }
+  return rows.slice(-limit);
+}"""
+
+
+class InvalidNumber(RuntimeError):
+    """WhatsApp reports that the number has no account."""
 
 
 def log(message: str) -> None:
@@ -81,7 +114,11 @@ def human_type(page, text: str, pacing: Pacing) -> None:
         time.sleep(delay)
 
 
-def open_chat(page, to: str, pacing: Pacing) -> None:
+def open_chat(page, to: str, pacing: Pacing, phone: str | None = None) -> None:
+    """Open the conversation by saved name (search) or by number (click-to-chat URL)."""
+    if phone:
+        _open_by_phone(page, phone, pacing)
+        return
     page.goto(LOGIN_URL, timeout=90000)
     page.wait_for_selector(CHAT_LIST, timeout=90000)
     search = page.locator(SEARCH).first
@@ -94,12 +131,53 @@ def open_chat(page, to: str, pacing: Pacing) -> None:
     time.sleep(pacing.open_chat_pause())
 
 
+def _open_by_phone(page, phone: str, pacing: Pacing, timeout: float = 60.0) -> None:
+    digits = re.sub(r"\D", "", phone)
+    page.goto(f"{LOGIN_URL}send?phone={digits}", timeout=90000)
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if page.locator(COMPOSER).count():
+            page.wait_for_timeout(1200)
+            time.sleep(pacing.open_chat_pause())
+            return
+        body = page.locator("body").inner_text() if page.locator("body").count() else ""
+        if INVALID_NUMBER.search(body or ""):
+            raise InvalidNumber("WhatsApp says the number has no account")
+        page.wait_for_timeout(1000)
+    raise RuntimeError("WhatsApp chat did not open for the number")
+
+
+def read_bubbles(page, limit: int = 30) -> list[dict]:
+    """Recent bubbles of the open chat, oldest first: {dir: in|out|unknown, text, id}."""
+    try:
+        rows = page.evaluate(READ_BUBBLES, limit)
+    except Exception:
+        return []
+    return [{"dir": row.get("dir", "unknown"), "text": str(row.get("text", "")).strip(),
+             "id": row.get("id", "")} for row in rows or []]
+
+
 def last_outgoing(page) -> str:
-    bubbles = page.locator(
-        '[data-testid="msg-container"]:has(span[data-icon="tail-out"]) span.selectable-text')
-    if not bubbles.count():
-        return ""
-    return bubbles.last.inner_text().strip()
+    for bubble in reversed(read_bubbles(page, 15)):
+        if bubble["dir"] == "out":
+            return bubble["text"]
+    return ""
+
+
+def _outgoing_ids(page) -> set[str]:
+    return {bubble["id"] for bubble in read_bubbles(page, 40)
+            if bubble["dir"] == "out" and bubble["id"]}
+
+
+def confirmed(page, text: str, before: set[str]) -> bool:
+    """The newest outgoing bubble is new (when ids exist) and starts like the message."""
+    prefix = text.strip()[:24]
+    bubbles = read_bubbles(page, 15)
+    outgoing = [bubble for bubble in bubbles if bubble["dir"] == "out"]
+    if not outgoing or prefix not in outgoing[-1]["text"]:
+        return False
+    newest = outgoing[-1]["id"]
+    return not newest or newest not in before
 
 
 def attach_image(page, image: Path) -> None:
@@ -124,18 +202,18 @@ def attach_image(page, image: Path) -> None:
     page.wait_for_timeout(4000)
 
 
-def send_message(page, to: str, text: str, image: Path | None, pacing: Pacing,
-                 dry_run: bool) -> str:
-    open_chat(page, to, pacing)
-    if dry_run:
-        log(f"dry run: would send to {to!r} after {pacing.between_messages():.1f}s")
-        return "dry-run"
-    time.sleep(pacing.between_messages())
+def deliver(page, text: str, pacing: Pacing, delay: float | None = None,
+            image: Path | None = None, link_wait: float = 0.0) -> str:
+    """Type and send one message in the open chat; `sent` only when the bubble is seen."""
+    time.sleep(pacing.between_messages() if delay is None else max(0.0, delay))
+    before = _outgoing_ids(page)
     if image is not None:
         attach_image(page, image)
     composer = page.locator(COMPOSER).first
     composer.click()
     human_type(page, text, pacing)
+    if link_wait and URL_IN_TEXT.search(text):
+        page.wait_for_timeout(int(link_wait * 1000))
     page.wait_for_timeout(600)
     page.wait_for_timeout(random.randint(400, 1200))
     for label in SEND_BUTTONS:
@@ -146,9 +224,64 @@ def send_message(page, to: str, text: str, image: Path | None, pacing: Pacing,
     else:
         page.keyboard.press("Enter")
     page.wait_for_timeout(2500)
-    if text.strip()[:24] not in last_outgoing(page):
-        return "unconfirmed"
-    return "sent"
+    return "sent" if confirmed(page, text, before) else "unconfirmed"
+
+
+def send_message(page, to: str, text: str, image: Path | None, pacing: Pacing,
+                 dry_run: bool) -> str:
+    open_chat(page, to, pacing)
+    if dry_run:
+        log(f"dry run: would send to {to!r} after {pacing.between_messages():.1f}s")
+        return "dry-run"
+    return deliver(page, text, pacing, image=image)
+
+
+def journal_state(path: Path, key: str) -> str | None:
+    """`sent`, `uncertain` (started/unconfirmed/error) or None when never attempted."""
+    states = [entry.get("state") for entry in read_journal(path) if entry.get("key") == key]
+    if "sent" in states:
+        return "sent"
+    if any(state in UNCERTAIN for state in states):
+        return "uncertain"
+    return None
+
+
+def send_sequence(page, to: str, items: list[dict], pacing: Pacing, journal_path: Path,
+                  extra: dict | None = None, link_wait: float = 0.0,
+                  deliver_fn=None) -> list[dict]:
+    """Send several messages in the chat already open, one journaled step each.
+
+    Each item is {key, text, delay}. A key already `sent` is skipped, an uncertain key stops
+    the sequence without typing (never a blind retry), and the first message that is not
+    confirmed stops the rest.
+    """
+    deliver_fn = deliver_fn or deliver
+    results = []
+    for item in items:
+        prior = journal_state(journal_path, item["key"])
+        if prior == "sent":
+            results.append({"key": item["key"], "state": "duplicate"})
+            continue
+        if prior == "uncertain":
+            results.append({"key": item["key"], "state": "fenced"})
+            break
+        entry = {"key": item["key"], "to": to, **(extra or {})}
+        journal(journal_path, {**entry, "state": "started",
+                               "at": datetime.now().isoformat(timespec="seconds")})
+        try:
+            state = deliver_fn(page, item["text"], pacing, delay=item.get("delay"),
+                               link_wait=link_wait)
+        except Exception as error:
+            journal(journal_path, {**entry, "state": "error", "error": str(error)[:300],
+                                   "at": datetime.now().isoformat(timespec="seconds")})
+            results.append({"key": item["key"], "state": "error", "error": str(error)[:300]})
+            break
+        journal(journal_path, {**entry, "state": state,
+                               "at": datetime.now().isoformat(timespec="seconds")})
+        results.append({"key": item["key"], "state": state})
+        if state != "sent":
+            break
+    return results
 
 
 def send_batch(page, messages: list[dict], pacing: Pacing, dry_run: bool,

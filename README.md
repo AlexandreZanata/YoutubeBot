@@ -45,6 +45,9 @@ python3 -m tools.ytbot run --channel fallem-prince --count 1
 python3 -m tools.ytbot community --channel fallem-prince
 python3 -m tools.ytbot commercial open --network mercadolivre
 python3 -m tools.ytbot commercial status --network mercadolivre
+python3 -m tools.ytbot commercial sales check --network whatsapp
+python3 -m tools.ytbot commercial sales simulate --network whatsapp --text "Quanto custa?"
+python3 -m tools.ytbot commercial sales run --network whatsapp --live --prospect --limit 3
 python3 -m tools.ytbot social open --network x
 python3 -m tools.ytbot social open --network instagram
 python3 -m tools.ytbot social status --network x
