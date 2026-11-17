@@ -126,6 +126,10 @@ profile under `.local/commercial/<network>/`; login is manual in the visible bro
 status/publishing work runs hidden. Read products and links only from the logged-in affiliate
 hub, never invent prices, commissions or links, and never commit browser state.
 
+WhatsApp Web in the commercial module is owner-operated: manual QR login in the visible
+browser, hidden sending, one chat at a time, human intervals, a `--live` gate and a journal
+that blocks repeats. It never broadcasts to lists and never feeds the Procurali pipeline.
+
 When delivering captured products from this workstation to the remote Procurali VPS (database,
 site, Telegram offers group queue, and WhatsApp Web assisted drafts), never copy VPS origin IPs,
 SSH private keys or device tokens into this repository and never post to Telegram/WhatsApp directly
@@ -172,8 +176,8 @@ On X only, every day also carries fifteen polemic comments on public posts under
 large reach. The comment defends a contrarian but defensible thesis that invites disagreement,
 never a personal attack, a false claim, politics, violence or a bait phrase. One project link
 maximum, after the argument, with no invented number. If fewer than fifteen pass the bar,
-report the gap. Drafts stay local until the owner gives the publish command. This rule never
-applies to YouTube or to Community posts.
+report the gap. Drafts stay local until the owner gives the publish command. The daily cap is 25 replies
+(ten contextual plus fifteen polemic). This rule never applies to YouTube or to Community posts.
 
 ## Intelligent distribution
 
@@ -190,13 +194,12 @@ quantity. See [distribution](docs/DISTRIBUTE.md).
 ## Community
 
 After the asset stage of every batch, check the selected channel's Community tab. The rule
-is one post per calendar day after 00:00 in the channel timezone. If today already has a
-post, do nothing; otherwise publish one question post that carries a dedicated square art
-generated for that post in the channel's visual style (never a plain crop of a video
-thumbnail), a link to the related video and, on Zaflas, the site https://zaflas.com.br/.
-Community text follows the channel language: English everywhere except Zaflas, which is
-Brazilian Portuguese. Never retry an unconfirmed publish blindly. See
-[community](docs/COMMUNITY.md).
+is one post per rolling 24 hours. If the newest post is younger than 24 hours, do nothing;
+otherwise publish one question post that carries a dedicated square art generated for that
+post in the channel's visual style (never a plain crop of a video thumbnail), a link to the
+related video and, on Zaflas, the site https://zaflas.com.br/. Community text follows the
+channel language: English everywhere except Zaflas, which is Brazilian Portuguese. Never
+retry an unconfirmed publish blindly. See [community](docs/COMMUNITY.md).
 
 ## Generation and upload profiles
 

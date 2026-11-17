@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
-from . import config, logic
+from . import codex_media, config, logic
 
 POST_TYPES = (
     "text",
@@ -147,7 +147,8 @@ def latest_post_label(page) -> str:
     return label.first.inner_text().strip()
 
 
-def posted_today(page, now: datetime | None = None) -> bool:
+def posted_recently(page, now: datetime | None = None, hours: int = 24) -> bool:
+    """One post per rolling 24 hours, not per calendar day."""
     current = now or datetime.now()
     label = latest_post_label(page)
     minutes = relative_minutes(label)
@@ -158,9 +159,9 @@ def posted_today(page, now: datetime | None = None) -> bool:
         except (OSError, ValueError):
             entry = {}
         if entry.get("state") == "posted" and entry.get("at"):
-            return datetime.fromisoformat(entry["at"]).date() == current.date()
+            return current - datetime.fromisoformat(entry["at"]) < timedelta(hours=hours)
         return False
-    return (current - timedelta(minutes=minutes)).date() == current.date()
+    return minutes <= hours * 60
 
 
 def has_posts(page) -> bool:
@@ -250,6 +251,51 @@ def _journal(entry: dict) -> None:
     path.write_text(json.dumps(entry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+ART_STYLES = {
+    "fallem-prince": "dark monochrome narrative engraving with etched midtones",
+    "whispers-from-heaven": "warm brown engraving with fine stippling, sacred and quiet",
+    "zaflas": "photorealistic Brazilian agribusiness at golden hour",
+    "infinite-random-worlds": "cinematic speculative world in gold and deep teal",
+    "vocal-pages": "dark navy and warm gold, contemplative cinematic still life",
+    "zanata": "cinematic black and amber, restrained and bookish",
+    "reflection": "full-bleed cinematic biblical scene with warm golden light",
+}
+
+
+def _generate_art(topic: str) -> Path | None:
+    """One dedicated square image per post; never a crop of a video thumbnail."""
+    from datetime import date
+    from PIL import Image, ImageOps
+
+    if not codex_media.available():
+        return None
+    slug = config.CHANNEL.slug if config.CHANNEL else "channel"
+    style = ART_STYLES.get(slug, "cinematic")
+    run_dir = config.DATA / "community" / "codex" / slug
+    run_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    run_dir.chmod(0o700)
+    schema = {"type": "object", "properties": {"image_path": {"type": "string", "maxLength": 4096}},
+              "required": ["image_path"], "additionalProperties": False}
+    prompt = ("Create one square 1:1 image for a YouTube community post. No text, no letters, "
+              "no numbers, no logos, no watermarks, no borders. Style: " + style +
+              ". Illustrate this question: " + topic[:160])
+    value = codex_media._execute(run_dir, f"art-{date.today():%Y%m%d}", prompt, schema,
+                                 images=True)
+    root = (Path.home() / ".codex" / "generated_images").resolve()
+    source = codex_media._bounded_image(value.get("image_path", ""), root)
+    if source is None:
+        source = codex_media._recent_image(root, __import__("time").time() - 900)
+    if source is None:
+        return None
+    destination = config.DATA / "community" / f"{slug}-{date.today():%Y%m%d}.png"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with Image.open(source) as image:
+        ImageOps.fit(image.convert("RGB"), (1080, 1080), Image.Resampling.LANCZOS).save(
+            destination, format="PNG", optimize=True)
+    destination.chmod(0o600)
+    return destination
+
+
 def _topic_image(topics: list[str]) -> tuple[str, Path | None]:
     for topic in topics:
         run_dir = logic.run_path(topic)
@@ -265,20 +311,20 @@ def ensure_post(context, topics: list[str]) -> dict:
         open_community(page)
         sort_recent(page)
         if has_posts(page):
-            if posted_today(page):
-                log("community already has a post today; nothing to do")
+            if posted_recently(page):
+                log("community already has a post in the last 24 hours; nothing to do")
                 return {"state": "present"}
             log("community has no post today; publishing a new one")
-        topic, thumbnail = _topic_image(topics)
+        topic, _thumbnail = _topic_image(topics)
         text = post_text(topic, config.CHANNEL.language if config.CHANNEL else "en")
+        image = _generate_art(topic)
+        if image is None:
+            log("dedicated post art is required; skipping the automatic post")
+            return {"state": "skipped-art"}
         _open_create_dialog(page)
-        image = None
-        if thumbnail is not None:
-            _select_image(page)
+        _select_image(page)
         _fill_message(page, text)
-        if thumbnail is not None:
-            image = square_image(thumbnail, config.DATA_DIR / "community" / f"{logic.slug(topic)}.png")
-            _attach_image(page, image)
+        _attach_image(page, image)
         _journal({"state": "started", "topic": topic, "text": text,
                   "image": str(image) if image else None,
                   "at": datetime.now().isoformat(timespec="seconds")})
