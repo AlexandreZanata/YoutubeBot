@@ -1,0 +1,104 @@
+{
+  "A interessado ate orcamento": [
+    "Boa tarde, tudo sim e você?",
+    "Quanto custa um site?",
+    "Sim, quero",
+    "Tenho uma barbearia, queria mostrar os serviços, preços e um botão pra agendar pelo WhatsApp"
+  ],
+  "B objecao de preco": [
+    "Quanto custa?",
+    "Tá caro, faz por 300?"
+  ],
+  "C pronto para fechar": [
+    "Gostei dos sites. Quero fazer, como faço pra pagar a entrada?"
+  ],
+  "D quer humano": [
+    "Quero falar com o Alexandre mesmo, não com robô"
+  ],
+  "E desconfiado": [
+    "Isso é golpe?"
+  ],
+  "F confuso": [
+    "Não entendi",
+    "Como assim?"
+  ],
+  "G so instagram": [
+    "A gente só usa Instagram, precisa mesmo de site?"
+  ],
+  "H ocupado": [
+    "Agora estou ocupado, me chama amanhã"
+  ],
+  "I ja tem quem faca": [
+    "Obrigado, mas já temos quem faça"
+  ],
+  "J irritado": [
+    "Para de me mandar mensagem, que saco"
+  ],
+  "K localizacao": [
+    "Vocês são de onde? Atendem em Sorriso?"
+  ],
+  "L referencia": [
+    "Vocês já fizeram site pra barbearia?"
+  ],
+  "M tecnico": [
+    "Faz com WordPress? Eu consigo editar depois sozinho?"
+  ],
+  "N dominio": [
+    "O domínio está incluso no valor?"
+  ],
+  "O loja virtual": [
+    "Faz loja virtual com pagamento online?"
+  ],
+  "P email": [
+    "Manda o orçamento no meu email"
+  ],
+  "Q pergunta repetida": [
+    "Quanto custa?",
+    "Mas quanto custa?"
+  ],
+  "R reclamacao": [
+    "Que absurdo mandar mensagem assim pra quem nem conhece"
+  ],
+  "S parcelamento": [
+    "Dá pra parcelar no cartão em 10x?"
+  ],
+  "T contrato": [
+    "Vocês fazem contrato? Tem nota fiscal?"
+  ],
+  "U ocupado agora nao": [
+    "Agora não posso, me chama amanhã"
+  ],
+  "V nao quero site quero app": [
+    "Não quero site, quero um aplicativo pra minha loja"
+  ],
+  "W conversa longa": [
+    "Tudo bem e você?",
+    "Quem é você?",
+    "Me mostra exemplos",
+    "Quanto custa?",
+    "E o prazo?",
+    "Tem servidor?",
+    "Como funciona o site?",
+    "Aceita pix?",
+    "E aplicativo?",
+    "Vocês fazem cardápio?"
+  ],
+  "X reclama do bot depois": [
+    "Quanto custa?",
+    "Você é um robô? quero falar com gente"
+  ],
+  "X robo e quer gente": [
+    "Quanto custa?",
+    "Você é um robô? quero falar com gente"
+  ],
+  "Y foto com legenda no orcamento": [
+    "Faz sistema de agendamento?",
+    "Sim",
+    "Photo\nEstúdio de fotos, trabalho segunda, quarta e quinta das 10h às 18h"
+  ],
+  "Z dono ja com a conversa": [
+    "Isso é golpe?",
+    "Oi?",
+    "Alô"
+  ]
+}

@@ -12,12 +12,23 @@ from .rules import SalesRules, normalize
 
 SAFETY = ("opt_out", "refusal", "auto_reply")
 # While qualifying, these still win over "the text is the project description".
-QUALIFYING_OVERRIDES = ("bot_question", "how_got_number", "call_request", "audio", "sticker",
-                        "media", "thanks")
+QUALIFYING_OVERRIDES = ("human_request", "bot_question", "how_got_number", "trust_concern",
+                        "call_request", "callback_later", "audio", "sticker", "media", "thanks")
 # Intents the local classifier decides alone for short messages (no model call).
 DECISIVE = ("opt_out", "refusal", "auto_reply", "bot_question", "sticker", "thanks",
-            "audio", "media")
+            "audio", "media", "human_request", "trust_concern", "callback_later")
 SHORT = 80
+# A photo or document with a caption arrives as "Photo\n<caption>": the caption is the message.
+MEDIA_LABEL = re.compile(r"^(photo|foto|image|imagem|video|document|documento)\s+(?=\S)")
+LABEL_LINE = re.compile(r"^\s*(photo|foto|image|imagem|video|vídeo|document|documento)\s*\n(?=\S)",
+                        re.IGNORECASE)
+# Always final locally: while qualifying, the text is the project description.
+ALWAYS_DECISIVE = ("quote_details",)
+
+
+def for_model(text: str) -> str:
+    """Show a media caption to the model as text with an attachment note."""
+    return LABEL_LINE.sub("[mídia anexada] ", text or "")
 
 
 def last_outgoing(history: list[dict]) -> str:
@@ -33,7 +44,7 @@ def _any(patterns: list[str], plain: str) -> bool:
 
 def classify(rules: SalesRules, text: str, history: list[dict] | None = None,
              state: str = "") -> str:
-    plain = normalize(text)
+    plain = MEDIA_LABEL.sub("", normalize(text))
     if not plain:
         return "unknown"
     for intent_id in SAFETY:
@@ -58,4 +69,6 @@ def classify(rules: SalesRules, text: str, history: list[dict] | None = None,
 
 def decisive(intent_id: str, text: str) -> bool:
     """True when the local result is final and the model is not consulted."""
+    if intent_id in ALWAYS_DECISIVE:
+        return True
     return intent_id in DECISIVE and len(normalize(text)) <= SHORT

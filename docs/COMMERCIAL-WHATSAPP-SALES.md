@@ -28,6 +28,8 @@ and the journal in [WhatsApp Web](COMMERCIAL-WHATSAPP.md); there is no second se
 | `sales/pacing.py` | Wait proportional to message length |
 | `sales/agent.py` | Conversation state machine, follow-ups, openings, owner hand-off |
 | `sales/store.py` | Leads, memory, do-not-contact list, logs |
+| `sales/notify.py` | Owner hand-off record and desktop notification with the contact |
+| `sales/rehearsal.py` + `scenarios.json` | Offline conversation rehearsal with the real model |
 | `sales/commands.py` | `commercial sales ...` CLI |
 
 Private state under `.local/commercial/whatsapp/sales/` (0700 directory, 0600 files):
@@ -72,6 +74,7 @@ python3 -m tools.ytbot commercial sales check    --network whatsapp [--ping]
 python3 -m tools.ytbot commercial sales import   --network whatsapp --csv ~/leads.csv
 python3 -m tools.ytbot commercial sales leads    --network whatsapp [--state opened]
 python3 -m tools.ytbot commercial sales simulate --network whatsapp --text "Quanto custa?"
+python3 -m tools.ytbot commercial sales rehearse --network whatsapp [--only negoci] [--no-llm]
 python3 -m tools.ytbot commercial sales run      --network whatsapp --once
 python3 -m tools.ytbot commercial sales run      --network whatsapp --live --interval 30
 python3 -m tools.ytbot commercial sales run      --network whatsapp --live --prospect --limit 3
@@ -83,6 +86,9 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
 
 - `check` validates the rules and shows the counters; `--ping` makes one tiny paid call.
 - `simulate` prints the decision and the delays for a hypothetical message; it never sends.
+- `rehearse` replays the customer conversations in `sales/scenarios.json` (27, synthetic lead)
+  through the real agent, rules and model with a fake WhatsApp, and prints each reply, state
+  and hand-off. Run it after editing the rules; about US$ 0.02 per full run.
 - `run` scans the chat list (listener), stores incoming messages of funnel leads, answers
   them, sends due follow-ups and, with `--prospect`, opens new leads up to the daily limit.
   Without `--live` it prints the decisions and changes no lead state. It stops on the first
@@ -139,18 +145,60 @@ the model using only the facts.
 | "Tenho interesse", "gostei" | `interested` | reply | Offer a quote |
 | "Sim" after the quote offer | `quote_accept` | qualify | Asks the business type and what the site or system should have |
 | Project description while qualifying | `quote_details` | quote | Fixed ack; the owner prepares the quote (notified) |
-| "Me liga", meeting, visit | `call_request` | handoff | Fixed: asks the best time; the owner calls |
+| "Me liga", meeting, visit | `call_request` | handoff 🔥 | Fixed: asks the best time; the owner calls |
+| "Quero falar com o Alexandre", "não com robô", "falar com gente" | `human_request` | handoff 🔥 | Fixed: "Claro! Já continuo com você pessoalmente." |
+| "Quero fechar", "pode começar", "como pago a entrada" | `ready_to_buy` | handoff 🔥 | Fixed: the owner sends the next steps |
+| "Me chama amanhã", "estou ocupado", "agora não posso" (never a refusal) | `callback_later` | handoff 🔥 | Fixed: "Sem problema! Te chamo depois então." |
+| "Tá caro", "faz por 300?", desconto, parcelar | `negotiation` | handoff | Fixed: the owner decides conditions |
+| "É golpe?", "é confiável?" | `trust_concern` | handoff | Fixed: acknowledges the care; the owner answers |
+| "Não entendi", "como assim?" | `confused` | reply | Simpler explanation once; a second time is `stuck` |
+| Same question again, or 8 bot replies without a quote | `stuck` | handoff | Fixed: "Desculpa se não fui claro! Já te respondo pessoalmente." |
 | Audio | `audio` | handoff | Fixed: cannot listen now, asks for text; owner notified |
-| Photo, video, document, location | `media` | handoff | Fixed ack; owner notified |
+| Photo, video, document, location | `media` | handoff | Fixed ack; owner notified. A caption is read as the message text |
 | Sticker or GIF only | `sticker` | ignore | Nothing |
 | "Já temos site" | `already_has_site` | close | Thanks; available later |
 | "Vou pensar", "mais pra frente" | `later` | close | Available whenever they want |
 | "Tudo bem e você?" | `greeting_reply` | reply | Short answer and an open question |
 | "Obrigado", "ok" | `thanks` | ignore | Nothing |
-| Anything not in the facts: city, invoice, contract, negotiation ("faz por 300?"), complaint, ambiguous text | `unknown` | handoff | Fixed: "Boa pergunta! Vou verificar direitinho e já te respondo."; owner notified |
+| Anything not in the facts: city, invoice, contract, domain, technology, e-mail, ambiguous text | `unknown` | handoff | Fixed: "Certo! Vou verificar direitinho e já te respondo."; owner notified |
 | Message outside 07:00–21:00 | — | — | Stored; answered at the start of the next reply window |
 | The owner typed in the chat | — | — | Detected when the chat opens; state `owner`, automation pauses |
 | A refused contact writes again | — | — | No automated answer; owner notified |
+
+## Hand-off to the owner
+
+The bot stops at the first moment it cannot move the sale forward on its own. It sends one
+short holding message, notifies the owner with the contact, moves the lead to `needs-owner`
+(or `quote-requested`) and sends nothing more until `resolve`. Found with 24 simulated
+conversations on the real model (2026-11-17).
+
+| Priority | When | Intents and triggers |
+| --- | --- | --- |
+| 🔥 hot — answer within minutes | Buying signal | `quote_details` (project described), `ready_to_buy` ("quero fechar", "como pago a entrada"), `human_request` ("quero falar com o Alexandre/com gente"), `call_request`, `callback_later` ("me chama amanhã") |
+| ⚠️ needed — the bot lacks information or authority | The answer is not in the rules or needs a person | `negotiation` (caro, desconto, "faz por 300", parcelar), `trust_concern` ("é golpe?"), `unknown` (cidade, contrato, nota fiscal, domínio, tecnologia, e-mail), `audio`, `media`, the model's own `handoff`, `stuck` |
+| 🛑 alert — something went wrong | Operational | send not confirmed, refused contact wrote again, outside `rules.json`, daily reply limit |
+
+`stuck` is detected by the agent, not by words: the contact asked the same thing again (the
+same intent twice in a row, e.g. "Quanto custa?" → "Mas quanto custa?", or a second
+"não entendi"), or the bot already answered `max_bot_replies_before_owner` (8) times without
+reaching a quote.
+
+Each hand-off is a line in `handoff.jsonl` and a desktop notification (`notify-send`, urgency
+critical for hot and alert):
+
+```json
+{"at": "2026-11-17T15:40:00-04:00", "lead": "L…", "name": "Barbearia Teste",
+ "phone": "+55 65 90000-0001", "wa_link": "https://wa.me/5565900000001",
+ "priority": "hot", "label": "🔥 Atender agora",
+ "reason": "Quer fechar: perguntou como começar ou pagar", "intent": "ready_to_buy",
+ "last_message": "Quero fechar, como faço pra pagar a entrada?",
+ "recent": ["Alexandre: …", "Cliente: …"]}
+```
+
+New messages in a conversation that is already with the owner are stored and produce at most
+one reminder per `owner_reminder_minutes` (30). `sales handoffs` lists the waiting
+conversations; after answering, `sales resolve --state engaged` hands one back to the bot
+(its repeat and reply counters restart).
 
 ## Decision pipeline
 
@@ -164,7 +212,9 @@ the model using only the facts.
 4. Otherwise the model receives the context model, the facts, the intents, the lead's public
    profile, the full history and the local label, and answers JSON:
    `{"intent", "messages", "handoff", "do_not_contact", "reason"}`.
-5. A refusal from either side blocks. `handoff` sends only the owner's ack. Fixed intents and
+5. A refusal from either side blocks. A local hand-off signal (buying, negotiation, human,
+   trust, callback) is never weakened by the model: between two hand-offs the higher
+   priority wins, and a model reply cannot cancel one. `handoff` sends only the owner's ack. Fixed intents and
    every `block`, `handoff`, `quote` or `ignore` action send the rules' text. Model text is sent
    only for `reply`, `qualify` and `close`, and only when the guard accepts it.
 6. The guard rejects any money value, number, percentage, e-mail, link, forbidden term

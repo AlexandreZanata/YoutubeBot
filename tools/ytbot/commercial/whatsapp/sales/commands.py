@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 from .. import listener as whatsapp_listener
 from . import llm as sales_llm
+from . import rehearsal
 from .agent import SalesAgent, WhatsAppChannel, owner_block, owner_resolve, split_pending
 from .decide import decide
 from .pacing import SalesPacing
@@ -154,6 +155,23 @@ def command_simulate(args, store_factory) -> None:
                                pacing.plan(decision.messages, args.text)]})
 
 
+def command_rehearse(args, store_factory) -> None:
+    """Run scripted customer conversations offline; nothing is sent or stored."""
+    rules, store, _ = _context(args, store_factory)
+    try:
+        scenarios = rehearsal.load_scenarios(Path(args.scenarios) if args.scenarios else None)
+    except (OSError, ValueError) as error:
+        raise SystemExit(f"[sales] {error}")
+    if args.only:
+        scenarios = {name: turns for name, turns in scenarios.items()
+                     if args.only.casefold() in name.casefold()}
+    transcripts = rehearsal.rehearse(rules, scenarios, _model(rules, store, not args.no_llm))
+    if args.json:
+        _print(transcripts)
+    else:
+        print(rehearsal.render(transcripts))
+
+
 def reload_if_changed(agent, path: Path, seen: float) -> float:
     """Reload the rules when the file changed; keep the current ones if the edit is invalid."""
     try:
@@ -254,6 +272,12 @@ def add_parser(actions, store_factory, page_factory) -> None:
     simulate.add_argument("--name", default="Empresa de teste")
     simulate.add_argument("--state", default="opened")
     simulate.add_argument("--no-llm", action="store_true")
+    rehearse = action("rehearse", "replay customer scenarios offline (never sends)",
+                      partial(command_rehearse, store_factory=store_factory))
+    rehearse.add_argument("--scenarios", default=None, help="JSON {name: [messages]}")
+    rehearse.add_argument("--only", default=None, help="scenarios whose name contains this")
+    rehearse.add_argument("--json", action="store_true")
+    rehearse.add_argument("--no-llm", action="store_true")
     run = action("run", "listen, answer, follow up and (with --prospect) open new leads",
                  partial(command_run, store_factory=store_factory, page_factory=page_factory))
     run.add_argument("--live", action="store_true", help="actually send")

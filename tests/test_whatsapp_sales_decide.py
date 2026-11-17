@@ -36,7 +36,7 @@ class SalesDecisionTests(unittest.TestCase):
         self.assertNotIn(LEAD["phone"], system["content"] + user["content"])
 
     def test_invented_price_falls_back_to_the_rules_text(self):
-        decision, _ = self.run_model("Faz mais barato?", {
+        decision, _ = self.run_model("E pra uma loja pequena, quanto fica?", {
             "intent": "price", "messages": ["Faço por R$ 300 pra você."]})
         self.assertEqual(decision.source, "template")
         self.assertIn("money value not in the rules: 300.00", decision.violations)
@@ -106,6 +106,31 @@ class SalesDecisionTests(unittest.TestCase):
         decision, _ = self.run_model(text, {
             "intent": "price", "messages": ["O site fica em média R$ 500."]})
         self.assertEqual(decision.messages[0], self.rules.intent("bot_question").messages[0])
+
+    def test_project_description_while_qualifying_is_final_locally(self):
+        lead = {**LEAD, "state": "qualifying"}
+        model = FakeModel({"intent": "media", "messages": []})
+        decision = decide(self.rules, lead, [], "Photo\nEstúdio de fotos, atendo de segunda a "
+                          "sexta das 10h às 18h e queria agendamento online", model, MONDAY)
+        self.assertEqual((decision.intent, decision.action), ("quote_details", "quote"))
+        self.assertEqual(model.calls, [])
+
+    def test_caption_reaches_the_model_as_text(self):
+        _, model = self.run_model("Photo\nQuanto custa um site assim pra minha loja de roupas?",
+                                  {"intent": "price", "messages": ["Ok"]})
+        self.assertIn("[mídia anexada] Quanto custa", model.calls[0]["messages"][1]["content"])
+
+    def test_negotiation_goes_to_the_owner_even_if_the_model_answers(self):
+        decision, _ = self.run_model("Faz mais barato?", {
+            "intent": "price", "messages": ["O site fica em média R$ 500."]})
+        self.assertEqual((decision.intent, decision.action), ("negotiation", "handoff"))
+
+    def test_local_buying_signal_is_never_weakened_by_the_model(self):
+        for answer in ({"intent": "unknown", "messages": []},
+                       {"intent": "price", "messages": ["O site fica em média R$ 500."]}):
+            decision, _ = self.run_model("Gostei muito dos exemplos que você mandou, quero fechar. "
+                                         "Como faço pra pagar a entrada?", answer)
+            self.assertEqual((decision.intent, decision.priority), ("ready_to_buy", "hot"))
 
     def test_short_decisive_messages_never_call_the_model(self):
         decision, model = self.run_model("Não, obrigado", {"intent": "interested"})

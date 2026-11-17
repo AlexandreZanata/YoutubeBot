@@ -33,7 +33,7 @@ class SalesAgentTests(unittest.TestCase):
         channel = channel if channel is not None else FakeChannel(self.store.journal_path)
         return SalesAgent(self.rules, self.store, channel if live else None, model, live=live,
                           clock=self.clock, sleep=self.pauses.append,
-                          notify=lambda title, body: self.notes.append(body),
+                          notify=self.notes.append,
                           log=lambda message: None), channel
 
     def event(self, text, number="0001", event_id="e1"):
@@ -177,7 +177,7 @@ class SalesAgentTests(unittest.TestCase):
         self.clock.now = MONDAY + timedelta(days=10)
         agent.followups()
         self.assertEqual(len(channel.sent), sent)
-        self.assertTrue(any("bloqueado" in note for note in self.notes))
+        self.assertTrue(any("bloqueado" in note["reason"] for note in self.notes))
 
     def test_quote_flow_goes_to_the_owner(self):
         lead, agent, channel = self.opened_lead()
@@ -191,7 +191,8 @@ class SalesAgentTests(unittest.TestCase):
         agent.ingest([self.event("Barbearia, quero agenda online com lembrete", event_id="e3")])
         agent.reply_pending()
         self.assertEqual(self.store.lead(lead["id"])["state"], "quote-requested")
-        self.assertTrue(any("quote_details" in note for note in self.notes))
+        self.assertTrue(any(note["intent"] == "quote_details" and note["priority"] == "hot"
+                            for note in self.notes))
         sent = len(channel.sent)
         agent.ingest([self.event("Alguma novidade?", event_id="e4")])
         self.assertEqual(agent.reply_pending(), [])
@@ -307,6 +308,70 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(agent.reply_pending()[0]["state"], "error")
         self.assertEqual(self.store.lead(lead["id"])["awaiting"], "e1")
         self.assertEqual(len(channel.sent), 8)
+
+    def test_owner_notification_carries_the_contact(self):
+        lead, agent, channel = self.opened_lead()
+        agent.ingest([self.event("Quero fechar, como faço pra pagar a entrada?")])
+        agent.reply_pending()
+        note = self.notes[-1]
+        self.assertEqual(note["priority"], "hot")
+        self.assertEqual(note["phone"], "+55 65 90000-0001")
+        self.assertEqual(note["wa_link"], "https://wa.me/5565900000001")
+        self.assertEqual(note["last_message"], "Quero fechar, como faço pra pagar a entrada?")
+        self.assertIn("Cliente: Quero fechar, como faço pra pagar a entrada?", note["recent"])
+        self.assertEqual(self.store.handoffs()[-1]["lead"], lead["id"])
+        self.assertEqual(channel.sent[-1]["text"],
+                         "Que ótimo! Já te respondo pessoalmente com os próximos passos.")
+        self.assertEqual(self.store.lead(lead["id"])["state"], "needs-owner")
+
+    def test_human_request_hands_off_instead_of_explaining_the_bot(self):
+        lead, agent, channel = self.opened_lead()
+        agent.ingest([self.event("Quero falar com o Alexandre mesmo, não com robô")])
+        agent.reply_pending()
+        self.assertEqual(channel.sent[-1]["text"], "Claro! Já continuo com você pessoalmente.")
+        self.assertEqual(self.notes[-1]["reason"], "Pediu para falar com você")
+
+    def test_repeated_question_means_the_bot_is_stuck(self):
+        lead, agent, channel = self.opened_lead()
+        agent.ingest([self.event("Quanto custa?")])
+        agent.reply_pending()
+        agent.ingest([self.event("Mas quanto custa?", event_id="e2")])
+        agent.reply_pending()
+        self.assertEqual(channel.sent[-1]["text"],
+                         "Desculpa se não fui claro! Já te respondo pessoalmente.")
+        self.assertIn("pergunta repetida", self.notes[-1]["reason"])
+        self.assertEqual(self.store.lead(lead["id"])["state"], "needs-owner")
+
+    def test_confusion_is_explained_once_then_handed_off(self):
+        lead, agent, channel = self.opened_lead()
+        agent.ingest([self.event("Não entendi")])
+        agent.reply_pending()
+        self.assertEqual(self.store.lead(lead["id"])["state"], "engaged")
+        agent.ingest([self.event("Como assim?", event_id="e2")])
+        agent.reply_pending()
+        self.assertEqual(self.store.lead(lead["id"])["state"], "needs-owner")
+        self.assertIn("pergunta repetida", self.notes[-1]["reason"])
+
+    def test_chat_with_the_owner_reminds_once_per_window(self):
+        lead, agent, channel = self.opened_lead()
+        agent.ingest([self.event("Isso é golpe?")])
+        agent.reply_pending()
+        count = len(self.notes)
+        agent.ingest([self.event("Oi?", event_id="e2"), self.event("Alô", event_id="e3")])
+        self.assertEqual(len(self.notes), count)
+        self.clock.now = MONDAY + timedelta(minutes=45)
+        agent.ingest([self.event("Tem alguém aí?", event_id="e4")])
+        self.assertEqual(len(self.notes), count + 1)
+        self.assertEqual(len(channel.sent), 9)
+
+    def test_long_conversation_without_quote_goes_to_the_owner(self):
+        lead, agent, channel = self.opened_lead()
+        self.store.update_lead(lead["id"], bot_replies=8, intents=["examples"])
+        agent.ingest([self.event("Quanto custa?")])
+        agent.reply_pending()
+        self.assertIn("conversa longa", self.notes[-1]["reason"])
+        owner_resolve(self.store, lead["id"], "engaged")
+        self.assertEqual(self.store.lead(lead["id"])["bot_replies"], 0)
 
     # Follow-ups ----------------------------------------------------------------------
     def test_one_follow_up_then_stop(self):

@@ -18,6 +18,8 @@ timezone = "America/Cuiaba"
 [limits]
 daily_openings = 10                 # owner decision 2026-11-17
 max_replies_per_lead_per_day = 12   # stops loops with other bots; the owner takes over
+max_bot_replies_before_owner = 8    # a long chat that has not reached a quote goes to the owner
+owner_reminder_minutes = 30         # new messages in a chat that is with the owner: one reminder
 max_messages_per_reply = 4          # links in their own messages do not count
 max_message_chars = 600
 followup_after_hours = 72           # one follow-up when the opening got no answer
@@ -138,8 +140,9 @@ affirmative = [
 negative = ['^(nao|n|nop|negativo)\b']
 
 [handoff]
-# Sent once when a case goes to the owner, so the contact is not left waiting.
-messages = ["Boa pergunta! Vou verificar direitinho e já te respondo."]
+# Sent once when the model asks for the owner on an ordinary intent, so the contact is not left
+# waiting. Dedicated hand-off intents below carry their own text, priority and reason.
+messages = ["Certo! Vou verificar direitinho e já te respondo."]
 
 # Intents. `action` decides what happens after the messages:
 #   reply   send the messages and keep the conversation going
@@ -149,6 +152,9 @@ messages = ["Boa pergunta! Vou verificar direitinho e já te respondo."]
 #   block   send the fixed messages, then never contact again (do-not-contact list)
 #   handoff send the messages, then the owner answers (state needs-owner)
 #   ignore  send nothing
+# Hand-off intents (`handoff`, `quote`) also carry `priority` and `reason` for the owner's
+# notification: hot = buying signal, answer within minutes; needed = the bot lacks the
+# information or the authority; alert = something went wrong.
 # `fixed = true` sends the messages verbatim; otherwise the model may reword them using only
 # the facts above. Order matters for the local classifier: the first matching pattern wins.
 
@@ -159,7 +165,8 @@ fixed = true
 when = "Pede para parar, remover o número, diz que é spam, ameaça denunciar ou bloquear."
 patterns = [
   'para de (me )?(mandar|enviar)', 'pare de', 'nao (me )?(mande|mandem|envie)', 'remov[ae] (meu|o meu|esse) (numero|contato)',
-  '\bspam\b', 'denunci', '\bbloque(ar|ia|ei|io)\b', 'nao (me )?(chame|chama|procure|incomode)', 'sai fora',
+  '\bspam\b', 'denunci', '\bbloque(ar|ia|ei|io)\b', 'nao (me )?(chame|chama|procure|incomode) mais',
+  'nao (me )?(chame|chama|procure|incomode)[.! ]*$', 'sai fora',
 ]
 messages = ["Desculpe o incômodo! Não vou mais entrar em contato. Obrigado pela atenção."]
 
@@ -167,12 +174,13 @@ messages = ["Desculpe o incômodo! Não vou mais entrar em contato. Obrigado pel
 id = "refusal"
 action = "block"
 fixed = true
-when = "Recusa: 'nesse momento não estou precisando', 'não, obrigado', 'agora não', 'não tenho interesse', 'não preciso', ou 'não' em resposta à oferta de orçamento."
+when = "Recusa: 'nesse momento não estou precisando', 'não, obrigado', 'agora não', 'não tenho interesse', 'não preciso', ou 'não' em resposta à oferta de orçamento. 'Agora não posso, me chama amanhã' NÃO é recusa (é callback_later)."
 patterns = [
-  'nao,? obrigad', 'nao (estou|to|estamos|tamo|tamos) precisando', 'nao (preciso|precisamos)',
-  'nao (tenho|temos) interesse', 'sem interesse', 'nao (quero|queremos)', 'agora nao',
-  'nesse momento nao', 'neste momento nao', 'no momento nao', 'nao me interessa', 'dispenso',
-  'obrigad[oa],? mas nao', 'nao,? valeu', 'nao e (do nosso|o nosso) interesse',
+  'nao,? obrigad', 'nao (estou|to|estamos|tamo|tamos) precisando', 'nao (preciso|precisamos)( de site| disso| nao)?[,.! ]*(obrigad[oa])?[.!]*$',
+  'nao (tenho|temos) interesse', 'sem interesse', 'nao (quero|queremos)( nao)?[,.! ]*(obrigad[oa])?[.!]*$',
+  '^agora nao[,.! ]*(obrigad[oa]|valeu)?[.!]*$', 'agora nao,? (obrigad|valeu|preciso|quero)',
+  'n(esse|este|o) momento nao (estou |to |estamos )?(precis|quero|tenho interesse|temos interesse)',
+  'nao me interessa', 'dispenso', 'obrigad[oa],? mas nao', 'nao,? valeu', 'nao e (do nosso|o nosso) interesse',
 ]
 messages = ["Entendo, obrigado pela atenção! Tenha um ótimo dia."]
 
@@ -187,6 +195,20 @@ patterns = [
   'digite (o numero|1|uma opcao)', 'no momento (nao estamos|estamos fora)', 'agradecemos (o|seu) contato',
 ]
 messages = []
+
+[[intents]]
+id = "human_request"
+action = "handoff"
+fixed = true
+priority = "hot"
+reason = "Pediu para falar com você"
+when = "Pede para falar com o Alexandre, com uma pessoa, com o responsável ou recusa falar com robô."
+patterns = [
+  'falar com (o |a |uma |um )?(alexandre|dono|responsavel|pessoa|alguem|humano|atendente|gente)',
+  'nao (quero )?(falar )?com (robo|bot|maquina)', 'quero (uma )?(pessoa|gente|humano)\b', 'atendimento humano',
+  'chama o alexandre',
+]
+messages = ["Claro! Já continuo com você pessoalmente."]
 
 [[intents]]
 id = "bot_question"
@@ -215,6 +237,16 @@ messages = [
 ]
 
 [[intents]]
+id = "trust_concern"
+action = "handoff"
+fixed = true
+priority = "needed"
+reason = "Desconfiança: precisa de contato pessoal"
+when = "Acha que é golpe, fraude ou pergunta se é confiável ou seguro."
+patterns = ['golpe', 'fraude', 'e confiavel', 'e seguro', 'desconfi', 'como (eu )?(sei|vou saber) que', 'e verdade isso']
+messages = ["Entendo a desconfiança, é bom ter cuidado! Já te respondo pessoalmente."]
+
+[[intents]]
 id = "who_are_you"
 action = "reply"
 fixed = false
@@ -228,6 +260,8 @@ messages = [
 id = "call_request"
 action = "handoff"
 fixed = true
+priority = "hot"
+reason = "Pediu ligação, reunião ou visita"
 when = "Pede ligação, chamada de vídeo, reunião ou visita."
 patterns = [
   'me liga', 'pode ligar', 'liga pra mim', 'ligar para (mim|nos)', 'prefiro (ligacao|falar por telefone)',
@@ -239,8 +273,10 @@ messages = ["Claro! Qual o melhor horário para você?"]
 id = "audio"
 action = "handoff"
 fixed = true
+priority = "needed"
+reason = "Mandou áudio"
 when = "Mandou áudio ou mensagem de voz."
-patterns = ['^(audio|voice message|mensagem de voz|ptt)\b', '^\W*\d{1,2}:\d{2}$']
+patterns = ['^(audio|voice message|mensagem de voz|ptt)$', '^\W*\d{1,2}:\d{2}$']
 messages = [
   "Recebi seu áudio! Agora não consigo ouvir, consegue me mandar por escrito? Se não der, eu ouço assim que puder e te respondo.",
 ]
@@ -257,9 +293,62 @@ messages = []
 id = "media"
 action = "handoff"
 fixed = true
+priority = "needed"
+reason = "Mandou foto, vídeo ou documento"
 when = "Mandou foto, imagem, vídeo, documento, localização ou contato."
-patterns = ['^(photo|foto|image|imagem|video|document|documento|location|localizacao|contact|contato)\b']
+patterns = ['^(photo|foto|image|imagem|video|document|documento|location|localizacao|contact|contato)$']
 messages = ["Recebi, obrigado! Vou dar uma olhada e já te respondo."]
+
+[[intents]]
+id = "ready_to_buy"
+action = "handoff"
+fixed = true
+priority = "hot"
+reason = "Quer fechar: perguntou como começar ou pagar"
+when = "Quer contratar ou começar já: 'quero fechar', 'pode começar', 'fechado', 'como faço para pagar a entrada'."
+patterns = [
+  'quero (fechar|contratar|comecar)', 'vamos (fechar|comecar)', 'pode (comecar|fazer)[.! ]*$', '^fechado\b',
+  'como (eu )?(faco|faço) (pra|para) (pagar|contratar|comecar|fechar)', 'pagar a entrada', 'onde (eu )?pago',
+  'manda (o pix|a chave|os dados( para pagamento)?)',
+]
+messages = ["Que ótimo! Já te respondo pessoalmente com os próximos passos."]
+
+[[intents]]
+id = "negotiation"
+action = "handoff"
+fixed = true
+priority = "needed"
+reason = "Negociação de preço ou pagamento"
+when = "Negocia valor ou condição: achou caro, pede desconto, oferece outro valor, quer parcelar ou começar sem entrada."
+patterns = [
+  'desconto', 'faz por', 'faria por', 'mais barato', 'abaix', 'baixar o (preco|valor)', '\bcaro\b',
+  'consegue (fazer )?por', 'parcel', '\b\d{1,2} ?x\b', 'sem entrada', 'melhor preco',
+]
+messages = ["Entendi! Condições de valor e pagamento eu vejo pessoalmente e já te respondo."]
+
+[[intents]]
+id = "callback_later"
+action = "handoff"
+fixed = true
+priority = "hot"
+reason = "Pediu para ser chamado depois"
+when = "Está ocupado agora e pede para chamar depois, amanhã ou em outro horário."
+patterns = [
+  '(me )?(chama|chame|fala comigo|procura|manda mensagem) (amanha|depois|mais tarde|outro dia|semana que vem|segunda|a tarde|a noite)',
+  '(estou|to|tô|estamos) (ocupad|na correria|dirigindo|atendendo)', 'agora nao (posso|consigo|da)',
+  'n(esse|este|o) momento nao (posso|consigo|da)',
+]
+messages = ["Sem problema! Te chamo depois então."]
+
+[[intents]]
+id = "confused"
+action = "reply"
+fixed = false
+when = "Não entendeu a mensagem: 'não entendi', 'como assim?', 'o que é isso?'. Explique de novo, mais simples, sem repetir os links. Se a confusão se repetir, o bot passa para o dono."
+patterns = ['nao entendi', '^como assim', 'o que (e|eh) isso', 'do que se trata', '^\?+$']
+messages = [
+  "Desculpa, vou explicar melhor! Eu crio sites para empresas. Vi que vocês não têm site no Google Maps e queria saber se teriam interesse em ter um.",
+]
 
 [[intents]]
 id = "already_has_site"
@@ -323,7 +412,7 @@ id = "price"
 action = "reply"
 fixed = false
 when = "Pergunta preço, valor, quanto custa, sem dizer se é site simples ou sistema."
-patterns = ['quanto (custa|fica|sai|e|eh|cobra)', '\bvalor', '\bpreco', 'qual o investimento', '\bcaro\b']
+patterns = ['quanto (custa|fica|sai|e|eh|cobra)', '\bvalor', '\bpreco', 'qual o investimento']
 messages = [
   "Um site institucional, que é só visual, fica em média R$ 500, com entrada de R$ 250, mais o servidor de R$ 39,90 por mês no boleto ou Pix (ou R$ 45 no cartão).",
   "Já sistemas e aplicativos têm o valor definido pelas funcionalidades que você precisa.",
@@ -345,7 +434,7 @@ id = "payment"
 action = "reply"
 fixed = false
 when = "Pergunta forma de pagamento, entrada, parcelamento, cartão, boleto ou Pix do projeto."
-patterns = ['pagamento', 'parcela', 'entrada', '\bboleto\b', '\bpix\b', 'cartao', 'como (eu )?pago']
+patterns = ['pagamento', 'entrada', '\bboleto\b', '\bpix\b', 'cartao', 'como (eu )?pago']
 messages = [
   "Para começar o site institucional a entrada é de R$ 250. As demais condições são combinadas no orçamento.",
 ]
@@ -380,6 +469,8 @@ action = "quote"
 fixed = true
 when = "Depois de aceitar o orçamento, descreve o que precisa (ramo, funcionalidades, exemplos)."
 patterns = []
+priority = "hot"
+reason = "Orçamento: o cliente descreveu o projeto"
 messages = ["Perfeito, anotei tudo! Vou preparar o orçamento e te mando por aqui."]
 
 [[intents]]
@@ -410,9 +501,21 @@ patterns = ['^(obrigad[oa]|valeu|vlw|ok|beleza|blz|show|certo|tmj)[!. ]*$', '^\W
 messages = []
 
 [[intents]]
+id = "stuck"
+action = "handoff"
+fixed = true
+priority = "needed"
+reason = "O bot não resolveu: pergunta repetida ou conversa longa"
+when = "Uso interno: a pessoa repetiu a mesma pergunta ou a conversa passou do limite de respostas automáticas."
+patterns = []
+messages = ["Desculpa se não fui claro! Já te respondo pessoalmente."]
+
+[[intents]]
 id = "unknown"
 action = "handoff"
 fixed = true
+priority = "needed"
+reason = "Pergunta ou pedido fora das regras"
 when = "Qualquer pergunta ou pedido cuja resposta não está nos fatos: cidade, contrato, nota fiscal, prazo de sistema, tecnologia, reclamação ou mensagem ambígua."
 patterns = []
-messages = ["Boa pergunta! Vou verificar direitinho e já te respondo."]
+messages = ["Certo! Vou verificar direitinho e já te respondo."]

@@ -46,6 +46,32 @@ class SalesClassifierTests(unittest.TestCase):
         for text, expected in cases.items():
             self.check(text, expected)
 
+    def test_moments_that_need_the_owner(self):
+        cases = {
+            "Quero falar com o Alexandre mesmo, não com robô": "human_request",
+            "Isso é golpe?": "trust_concern",
+            "Tá caro, faz por 300?": "negotiation",
+            "Dá pra parcelar no cartão em 10x?": "negotiation",
+            "Quero fechar, como faço pra pagar a entrada?": "ready_to_buy",
+            "Agora estou ocupado, me chama amanhã": "callback_later",
+            "Agora não posso, me chama amanhã": "callback_later",
+            "Não me chama agora, me chama amanhã": "callback_later",
+            "Nesse momento não posso falar": "callback_later",
+            "Você é um robô? quero falar com gente": "human_request",
+            "Não entendi": "confused",
+            "Como assim?": "confused",
+        }
+        for text, expected in cases.items():
+            self.check(text, expected)
+
+    def test_busy_or_redirecting_messages_are_never_refusals(self):
+        for text in ("Agora não posso, me chama amanhã", "Não quero site, quero um aplicativo",
+                     "Não me chama agora, me chama amanhã", "Nesse momento não posso falar"):
+            self.assertNotIn(classifier.classify(self.rules, text, None, "engaged"),
+                             ("refusal", "opt_out"), text)
+        self.check("Não me chama mais", "opt_out")
+        self.check("Não quero, obrigado", "refusal")
+
     def test_short_answers_read_the_offer_question(self):
         self.check("Sim", "quote_accept", OFFER)
         self.check("pode sim", "quote_accept", OFFER)
@@ -54,6 +80,9 @@ class SalesClassifierTests(unittest.TestCase):
     def test_qualifying_text_is_the_project_description(self):
         self.check("Barbearia, quero agendamento online e lembrete", "quote_details",
                    state="qualifying")
+        self.check("Photo\nEstúdio de fotos, atendo segunda a sexta", "quote_details",
+                   state="qualifying")
+        self.check("Photo", "media", state="qualifying")
         self.check("é robô?", "bot_question", state="qualifying")
 
     def test_only_short_messages_are_decided_locally(self):

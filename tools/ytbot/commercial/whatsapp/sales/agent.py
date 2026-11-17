@@ -14,14 +14,14 @@ conversation at a time with a pause between chats.
 from __future__ import annotations
 
 import random
-import subprocess
 import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from .. import listener, sender
+from . import notify as owner_notify
 from .context import effective
-from .decide import Decision, decide
+from .decide import Decision, decide, stuck
 from .pacing import SalesPacing
 from .rules import SalesRules, normalize
 from .store import SalesStore, stamp
@@ -32,13 +32,6 @@ REOPENS = ("new", "opened", "followed-up", "closed", "no-response", "engaged")
 OWNER_STATES = ("needs-owner", "quote-requested", "owner", "unconfirmed")
 NEXT_STATE = {"qualify": "qualifying", "quote": "quote-requested", "close": "closed",
               "block": "do-not-contact", "handoff": "needs-owner"}
-
-
-def desktop_notify(title: str, body: str) -> None:
-    try:
-        subprocess.run(["notify-send", title, body], timeout=5, check=False)
-    except Exception:
-        pass
 
 
 def _ours(text: str, sent: list[str]) -> bool:
@@ -86,7 +79,7 @@ class WhatsAppChannel:
 class SalesAgent:
     def __init__(self, rules: SalesRules, store: SalesStore, channel=None, llm=None,
                  live: bool = False, clock=None, sleep=time.sleep, rng=random,
-                 notify=desktop_notify, log=None):
+                 notify=owner_notify.desktop_notify, log=None):
         self.rules = rules
         self.store = store
         self.channel = channel
@@ -136,12 +129,26 @@ class SalesAgent:
             return all(listener.contact_allowed(name, rules) for name in names)
         return any(listener.contact_allowed(name, rules) for name in names)
 
-    def _handoff(self, lead: dict, reason: str, text: str = "") -> None:
-        now = self.now()
-        self.store.log_handoff({"at": stamp(now), "lead": lead["id"], "name": lead["name"],
-                                "state": lead.get("state"), "reason": reason, "text": text})
-        self.notify("Zaflas vendas", f"{lead['name']}: {reason}")
-        self.log(f"owner needed for {lead['name']}: {reason}")
+    def _handoff(self, lead: dict, reason: str, text: str = "", priority: str = "alert",
+                 intent: str = "") -> dict:
+        """Record and notify a conversation the owner must take over, with the contact."""
+        lead = self.store.lead(lead["id"]) or lead
+        entry = owner_notify.handoff_entry(
+            lead, self.store.history(lead["id"]), reason, priority, intent, text, self.now(),
+            self.rules.raw.get("agent_name", "Alexandre"))
+        self.store.log_handoff(entry)
+        self.notify(entry)
+        self.log(f"owner needed for {lead['name']} ({priority}): {reason}")
+        return entry
+
+    def _remind(self, lead: dict) -> bool:
+        """One reminder per window for a chat already with the owner, not one per message."""
+        window = timedelta(minutes=float(self.rules.limits["owner_reminder_minutes"]))
+        for entry in reversed(self.store.handoffs()):
+            if entry.get("lead") == lead["id"]:
+                last = self._parse(entry.get("at"))
+                return last is None or self.now() - last >= window
+        return True
 
     def openings_today(self) -> int:
         today = self.now().date()
@@ -175,7 +182,7 @@ class SalesAgent:
     def _fence(self, lead: dict, worst: str, what: str) -> None:
         self.store.update_lead(lead["id"], state="unconfirmed",
                                handoff_reason=f"{what}: {worst}")
-        self._handoff(lead, f"envio não confirmado ({what}: {worst}); verifique a conversa")
+        self._handoff(lead, f"Envio não confirmado ({what}: {worst}); verifique a conversa")
 
     # Incoming ------------------------------------------------------------------------
     def ingest(self, events: list[dict]) -> list[str]:
@@ -207,9 +214,10 @@ class SalesAgent:
             elif lead["state"] == "qualifying":
                 changes["awaiting"] = event.get("id")
             elif lead["state"] == "do-not-contact":
-                self._handoff(lead, "contato bloqueado voltou a escrever", event["text"])
-            elif lead["state"] in OWNER_STATES:
-                self._handoff(lead, "nova mensagem numa conversa com você", event["text"])
+                self._handoff(lead, "Contato bloqueado voltou a escrever", event["text"])
+            elif lead["state"] in OWNER_STATES and self._remind(lead):
+                self._handoff(lead, "Nova mensagem numa conversa que está com você",
+                              event["text"], "needed")
             self.store.update_lead(lead["id"], **changes)
             touched.append(lead["id"])
         return touched
@@ -260,14 +268,15 @@ class SalesAgent:
             return {**result, "state": "do-not-contact"}
         if not self.contact_allowed(lead):
             self.store.update_lead(lead["id"], awaiting=None)
-            self._handoff(lead, "contato fora da regra de respostas (rules.json)")
+            self._handoff(lead, "Contato fora da regra de respostas (rules.json)")
             return {**result, "state": "blocked-by-rules"}
         today = self.now().date().isoformat()
         replies = lead.get("replies") or {}
         if replies.get(today, 0) >= int(self.rules.limits["max_replies_per_lead_per_day"]):
             self.store.update_lead(lead["id"], state="needs-owner", awaiting=None,
                                    handoff_reason="limite diário de respostas")
-            self._handoff(lead, "limite diário de respostas automáticas atingido")
+            self._handoff(lead, "Limite diário de respostas automáticas atingido",
+                          priority="needed")
             return {**result, "state": "needs-owner"}
         if not self.live:
             planned = (lead["id"], str(lead.get("awaiting")))
@@ -298,6 +307,7 @@ class SalesAgent:
             return {**result, "state": "nothing-to-answer"}
         decision = decide(self.rules, lead, prior, text, self.llm, self.now(),
                           usage=self.store.log_usage)
+        decision = self._check_progress(lead, decision)
         self.store.log_decision({"at": stamp(self.now()), "lead": lead["id"],
                                  "live": self.live, "text": text, **decision.record()})
         result.update({"intent": decision.intent, "action": decision.action,
@@ -305,6 +315,17 @@ class SalesAgent:
         if not self.live:
             return {**result, "state": "planned"}
         return self._apply(lead, decision, text, result, replies, today)
+
+    def _check_progress(self, lead: dict, decision: Decision) -> Decision:
+        """Hand off when the bot is not moving the conversation toward a quote."""
+        if decision.action not in ("reply", "qualify", "close"):
+            return decision
+        intents = lead.get("intents") or []
+        if intents and intents[-1] == decision.intent:
+            return stuck(self.rules, decision.hint, "pergunta repetida")
+        if lead.get("bot_replies", 0) >= int(self.rules.limits["max_bot_replies_before_owner"]):
+            return stuck(self.rules, decision.hint, "conversa longa sem orçamento")
+        return decision
 
     def _apply(self, lead: dict, decision: Decision, text: str, result: dict, replies: dict,
                today: str) -> dict:
@@ -324,6 +345,9 @@ class SalesAgent:
                    "replies": {today: replies.get(today, 0) + (1 if decision.messages else 0)}}
         if decision.messages:
             changes["last_out_at"] = stamp(self.now())
+        if decision.action in ("reply", "qualify", "close") and decision.messages:
+            changes["intents"] = ((lead.get("intents") or []) + [decision.intent])[-5:]
+            changes["bot_replies"] = lead.get("bot_replies", 0) + 1
         if decision.action == "block":
             self.store.add_dnc(lead["phone"], decision.intent, self.now())
             listener.revoke_contact(self.store.contact_rules_path, self._contact_entry(lead))
@@ -331,7 +355,8 @@ class SalesAgent:
             changes["handoff_reason"] = decision.intent
         self.store.update_lead(lead["id"], **changes)
         if decision.action in ("handoff", "quote"):
-            self._handoff(lead, f"{decision.intent}: responda pessoalmente", text)
+            self._handoff(lead, decision.owner_reason or decision.intent, text,
+                          decision.priority or "needed", decision.intent)
         return {**result, "state": state}
 
     # Openings and follow-ups ---------------------------------------------------------
@@ -463,7 +488,8 @@ def owner_resolve(store: SalesStore, lead_id: str, state: str) -> dict:
     lead = store.lead(lead_id)
     if lead is None:
         raise KeyError(lead_id)
-    return store.update_lead(lead_id, state=state, awaiting=None, handoff_reason=None)
+    return store.update_lead(lead_id, state=state, awaiting=None, handoff_reason=None,
+                             intents=[], bot_replies=0)
 
 
 def owner_block(store: SalesStore, lead_id: str, now: datetime) -> dict:

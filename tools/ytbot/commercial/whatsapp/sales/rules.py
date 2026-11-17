@@ -14,7 +14,9 @@ RULES_PATH = Path(__file__).with_name("sales_rules.toml")
 ALLOWED_MODELS = ("deepseek-v4.1-flash",)
 ACTIONS = ("reply", "qualify", "quote", "close", "block", "handoff", "ignore")
 REQUIRED_INTENTS = ("opt_out", "refusal", "auto_reply", "bot_question", "unknown",
-                    "quote_accept", "quote_details", "system_request", "site_institutional")
+                    "quote_accept", "quote_details", "system_request", "site_institutional",
+                    "human_request", "stuck")
+PRIORITIES = ("hot", "needed", "alert")
 MONEY = re.compile(r"r\$\s*(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?")
 REAIS = re.compile(r"(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?\s*reais")
 NUMBER = re.compile(r"\d+")
@@ -70,6 +72,8 @@ class Intent:
     when: str
     patterns: tuple[re.Pattern, ...]
     messages: tuple[str, ...]
+    priority: str = "needed"
+    reason: str = ""
 
     def matches(self, plain: str) -> bool:
         return any(pattern.search(plain) for pattern in self.patterns)
@@ -179,6 +183,7 @@ def build(raw: dict) -> SalesRules:
             raise RulesError(f"missing {key}")
     _require(raw, "limits", ("daily_openings", "max_replies_per_lead_per_day",
                              "max_messages_per_reply", "max_message_chars",
+                             "max_bot_replies_before_owner", "owner_reminder_minutes",
                              "followup_after_hours", "max_followups",
                              "no_response_after_followup_hours"))
     _require(raw, "hours", ("opening_days", "opening_start", "opening_end", "reply_days",
@@ -236,8 +241,14 @@ def build(raw: dict) -> SalesRules:
             patterns = tuple(re.compile(pattern) for pattern in item.get("patterns", []))
         except re.error as error:
             raise RulesError(f"intent {intent_id}: bad pattern ({error})") from error
+        priority = item.get("priority", "needed")
+        if priority not in PRIORITIES:
+            raise RulesError(f"intent {intent_id}: priority must be one of {', '.join(PRIORITIES)}")
+        if item["action"] in ("handoff", "quote") and not item.get("reason"):
+            raise RulesError(f"intent {intent_id}: a hand-off needs a reason for the owner")
         intents.append(Intent(intent_id, item["action"], bool(item.get("fixed", False)),
-                              item.get("when", ""), patterns, messages))
+                              item.get("when", ""), patterns, messages, priority,
+                              item.get("reason", "")))
     missing = [intent for intent in REQUIRED_INTENTS if intent not in seen]
     if missing:
         raise RulesError(f"missing intents: {', '.join(missing)}")
