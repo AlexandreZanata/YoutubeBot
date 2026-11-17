@@ -27,6 +27,12 @@ the hidden browser.
 
 The UI depends on the domain; the domain never depends on Slint.
 
+## Renderer
+
+The window uses Slint's **femtovg** (OpenGL) renderer. The software renderer produced
+corrupted, striped frames on the owner's desktop session, so it is not used. If femtovg is
+unavailable on a machine, set `SLINT_BACKEND=winit-software` to fall back explicitly.
+
 ## Build
 
 ```bash
