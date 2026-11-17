@@ -85,6 +85,22 @@ CHANNELS = {
         slots=(0,),
         interval_days=2,
     ),
+    "reflection": Channel(
+        slug="reflection",
+        name="the word of reflection",
+        handle="@thewordofreflection",
+        channel_id="UCISw6UDaFINPRuuMr0s7tpA",
+        prompts="reflection",
+        background="whispers_from_heaven",
+        language="en",
+        min_article_chars=13000,
+        article_retry=(
+            "Target narration length: 2,200 to 2,500 English words, about 14 to 16 "
+            "minutes. Keep the same character and moment."
+        ),
+        max_article_chars=48000,
+        slots=(5, 17),
+    ),
     "zanata": Channel(
         slug="zanata",
         name="zanata",
