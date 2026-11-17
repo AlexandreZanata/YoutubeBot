@@ -1,288 +1,473 @@
-import { Button, ScrollView } from "std-widgets.slint";
+// YoutubeBot Manager window: sidebar navigation, header with breadcrumb and search, the
+// active page and a status footer. Keyboard: Ctrl+R refresh, Ctrl+K search, Ctrl+1…7
+// sections, arrows/Home/End move in the page list, Enter opens, Esc clears.
 
-export struct SessionRow {
-    id: string,
-    label: string,
-    network: string,
-    channel: string,
-    status: string,
-    detail: string,
-    key: string,
-    scope: string,
-    actionable: bool,
-}
+import { LineEdit, Palette } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Store, Bridge } from "store.slint";
+import { Btn, NavItem, Caption, Badge, Body, NoticeView } from "controls.slint";
+import {
+    OverviewPage, ChannelsPage, ShortsPage, SocialPage, CommercialPage, SessionsPage, SettingsPage,
+} from "pages.slint";
 
-component FilterItem inherits Rectangle {
-    in property <string> label;
-    in property <bool> active;
-    callback picked();
-
-    height: 34px;
-    border-radius: 6px;
-    background: active ? #1f6feb2e : transparent;
-
-    Text {
-        text: root.label;
-        color: root.active ? #dbe7ff : #aab6c5;
-        font-size: 13px;
-        vertical-alignment: center;
-        x: 12px;
-    }
-
-    TouchArea {
-        clicked => { root.picked(); }
-    }
-}
+export { Theme } from "theme.slint";
+export {
+    Store, Bridge, Notice, Fact, Kpi, UpcomingRow, ChannelCard, VideoRow, ShortRow, XPostRow,
+    ContactRow, ProductRow, SourceRow, SessionRow,
+} from "store.slint";
 
 export component AppWindow inherits Window {
     title: "YoutubeBot Manager";
-    width: 1180px;
-    height: 760px;
-    background: #0f1216;
+    preferred-width: 1280px;
+    preferred-height: 800px;
+    min-width: 1024px;
+    min-height: 720px;
+    // Explicit, so a fixed-size child never caps how far the owner can enlarge the window.
+    max-width: 100000px;
+    max-height: 100000px;
+    background: Theme.bg;
+    default-font-family: Theme.font;
+    default-font-size: Theme.text-sm;
+    forward-focus: keys;
 
-    in-out property <[SessionRow]> sessions;
-    in-out property <int> selected: -1;
-    in property <string> status-text: "Pronto";
-    in property <string> active-filter: "all";
+    in-out property <bool> dark <=> Theme.dark;
+    property <[string]> titles: [
+        "Visão geral", "Canais", "Shorts", "Social (X)", "Comercial", "Sessões", "Configurações",
+    ];
 
-    callback refresh();
-    callback open-selected(int);
-    callback stop-selected(int);
-    callback filter-changed(string);
+    init => {
+        Palette.color-scheme = Theme.dark ? ColorScheme.dark : ColorScheme.light;
+    }
 
-    VerticalLayout {
-        spacing: 0px;
+    changed dark => {
+        Palette.color-scheme = self.dark ? ColorScheme.dark : ColorScheme.light;
+    }
 
-        Rectangle {
-            height: 64px;
-            background: #151a21;
+    function go(page: int) {
+        Bridge.navigate(page);
+    }
 
-            HorizontalLayout {
-                padding-left: 20px;
-                padding-right: 20px;
-                alignment: space-between;
+    function list-length() -> int {
+        if (Store.page == 0) {
+            return Store.upcoming.length;
+        }
+        if (Store.page == 1) {
+            return Store.channel-open ? Store.videos.length : Store.channels.length;
+        }
+        if (Store.page == 2) {
+            return Store.shorts.length;
+        }
+        if (Store.page == 3) {
+            return Store.x-posts.length;
+        }
+        if (Store.page == 4) {
+            return Store.wa-contacts.length;
+        }
+        if (Store.page == 5) {
+            return Store.sessions.length;
+        }
+        return Store.sources.length;
+    }
 
-                VerticalLayout {
-                    alignment: center;
-                    spacing: 2px;
+    function list-current() -> int {
+        if (Store.page == 0) {
+            return Store.upcoming-current;
+        }
+        if (Store.page == 1) {
+            return Store.channel-open ? Store.video-current : Store.channel-current;
+        }
+        if (Store.page == 2) {
+            return Store.short-current;
+        }
+        if (Store.page == 3) {
+            return Store.x-current;
+        }
+        if (Store.page == 4) {
+            return Store.contact-current;
+        }
+        if (Store.page == 5) {
+            return Store.session-current;
+        }
+        return Store.source-current;
+    }
 
-                    Text {
-                        text: "YoutubeBot Manager";
-                        color: #eef2f7;
-                        font-size: 20px;
-                        font-weight: 700;
-                    }
+    function set-current(value: int) {
+        if (Store.page == 0) {
+            Store.upcoming-current = value;
+        } else if (Store.page == 1 && Store.channel-open) {
+            Store.video-current = value;
+        } else if (Store.page == 1) {
+            Store.channel-current = value;
+        } else if (Store.page == 2) {
+            Store.short-current = value;
+        } else if (Store.page == 3) {
+            Store.x-current = value;
+        } else if (Store.page == 4) {
+            Store.contact-current = value;
+        } else if (Store.page == 5) {
+            Store.session-current = value;
+        } else {
+            Store.source-current = value;
+        }
+    }
 
-                    Text {
-                        text: "Contas, canais e janelas logadas";
-                        color: #8b98a9;
-                        font-size: 12px;
-                    }
-                }
+    function move-to(target: int) {
+        let count = root.list-length();
+        if (count == 0) {
+            return;
+        }
+        root.set-current(Math.max(0, Math.min(count - 1, target)));
+    }
 
-                Button {
-                    text: "Atualizar";
-                    clicked => { root.refresh(); }
-                }
+    function move(delta: int) {
+        let current = root.list-current();
+        if (current < 0) {
+            root.move-to(delta > 0 ? 0 : root.list-length() - 1);
+        } else {
+            root.move-to(current + delta);
+        }
+    }
+
+    function activate() {
+        if (Store.page == 1 && !Store.channel-open && Store.channel-current >= 0) {
+            Bridge.open-channel(Store.channel-current);
+        }
+    }
+
+    function clear-selection() {
+        if (Store.page == 1 && Store.channel-open) {
+            Store.channel-open = false;
+            Store.video-current = -1;
+        } else {
+            Store.upcoming-current = -1;
+            Store.channel-current = -1;
+            Store.short-current = -1;
+            Store.x-current = -1;
+            Store.contact-current = -1;
+            Store.session-current = -1;
+            Store.source-current = -1;
+        }
+        if (Store.search-text != "") {
+            Store.search-text = "";
+            Bridge.search-changed("");
+        }
+        keys.focus();
+    }
+
+    keys := FocusScope {
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+
+        KeyBinding {
+            keys: @keys(Control + "r");
+            activated => {
+                Bridge.refresh();
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "k");
+            activated => {
+                search.focus();
+                search.select-all();
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "1");
+            activated => {
+                root.go(0);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "2");
+            activated => {
+                root.go(1);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "3");
+            activated => {
+                root.go(2);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "4");
+            activated => {
+                root.go(3);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "5");
+            activated => {
+                root.go(4);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "6");
+            activated => {
+                root.go(5);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "7");
+            activated => {
+                root.go(6);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Escape);
+            activated => {
+                root.clear-selection();
+            }
+        }
+        KeyBinding {
+            keys: @keys(DownArrow);
+            activated => {
+                root.move(1);
+            }
+        }
+        KeyBinding {
+            keys: @keys(UpArrow);
+            activated => {
+                root.move(-1);
+            }
+        }
+        KeyBinding {
+            keys: @keys(RightArrow);
+            activated => {
+                root.move(1);
+            }
+        }
+        KeyBinding {
+            keys: @keys(LeftArrow);
+            activated => {
+                root.move(-1);
+            }
+        }
+        KeyBinding {
+            keys: @keys(PageDown);
+            activated => {
+                root.move(10);
+            }
+        }
+        KeyBinding {
+            keys: @keys(PageUp);
+            activated => {
+                root.move(-10);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Home);
+            activated => {
+                root.move-to(0);
+            }
+        }
+        KeyBinding {
+            keys: @keys(End);
+            activated => {
+                root.move-to(root.list-length() - 1);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Return);
+            activated => {
+                root.activate();
             }
         }
 
         HorizontalLayout {
-            spacing: 0px;
+            spacing: 0;
 
+            // Sidebar
             Rectangle {
-                width: 210px;
-                background: #121722;
+                width: 232px;
+                background: Theme.sidebar;
+
+                Rectangle {
+                    x: parent.width - 1px;
+                    width: 1px;
+                    background: Theme.border;
+                }
 
                 VerticalLayout {
-                    padding: 14px;
-                    spacing: 6px;
+                    padding: Theme.space-4;
+                    spacing: Theme.space-1;
 
-                    Text {
-                        text: "REDES";
-                        color: #6f7c8d;
-                        font-size: 11px;
-                        font-weight: 700;
-                    }
-
-                    FilterItem {
-                        label: "Todas";
-                        active: root.active-filter == "all";
-                        picked => { root.filter-changed("all"); }
-                    }
-                    FilterItem {
-                        label: "YouTube";
-                        active: root.active-filter == "YouTube";
-                        picked => { root.filter-changed("YouTube"); }
-                    }
-                    FilterItem {
-                        label: "WhatsApp";
-                        active: root.active-filter == "WhatsApp";
-                        picked => { root.filter-changed("WhatsApp"); }
-                    }
-                    FilterItem {
-                        label: "Mercado Livre";
-                        active: root.active-filter == "Mercado Livre";
-                        picked => { root.filter-changed("Mercado Livre"); }
-                    }
-                    FilterItem {
-                        label: "X";
-                        active: root.active-filter == "X";
-                        picked => { root.filter-changed("X"); }
-                    }
-                    FilterItem {
-                        label: "Instagram";
-                        active: root.active-filter == "Instagram";
-                        picked => { root.filter-changed("Instagram"); }
-                    }
-                }
-            }
-
-            Rectangle {
-                background: #0f1216;
-
-                ScrollView {
-                    for row[i] in root.sessions : Rectangle {
-                        height: 56px;
-                        background: i == root.selected ? #1f6feb26 : #11161f;
-
-                        HorizontalLayout {
-                            padding-left: 18px;
-                            padding-right: 18px;
-                            spacing: 12px;
-
-                            VerticalLayout {
-                                alignment: center;
-                                spacing: 2px;
-
-                                Text {
-                                    text: row.label;
-                                    color: #e8eef6;
-                                    font-size: 14px;
-                                    font-weight: 600;
-                                    overflow: elide;
-                                }
-
-                                Text {
-                                    text: row.network + "  ·  " + row.channel;
-                                    color: #7d8a9b;
-                                    font-size: 11px;
-                                    overflow: elide;
-                                }
-                            }
-
-                            Text {
-                                text: row.status;
-                                color: row.status == "logged-in" || row.status == "configurado" ? #4cc38a : #e0b341;
-                                font-size: 12px;
-                                horizontal-alignment: right;
-                                vertical-alignment: center;
-                                width: 140px;
-                            }
-                        }
-
-                        TouchArea {
-                            clicked => { root.selected = i; }
-                        }
-                    }
-                }
-            }
-
-            Rectangle {
-                width: 320px;
-                background: #121722;
-
-                VerticalLayout {
-                    padding: 18px;
-                    spacing: 12px;
-
-                    Text {
-                        text: "DETALHES";
-                        color: #6f7c8d;
-                        font-size: 11px;
-                        font-weight: 700;
-                    }
-
-                    if root.selected >= 0 && root.selected < root.sessions.length : VerticalLayout {
-                        spacing: 8px;
-
+                    VerticalLayout {
+                        padding-left: Theme.space-3;
+                        padding-bottom: Theme.space-4;
                         Text {
-                            text: root.sessions[root.selected].label;
-                            color: #eef2f7;
-                            font-size: 18px;
+                            text: "YoutubeBot";
+                            font-family: Theme.font;
+                            font-size: Theme.text-lg;
                             font-weight: 700;
-                            wrap: word-wrap;
+                            color: Theme.text;
                         }
-
-                        Text {
-                            text: root.sessions[root.selected].network;
-                            color: #8b98a9;
-                            font-size: 13px;
-                        }
-
-                        Rectangle {
-                            height: 1px;
-                            background: #1d2530;
-                        }
-
-                        Text {
-                            text: "Canal: " + (root.sessions[root.selected].channel == "" ? "não vinculado" : root.sessions[root.selected].channel);
-                            color: #c8d3e0;
-                            font-size: 12px;
-                            wrap: word-wrap;
-                        }
-
-                        Text {
-                            text: "Status: " + root.sessions[root.selected].status;
-                            color: #c8d3e0;
-                            font-size: 12px;
-                        }
-
-                        Text {
-                            text: root.sessions[root.selected].detail;
-                            color: #7d8a9b;
-                            font-size: 12px;
-                            wrap: word-wrap;
-                        }
-
-                        Rectangle {
-                            height: 1px;
-                            background: #1d2530;
-                        }
-
-                        Button {
-                            text: "Abrir janela";
-                            enabled: root.sessions[root.selected].actionable;
-                            clicked => { root.open-selected(root.selected); }
-                        }
-
-                        Button {
-                            text: "Parar navegador";
-                            enabled: root.sessions[root.selected].actionable;
-                            clicked => { root.stop-selected(root.selected); }
+                        Caption {
+                            text: "Manager · somente leitura";
                         }
                     }
 
-                    if root.selected < 0 : Text {
-                        text: "Selecione uma sessão para ver os detalhes.";
-                        color: #6f7c8d;
-                        font-size: 12px;
-                        wrap: word-wrap;
+                    for title[index] in root.titles: NavItem {
+                        text: title;
+                        shortcut: "Ctrl+" + (index + 1);
+                        active: Store.page == index;
+                        clicked => {
+                            root.go(index);
+                        }
+                    }
+
+                    Rectangle {
+                        vertical-stretch: 1;
+                    }
+
+                    Btn {
+                        text: Theme.dark ? "Usar tema claro" : "Usar tema escuro";
+                        kind: "ghost";
+                        clicked => {
+                            Bridge.theme-picked(!Theme.dark);
+                        }
                     }
                 }
             }
-        }
 
-        Rectangle {
-            height: 34px;
-            background: #151a21;
+            // Main column
+            VerticalLayout {
+                spacing: 0;
 
-            Text {
-                text: root.status-text;
-                color: #8b98a9;
-                font-size: 12px;
-                vertical-alignment: center;
-                x: 20px;
+                Rectangle {
+                    height: 76px;
+
+                    HorizontalLayout {
+                        padding-left: Theme.space-8;
+                        padding-right: Theme.space-8;
+                        spacing: Theme.space-4;
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: Theme.space-1;
+                            Caption {
+                                text: "YoutubeBot  /  " + root.titles[Store.page] + (Store.page == 1 && Store.channel-open ? "  /  " + Store.channel-detail.name : "");
+                                accessible-label: "Caminho: " + self.text;
+                            }
+                            Text {
+                                text: Store.page == 1 && Store.channel-open ? Store.channel-detail.name : root.titles[Store.page];
+                                font-family: Theme.font;
+                                font-size: Theme.text-xl;
+                                font-weight: 700;
+                                color: Theme.text;
+                                accessible-role: AccessibleRole.text;
+                            }
+                        }
+
+                        Rectangle {
+                            horizontal-stretch: 1;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            search := LineEdit {
+                                width: 300px;
+                                placeholder-text: "Buscar nesta página (Ctrl+K)";
+                                text <=> Store.search-text;
+                                accessible-label: "Buscar nesta página";
+                                edited(text) => {
+                                    Bridge.search-changed(text);
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Btn {
+                                text: Store.loading ? "Atualizando…" : "Atualizar";
+                                description: "Ctrl+R";
+                                enabled: !Store.loading;
+                                clicked => {
+                                    Bridge.refresh();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if Store.login-banner != "": Rectangle {
+                    height: 44px;
+                    background: Theme.surface;
+
+                    Rectangle {
+                        y: parent.height - 1px;
+                        height: 1px;
+                        background: Theme.border;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: Theme.space-8;
+                        padding-right: Theme.space-8;
+                        spacing: Theme.space-3;
+                        Badge {
+                            text: "Login necessário";
+                            tone: 2;
+                        }
+                        Body {
+                            text: Store.login-banner;
+                            overflow: elide;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    vertical-stretch: 1;
+
+                    VerticalLayout {
+                        padding-left: Theme.space-8;
+                        padding-right: Theme.space-8;
+                        padding-top: Theme.space-2;
+                        padding-bottom: Theme.space-6;
+
+                        if Store.root-notice.kind != 0 && Store.page != 6: NoticeView {
+                            notice: Store.root-notice;
+                            action-text: "Abrir configurações";
+                            action => {
+                                root.go(6);
+                            }
+                        }
+
+                        if Store.root-notice.kind == 0 && Store.page == 0: OverviewPage { }
+                        if Store.root-notice.kind == 0 && Store.page == 1: ChannelsPage { }
+                        if Store.root-notice.kind == 0 && Store.page == 2: ShortsPage { }
+                        if Store.root-notice.kind == 0 && Store.page == 3: SocialPage { }
+                        if Store.root-notice.kind == 0 && Store.page == 4: CommercialPage { }
+                        if Store.root-notice.kind == 0 && Store.page == 5: SessionsPage { }
+                        if Store.page == 6: SettingsPage { }
+                    }
+                }
+
+                Rectangle {
+                    height: 32px;
+                    background: Theme.sidebar;
+
+                    Rectangle {
+                        height: 1px;
+                        y: 0;
+                        background: Theme.border;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: Theme.space-8;
+                        padding-right: Theme.space-8;
+                        spacing: Theme.space-4;
+                        Caption {
+                            text: Store.status-text;
+                            color: Theme.text-muted;
+                            overflow: elide;
+                            accessible-label: "Status: " + self.text;
+                        }
+                        Caption {
+                            horizontal-stretch: 0;
+                            text: Store.loading ? "Atualizando…" : Store.updated-text;
+                        }
+                    }
+                }
             }
         }
     }

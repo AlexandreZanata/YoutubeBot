@@ -1,0 +1,1294 @@
+// The seven pages. They only lay out what `Store` holds and call `Bridge`.
+
+import { LineEdit, ComboBox } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Store, Bridge, Notice, ChannelCard } from "store.slint";
+import {
+    Btn, Segmented, Badge, Card, SectionTitle, Caption, Body, Skeleton, KpiCard, NoticeView,
+    FactLine, RowList, RowFrame,
+} from "controls.slint";
+
+component ColumnHead inherits Text {
+    font-family: Theme.font;
+    font-size: Theme.text-xs;
+    font-weight: 600;
+    color: Theme.text-subtle;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+component Cell inherits Text {
+    font-family: Theme.font;
+    font-size: Theme.text-sm;
+    color: Theme.text;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+component SkeletonRows inherits VerticalLayout {
+    in property <int> rows: 5;
+    padding: Theme.space-4;
+    spacing: Theme.space-3;
+    for index in self.rows: Skeleton {
+        height: 20px;
+    }
+}
+
+// A list panel: title, then its rows. Loading and state notices cover the rows, so the
+// content stays mounted (Slint cannot place @children inside a conditional).
+component Panel inherits Card {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <Notice> notice;
+    in property <bool> loading;
+    in property <string> action-text;
+    callback action();
+
+    property <length> header-height: 48px;
+    min-height: 220px;
+
+    VerticalLayout {
+        HorizontalLayout {
+            height: root.header-height;
+            padding-left: Theme.space-4;
+            padding-right: Theme.space-4;
+            spacing: Theme.space-3;
+            SectionTitle {
+                text: root.title;
+            }
+            Caption {
+                text: root.subtitle;
+                horizontal-alignment: right;
+                overflow: elide;
+            }
+        }
+
+        VerticalLayout {
+            vertical-stretch: 1;
+            @children
+        }
+    }
+
+    if root.loading || root.notice.kind != 0: Rectangle {
+        y: root.header-height;
+        height: root.height - root.header-height - 1px;
+        x: 1px;
+        width: root.width - 2px;
+        background: Theme.surface;
+        border-radius: Theme.radius-md;
+
+        TouchArea { }
+
+        if root.loading: SkeletonRows {
+            width: parent.width;
+            height: parent.height;
+            alignment: start;
+        }
+        if !root.loading: NoticeView {
+            width: parent.width;
+            height: parent.height;
+            notice: root.notice;
+            action-text: root.notice.kind == 3 ? root.action-text : "";
+            action => {
+                root.action();
+            }
+        }
+    }
+}
+
+export component OverviewPage inherits VerticalLayout {
+    spacing: Theme.space-4;
+
+    HorizontalLayout {
+        spacing: Theme.space-3;
+        alignment: start;
+
+        Segmented {
+            label: "Período";
+            options: ["Este mês", "Últimos 30 dias", "Personalizado"];
+            current: Store.period-index;
+            picked(index) => {
+                Bridge.period-picked(index);
+            }
+        }
+
+        if Store.period-index == 2: HorizontalLayout {
+            spacing: Theme.space-2;
+            start := LineEdit {
+                width: 132px;
+                placeholder-text: "Início DD/MM/AAAA";
+                text <=> Store.custom-start;
+                accessible-label: "Data inicial";
+                accepted => {
+                    Bridge.apply-custom-period(start.text, end.text);
+                }
+            }
+            end := LineEdit {
+                width: 132px;
+                placeholder-text: "Fim DD/MM/AAAA";
+                text <=> Store.custom-end;
+                accessible-label: "Data final";
+                accepted => {
+                    Bridge.apply-custom-period(start.text, end.text);
+                }
+            }
+            Btn {
+                text: "Aplicar";
+                kind: "primary";
+                clicked => {
+                    Bridge.apply-custom-period(start.text, end.text);
+                }
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
+        ComboBox {
+            width: 220px;
+            model: Store.channel-options;
+            current-index <=> Store.channel-index;
+            accessible-label: "Filtrar por canal";
+            selected => {
+                Bridge.channel-filter-picked(self.current-index);
+            }
+        }
+    }
+
+    HorizontalLayout {
+        spacing: Theme.space-2;
+        Caption {
+            text: "Período: " + Store.period-label + " · horários em America/Cuiaba";
+        }
+        if Store.period-error != "": Text {
+            text: Store.period-error;
+            font-family: Theme.font;
+            font-size: Theme.text-xs;
+            font-weight: 600;
+            color: Theme.danger;
+            vertical-alignment: center;
+        }
+    }
+
+    HorizontalLayout {
+        vertical-stretch: 0;
+        spacing: Theme.space-3;
+        for index in 3: KpiCard {
+            label: Store.kpis[index].label;
+            value: Store.kpis[index].value;
+            caption: Store.kpis[index].caption;
+            available: Store.kpis[index].available;
+            loading: Store.loading && !Store.has-data;
+        }
+    }
+
+    HorizontalLayout {
+        vertical-stretch: 0;
+        spacing: Theme.space-3;
+        for index in 3: KpiCard {
+            label: Store.kpis[index + 3].label;
+            value: Store.kpis[index + 3].value;
+            caption: Store.kpis[index + 3].caption;
+            available: Store.kpis[index + 3].available;
+            loading: Store.loading && !Store.has-data;
+        }
+    }
+
+    Panel {
+        vertical-stretch: 1;
+        min-height: 200px;
+        title: "Próximos agendamentos";
+        subtitle: Store.upcoming-summary;
+        notice: Store.upcoming-notice;
+        loading: Store.loading && !Store.has-data;
+
+        HorizontalLayout {
+            padding-left: Theme.space-4;
+            padding-right: Theme.space-4;
+            height: 28px;
+            spacing: Theme.space-3;
+            ColumnHead {
+                text: "Data e hora";
+                width: 130px;
+            }
+            ColumnHead {
+                text: "Quando";
+                width: 110px;
+            }
+            ColumnHead {
+                text: "Canal";
+                width: 170px;
+            }
+            ColumnHead {
+                text: "Título";
+            }
+            ColumnHead {
+                text: "Tipo";
+                width: 60px;
+            }
+        }
+
+        RowList {
+            vertical-stretch: 1;
+            label: "Próximos agendamentos";
+            count: Store.upcoming.length;
+            current: Store.upcoming-current;
+            row-height: 40px;
+
+            for row[index] in Store.upcoming: RowFrame {
+                height: 40px;
+                selected: index == Store.upcoming-current;
+                label: row.when + ", " + row.channel + ", " + row.title;
+                clicked => {
+                    Store.upcoming-current = index;
+                }
+                HorizontalLayout {
+                    padding-left: Theme.space-4;
+                    padding-right: Theme.space-4;
+                    spacing: Theme.space-3;
+                    Cell {
+                        text: row.when;
+                        width: 130px;
+                        font-weight: 600;
+                    }
+                    Cell {
+                        text: row.relative;
+                        width: 110px;
+                        color: Theme.text-muted;
+                    }
+                    Cell {
+                        text: row.channel;
+                        width: 170px;
+                        color: Theme.text-muted;
+                    }
+                    Cell {
+                        text: row.title;
+                    }
+                    Cell {
+                        text: row.kind;
+                        width: 60px;
+                        color: Theme.text-subtle;
+                    }
+                }
+            }
+        }
+    }
+}
+
+component ChannelTile inherits Card {
+    in property <ChannelCard> card;
+    in property <bool> selected;
+    callback clicked();
+
+    border-width: self.selected ? 2px : 1px;
+    border-color: self.selected ? Theme.text : Theme.border;
+    accessible-role: AccessibleRole.list-item;
+    accessible-label: self.card.name + ", " + self.card.binding + ", " + self.card.published + " publicados, " + self.card.scheduled + " agendados";
+    accessible-item-selected: self.selected;
+    accessible-action-default => {
+        self.clicked();
+    }
+
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    VerticalLayout {
+        padding: Theme.space-4;
+        spacing: Theme.space-2;
+        alignment: start;
+
+        Text {
+            text: root.card.name;
+            font-family: Theme.font;
+            font-size: Theme.text-md;
+            font-weight: 600;
+            color: Theme.text;
+            overflow: elide;
+        }
+        HorizontalLayout {
+            spacing: Theme.space-2;
+            Caption {
+                text: root.card.handle;
+                overflow: elide;
+            }
+            Badge {
+                text: root.card.binding;
+                tone: root.card.binding-tone;
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: Theme.border;
+        }
+
+        if !root.card.available: Text {
+            text: "Sem registro de vídeos neste computador.";
+            font-family: Theme.font;
+            font-size: Theme.text-sm;
+            color: Theme.warning;
+            wrap: word-wrap;
+        }
+
+        if root.card.available: HorizontalLayout {
+            spacing: Theme.space-4;
+            for metric[index] in [
+                { label: "publicados", value: root.card.published },
+                { label: "agendados", value: root.card.scheduled },
+                { label: "rascunhos", value: root.card.drafts },
+            ]: VerticalLayout {
+                Text {
+                    text: metric.value;
+                    font-family: Theme.font;
+                    font-size: Theme.text-lg;
+                    font-weight: 700;
+                    color: Theme.text;
+                }
+                Caption {
+                    text: metric.label;
+                }
+            }
+        }
+
+        if root.card.available: VerticalLayout {
+            spacing: Theme.space-1;
+            Body {
+                text: "Último: " + root.card.last-when + (root.card.last-title != "" ? " · " + root.card.last-title : "");
+                font-size: Theme.text-xs;
+                color: Theme.text-muted;
+                overflow: elide;
+            }
+            Body {
+                text: "Próximo: " + root.card.next-when + (root.card.next-title != "" ? " · " + root.card.next-title : "");
+                font-size: Theme.text-xs;
+                color: Theme.text-muted;
+                overflow: elide;
+            }
+        }
+
+        Body {
+            text: root.card.community;
+            font-size: Theme.text-xs;
+            color: root.card.community-tone == 2 ? Theme.warning : Theme.text-subtle;
+            overflow: elide;
+        }
+    }
+}
+
+export component ChannelsPage inherits VerticalLayout {
+    property <int> columns: self.width >= 900px ? 3 : 2;
+    property <length> gap: Theme.space-3;
+    property <length> tile-width: (self.width - (self.columns - 1) * self.gap) / self.columns;
+    property <length> tile-height: 214px;
+
+    spacing: Theme.space-4;
+
+    if !Store.channel-open && Store.loading && !Store.has-data: SkeletonRows {
+        rows: 8;
+    }
+
+    if !Store.channel-open && Store.has-data && Store.channels-notice.kind != 0: NoticeView {
+        notice: Store.channels-notice;
+    }
+
+    if !Store.channel-open && Store.has-data && Store.channels-notice.kind == 0: VerticalLayout {
+        spacing: Theme.space-2;
+        Caption {
+            text: "Período: " + Store.period-label + " · Enter abre o canal selecionado";
+        }
+        grid := Flickable {
+            vertical-stretch: 1;
+            content-height: Math.ceil(Store.channels.length / root.columns) * (root.tile-height + root.gap);
+
+            changed height => {
+                self.content-y = 0;
+            }
+
+            for card[index] in Store.channels: ChannelTile {
+                x: Math.mod(index, root.columns) * (root.tile-width + root.gap);
+                y: Math.floor(index / root.columns) * (root.tile-height + root.gap);
+                width: root.tile-width;
+                height: root.tile-height;
+                card: card;
+                selected: index == Store.channel-current;
+                clicked => {
+                    Store.channel-current = index;
+                    Bridge.open-channel(index);
+                }
+            }
+        }
+    }
+
+    if Store.channel-open: VerticalLayout {
+        spacing: Theme.space-4;
+
+        HorizontalLayout {
+            spacing: Theme.space-3;
+            Btn {
+                text: "← Voltar";
+                kind: "ghost";
+                description: "Esc";
+                clicked => {
+                    Store.channel-open = false;
+                    Store.video-current = -1;
+                }
+            }
+            VerticalLayout {
+                Text {
+                    text: Store.channel-detail.name;
+                    font-family: Theme.font;
+                    font-size: Theme.text-lg;
+                    font-weight: 600;
+                    color: Theme.text;
+                }
+                Caption {
+                    text: Store.channel-detail.handle + " · " + Store.period-label;
+                }
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+            Badge {
+                text: Store.channel-detail.binding;
+                tone: Store.channel-detail.binding-tone;
+            }
+        }
+
+        HorizontalLayout {
+            vertical-stretch: 0;
+            spacing: Theme.space-3;
+            KpiCard {
+                label: "Publicados no período";
+                value: Store.channel-detail.published;
+                caption: "Último: " + Store.channel-detail.last-when;
+                available: Store.channel-detail.available;
+            }
+            KpiCard {
+                label: "Agendados no período";
+                value: Store.channel-detail.scheduled;
+                caption: "Próximo: " + Store.channel-detail.next-when;
+                available: Store.channel-detail.available;
+            }
+            KpiCard {
+                label: "Rascunhos";
+                value: Store.channel-detail.drafts;
+                caption: "Upload sem agendamento confirmado";
+                available: Store.channel-detail.available;
+            }
+        }
+
+        Panel {
+            vertical-stretch: 1;
+            title: "Vídeos";
+            subtitle: Store.videos.length > 0 ? Store.videos.length + " no período" : "";
+            notice: Store.videos-notice;
+
+            HorizontalLayout {
+                padding-left: Theme.space-4;
+                padding-right: Theme.space-4;
+                height: 28px;
+                spacing: Theme.space-3;
+                ColumnHead {
+                    text: "Título";
+                }
+                ColumnHead {
+                    text: "Slot";
+                    width: 130px;
+                }
+                ColumnHead {
+                    text: "Estado";
+                    width: 96px;
+                }
+                ColumnHead {
+                    text: "Link";
+                    width: 200px;
+                }
+            }
+
+            RowList {
+                vertical-stretch: 1;
+                label: "Vídeos do canal";
+                count: Store.videos.length;
+                current: Store.video-current;
+                row-height: 40px;
+                for row[index] in Store.videos: RowFrame {
+                    height: 40px;
+                    selected: index == Store.video-current;
+                    label: row.title + ", " + row.when + ", " + row.state;
+                    clicked => {
+                        Store.video-current = index;
+                    }
+                    HorizontalLayout {
+                        padding-left: Theme.space-4;
+                        padding-right: Theme.space-4;
+                        spacing: Theme.space-3;
+                        Cell {
+                            text: row.title;
+                        }
+                        Cell {
+                            text: row.when;
+                            width: 130px;
+                            color: Theme.text-muted;
+                        }
+                        Rectangle {
+                            width: 96px;
+                            Badge {
+                                x: 0;
+                                text: row.state;
+                                tone: row.state-kind == 0 ? 1 : row.state-kind == 1 ? 4 : 2;
+                            }
+                        }
+                        Cell {
+                            text: row.link;
+                            width: 200px;
+                            color: Theme.accent;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component ShortsPage inherits VerticalLayout {
+    spacing: Theme.space-4;
+
+    Caption {
+        text: Store.shorts-summary;
+    }
+
+    Panel {
+        vertical-stretch: 1;
+        title: "Shorts do Zaflas";
+        subtitle: Store.shorts.length > 0 ? Store.shorts.length + " registrados · ↑ ↓ para navegar" : "";
+        notice: Store.shorts-notice;
+        loading: Store.loading && !Store.has-data;
+
+        RowList {
+            vertical-stretch: 1;
+            label: "Shorts";
+            count: Store.shorts.length;
+            current: Store.short-current;
+            row-height: 112px;
+            for row[index] in Store.shorts: RowFrame {
+                height: 112px;
+                selected: index == Store.short-current;
+                label: row.title + ", " + row.when + ", " + row.state;
+                clicked => {
+                    Store.short-current = index;
+                }
+                HorizontalLayout {
+                    padding-left: Theme.space-4;
+                    padding-right: Theme.space-4;
+                    padding-top: Theme.space-2;
+                    padding-bottom: Theme.space-2;
+                    spacing: Theme.space-4;
+
+                    Rectangle {
+                        width: 54px;
+                        height: 96px;
+                        border-radius: Theme.radius-sm;
+                        background: Theme.surface-alt;
+                        clip: true;
+                        if row.has-thumb: Image {
+                            width: parent.width;
+                            height: parent.height;
+                            source: row.thumb;
+                            image-fit: cover;
+                            accessible-role: AccessibleRole.image;
+                            accessible-label: "Thumbnail de " + row.title;
+                        }
+                        if !row.has-thumb: Text {
+                            text: "sem\nthumb";
+                            font-family: Theme.font;
+                            font-size: Theme.text-xs;
+                            color: Theme.text-subtle;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: Theme.space-1;
+                        Text {
+                            text: row.title;
+                            font-family: Theme.font;
+                            font-size: Theme.text-md;
+                            font-weight: 600;
+                            color: Theme.text;
+                            overflow: elide;
+                        }
+                        Body {
+                            text: row.when;
+                            color: Theme.text-muted;
+                        }
+                        Caption {
+                            text: row.link;
+                            color: Theme.accent;
+                        }
+                    }
+
+                    VerticalLayout {
+                        width: 120px;
+                        alignment: center;
+                        Badge {
+                            text: row.state;
+                            tone: row.state-kind == 0 ? 1 : row.state-kind == 1 ? 4 : 2;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component SocialPage inherits VerticalLayout {
+    spacing: Theme.space-4;
+
+    HorizontalLayout {
+        vertical-stretch: 0;
+        spacing: Theme.space-3;
+        for index in 3: KpiCard {
+            label: Store.x-kpis[index].label;
+            value: Store.x-kpis[index].value;
+            caption: Store.x-kpis[index].caption;
+            available: Store.x-kpis[index].available;
+            loading: Store.loading && !Store.has-data;
+        }
+    }
+
+    HorizontalLayout {
+        vertical-stretch: 1;
+        spacing: Theme.space-3;
+
+        VerticalLayout {
+            width: 300px;
+            alignment: start;
+            Card {
+                VerticalLayout {
+                    padding: Theme.space-4;
+                    spacing: Theme.space-2;
+                    alignment: start;
+                    SectionTitle {
+                        text: "Conta no X";
+                    }
+                    if Store.loading && !Store.has-data: SkeletonRows {
+                        rows: 3;
+                    }
+                    for fact in Store.x-facts: FactLine {
+                        label: fact.label;
+                        value: fact.value;
+                        tone: fact.tone;
+                    }
+                }
+            }
+        }
+
+        Panel {
+            vertical-stretch: 1;
+            title: "Posts no período";
+            subtitle: Store.period-label;
+            notice: Store.x-notice;
+            loading: Store.loading && !Store.has-data;
+            action-text: "Tentar novamente";
+            action => {
+                Bridge.refresh();
+            }
+
+            HorizontalLayout {
+                padding-left: Theme.space-4;
+                padding-right: Theme.space-4;
+                height: 28px;
+                spacing: Theme.space-3;
+                ColumnHead {
+                    text: "Data";
+                    width: 130px;
+                }
+                ColumnHead {
+                    text: "Texto";
+                }
+                ColumnHead {
+                    text: "Estado";
+                    width: 96px;
+                }
+            }
+
+            RowList {
+                vertical-stretch: 1;
+                label: "Posts no X";
+                count: Store.x-posts.length;
+                current: Store.x-current;
+                row-height: 52px;
+                for row[index] in Store.x-posts: RowFrame {
+                    height: 52px;
+                    selected: index == Store.x-current;
+                    label: row.when + ", " + row.text + ", " + row.state;
+                    clicked => {
+                        Store.x-current = index;
+                    }
+                    HorizontalLayout {
+                        padding-left: Theme.space-4;
+                        padding-right: Theme.space-4;
+                        spacing: Theme.space-3;
+                        Cell {
+                            text: row.when;
+                            width: 130px;
+                            color: Theme.text-muted;
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            Cell {
+                                text: row.text;
+                            }
+                            Caption {
+                                text: row.link;
+                                color: Theme.accent;
+                            }
+                        }
+                        Rectangle {
+                            width: 96px;
+                            Badge {
+                                x: 0;
+                                text: row.state;
+                                tone: row.state-kind;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component CommercialPage inherits HorizontalLayout {
+    spacing: Theme.space-4;
+
+    VerticalLayout {
+        spacing: Theme.space-3;
+
+        Card {
+            VerticalLayout {
+                padding: Theme.space-4;
+                spacing: Theme.space-2;
+                alignment: start;
+                SectionTitle {
+                    text: "WhatsApp Web";
+                }
+                if Store.loading && !Store.has-data: SkeletonRows {
+                    rows: 3;
+                }
+                for fact in Store.wa-facts: FactLine {
+                    label: fact.label;
+                    value: fact.value;
+                    tone: fact.tone;
+                }
+                FactLine {
+                    label: "Regras";
+                    value: Store.wa-rules-label;
+                }
+                for contact in Store.wa-rules: Body {
+                    text: "· " + contact;
+                    color: Theme.text-muted;
+                    overflow: elide;
+                }
+            }
+        }
+
+        Panel {
+            vertical-stretch: 1;
+            title: "Últimas mensagens por contato";
+            subtitle: Store.period-label;
+            notice: Store.wa-notice;
+            loading: Store.loading && !Store.has-data;
+            action-text: "Tentar novamente";
+            action => {
+                Bridge.refresh();
+            }
+
+            RowList {
+                vertical-stretch: 1;
+                label: "Mensagens recebidas por contato";
+                count: Store.wa-contacts.length;
+                current: Store.contact-current;
+                row-height: 64px;
+                for row[index] in Store.wa-contacts: RowFrame {
+                    height: 64px;
+                    selected: index == Store.contact-current;
+                    label: row.contact + ", " + row.count + ", " + row.text;
+                    clicked => {
+                        Store.contact-current = index;
+                    }
+                    VerticalLayout {
+                        padding-left: Theme.space-4;
+                        padding-right: Theme.space-4;
+                        alignment: center;
+                        spacing: Theme.space-1;
+                        HorizontalLayout {
+                            spacing: Theme.space-3;
+                            Cell {
+                                text: row.contact;
+                                font-weight: 600;
+                            }
+                            Caption {
+                                horizontal-stretch: 0;
+                                text: row.when + " · " + row.count;
+                            }
+                        }
+                        HorizontalLayout {
+                            spacing: Theme.space-3;
+                            Body {
+                                text: row.text;
+                                color: Theme.text-muted;
+                                overflow: elide;
+                            }
+                            Badge {
+                                text: row.allowed ? "permitido" : "fora da regra";
+                                tone: row.allowed ? 1 : 0;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    VerticalLayout {
+        spacing: Theme.space-3;
+
+        Card {
+            VerticalLayout {
+                padding: Theme.space-4;
+                spacing: Theme.space-2;
+                alignment: start;
+                SectionTitle {
+                    text: "Mercado Livre";
+                }
+                if Store.loading && !Store.has-data: SkeletonRows {
+                    rows: 3;
+                }
+                for fact in Store.ml-facts: FactLine {
+                    label: fact.label;
+                    value: fact.value;
+                    tone: fact.tone;
+                }
+            }
+        }
+
+        Panel {
+            vertical-stretch: 1;
+            title: "Últimos produtos capturados";
+            notice: Store.ml-notice;
+            loading: Store.loading && !Store.has-data;
+            action-text: "Tentar novamente";
+            action => {
+                Bridge.refresh();
+            }
+
+            RowList {
+                vertical-stretch: 1;
+                label: "Produtos capturados";
+                count: Store.products.length;
+                current: -1;
+                row-height: 56px;
+                for row[index] in Store.products: RowFrame {
+                    height: 56px;
+                    label: row.title + ", " + row.price;
+                    VerticalLayout {
+                        padding-left: Theme.space-4;
+                        padding-right: Theme.space-4;
+                        alignment: center;
+                        spacing: Theme.space-1;
+                        HorizontalLayout {
+                            spacing: Theme.space-3;
+                            Cell {
+                                text: row.title;
+                                font-weight: 600;
+                            }
+                            Cell {
+                                width: 104px;
+                                text: row.price;
+                                font-weight: 600;
+                                horizontal-alignment: right;
+                            }
+                        }
+                        Caption {
+                            text: row.brand + (row.commission != "" ? " · comissão " + row.commission : "");
+                            overflow: elide;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component SessionsPage inherits HorizontalLayout {
+    spacing: Theme.space-4;
+
+    Panel {
+        horizontal-stretch: 1;
+        title: "Sessões";
+        subtitle: "Atualiza a cada 5 s · ↑ ↓ para navegar";
+        notice: Store.sessions-notice;
+        loading: Store.loading && !Store.has-data;
+
+        RowList {
+            vertical-stretch: 1;
+            label: "Sessões";
+            count: Store.sessions.length;
+            current: Store.session-current;
+            row-height: 56px;
+            for row[index] in Store.sessions: RowFrame {
+                height: 56px;
+                selected: index == Store.session-current;
+                label: row.label + ", " + row.network + ", " + row.status + ", " + row.activity;
+                clicked => {
+                    Store.session-current = index;
+                }
+                HorizontalLayout {
+                    padding-left: Theme.space-4;
+                    padding-right: Theme.space-4;
+                    spacing: Theme.space-3;
+                    VerticalLayout {
+                        alignment: center;
+                        Cell {
+                            text: row.label;
+                            font-weight: 600;
+                        }
+                        Caption {
+                            text: row.network + (row.channel != "" ? " · " + row.channel : "");
+                            overflow: elide;
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        width: 150px;
+                        Badge {
+                            text: row.status;
+                            tone: row.status-tone;
+                        }
+                        Caption {
+                            text: row.activity;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Card {
+        width: 340px;
+        VerticalLayout {
+            padding: Theme.space-4;
+            spacing: Theme.space-3;
+            alignment: start;
+
+            SectionTitle {
+                text: "Detalhes";
+            }
+
+            if Store.session-current < 0 || Store.session-current >= Store.sessions.length: Body {
+                text: "Selecione uma sessão com o mouse ou com ↑ ↓.";
+                color: Theme.text-subtle;
+                wrap: word-wrap;
+            }
+
+            if Store.session-current >= 0 && Store.session-current < Store.sessions.length: VerticalLayout {
+                spacing: Theme.space-2;
+                Text {
+                    text: Store.sessions[Store.session-current].label;
+                    font-family: Theme.font;
+                    font-size: Theme.text-lg;
+                    font-weight: 600;
+                    color: Theme.text;
+                    wrap: word-wrap;
+                }
+                FactLine {
+                    label: "Rede";
+                    value: Store.sessions[Store.session-current].network;
+                }
+                FactLine {
+                    label: "Canal / conta";
+                    value: Store.sessions[Store.session-current].channel == "" ? "não vinculado" : Store.sessions[Store.session-current].channel;
+                }
+                FactLine {
+                    label: "Estado";
+                    value: Store.sessions[Store.session-current].status;
+                    tone: Store.sessions[Store.session-current].status-tone;
+                }
+                FactLine {
+                    label: "Navegador";
+                    value: Store.sessions[Store.session-current].activity;
+                }
+                FactLine {
+                    label: "Detalhe";
+                    value: Store.sessions[Store.session-current].detail;
+                }
+                Rectangle {
+                    height: 1px;
+                    background: Theme.border;
+                }
+                if Store.sessions[Store.session-current].actionable: VerticalLayout {
+                    spacing: Theme.space-2;
+                    HorizontalLayout {
+                        spacing: Theme.space-2;
+                        Btn {
+                            text: "Abrir janela";
+                            kind: "primary";
+                            enabled: !Store.action-busy;
+                            description: "Abre a janela visível para login";
+                            clicked => {
+                                Bridge.open-session(Store.session-current);
+                            }
+                        }
+                        Btn {
+                            text: "Parar navegador";
+                            enabled: !Store.action-busy;
+                            clicked => {
+                                Bridge.stop-session(Store.session-current);
+                            }
+                        }
+                    }
+                    Caption {
+                        text: Store.sessions[Store.session-current].command;
+                        wrap: word-wrap;
+                    }
+                }
+                if !Store.sessions[Store.session-current].actionable: Body {
+                    text: "Canais do YouTube não têm ação de navegador aqui: o pipeline usa run, shorts e distribute.";
+                    color: Theme.text-subtle;
+                    font-size: Theme.text-xs;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+}
+
+export component SettingsPage inherits VerticalLayout {
+    spacing: Theme.space-4;
+
+    HorizontalLayout {
+        spacing: Theme.space-3;
+
+        Card {
+            horizontal-stretch: 1;
+            preferred-width: 1px;
+            VerticalLayout {
+                padding: Theme.space-4;
+                spacing: Theme.space-3;
+                alignment: start;
+                SectionTitle {
+                    text: "Aparência e atualização";
+                }
+                HorizontalLayout {
+                    spacing: Theme.space-3;
+                    Body {
+                        width: 132px;
+                        text: "Tema";
+                        color: Theme.text-subtle;
+                    }
+                    Segmented {
+                        label: "Tema";
+                        options: ["Claro", "Escuro"];
+                        current: Theme.dark ? 1 : 0;
+                        picked(index) => {
+                            Bridge.theme-picked(index == 1);
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: Theme.space-3;
+                    Body {
+                        width: 132px;
+                        text: "Atualizar a cada";
+                        color: Theme.text-subtle;
+                    }
+                    Segmented {
+                        label: "Intervalo de atualização";
+                        options: Store.refresh-options;
+                        current: Store.refresh-index;
+                        picked(index) => {
+                            Bridge.refresh-interval-picked(index);
+                        }
+                    }
+                }
+                Caption {
+                    text: "Preferências salvas em ~/.config/ytbot-manager/settings.json.";
+                }
+            }
+        }
+
+        Card {
+            horizontal-stretch: 1;
+            preferred-width: 1px;
+            VerticalLayout {
+                padding: Theme.space-4;
+                spacing: Theme.space-3;
+                alignment: start;
+                SectionTitle {
+                    text: "Raiz do projeto";
+                }
+                root-field := LineEdit {
+                    min-width: 0px;
+                    text <=> Store.root-input;
+                    placeholder-text: "/caminho/para/o/projeto";
+                    accessible-label: "Raiz do projeto";
+                    accepted => {
+                        Bridge.apply-root(self.text);
+                    }
+                }
+                HorizontalLayout {
+                    spacing: Theme.space-2;
+                    alignment: start;
+                    Btn {
+                        text: "Aplicar";
+                        kind: "primary";
+                        clicked => {
+                            Bridge.apply-root(root-field.text);
+                        }
+                    }
+                    Btn {
+                        text: "Usar padrão";
+                        clicked => {
+                            Bridge.reset-root();
+                        }
+                    }
+                }
+                Caption {
+                    min-width: 0px;
+                    text: Store.root-source;
+                    overflow: elide;
+                }
+                if Store.root-error != "": Text {
+                    min-width: 0px;
+                    text: Store.root-error;
+                    font-family: Theme.font;
+                    font-size: Theme.text-xs;
+                    font-weight: 600;
+                    color: Theme.danger;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+
+    HorizontalLayout {
+        vertical-stretch: 1;
+        spacing: Theme.space-3;
+
+        Panel {
+            horizontal-stretch: 1;
+            title: "Diagnóstico (somente leitura)";
+            subtitle: Store.sources.length + " fontes";
+
+            HorizontalLayout {
+                padding-left: Theme.space-4;
+                padding-right: Theme.space-4;
+                height: 28px;
+                spacing: Theme.space-3;
+                ColumnHead {
+                    text: "Fonte";
+                    width: 220px;
+                }
+                ColumnHead {
+                    text: "Caminho";
+                }
+                ColumnHead {
+                    text: "Estado";
+                    width: 120px;
+                }
+                ColumnHead {
+                    text: "Registros";
+                    width: 80px;
+                }
+            }
+
+            RowList {
+                vertical-stretch: 1;
+                label: "Fontes de dados";
+                count: Store.sources.length;
+                current: Store.source-current;
+                row-height: 36px;
+                for row[index] in Store.sources: RowFrame {
+                    height: 36px;
+                    selected: index == Store.source-current;
+                    label: row.label + ", " + row.state;
+                    clicked => {
+                        Store.source-current = index;
+                    }
+                    HorizontalLayout {
+                        padding-left: Theme.space-4;
+                        padding-right: Theme.space-4;
+                        spacing: Theme.space-3;
+                        Cell {
+                            text: row.label;
+                            width: 220px;
+                        }
+                        Cell {
+                            min-width: 0px;
+                            text: row.path;
+                            color: Theme.text-muted;
+                            font-size: Theme.text-xs;
+                        }
+                        Rectangle {
+                            width: 120px;
+                            Badge {
+                                x: 0;
+                                text: row.state;
+                                tone: row.state-kind == 0 ? 1 : row.state-kind == 1 ? 2 : 3;
+                            }
+                        }
+                        Cell {
+                            text: row.records;
+                            width: 80px;
+                            horizontal-alignment: right;
+                        }
+                    }
+                }
+            }
+        }
+
+        Card {
+            width: 340px;
+            VerticalLayout {
+                padding: Theme.space-4;
+                spacing: Theme.space-2;
+                alignment: start;
+                SectionTitle {
+                    text: "Aplicativo";
+                }
+                for fact in Store.app-facts: FactLine {
+                    label: fact.label;
+                    value: fact.value;
+                    tone: fact.tone;
+                }
+                Rectangle {
+                    height: 1px;
+                    background: Theme.border;
+                }
+                SectionTitle {
+                    text: "Atalhos";
+                }
+                for shortcut in [
+                    { label: "Ctrl+R", value: "Atualizar" },
+                    { label: "Ctrl+K", value: "Buscar nesta página" },
+                    { label: "Ctrl+1 … 7", value: "Ir para a seção" },
+                    { label: "↑ ↓ Home End", value: "Navegar na lista" },
+                    { label: "Enter", value: "Abrir canal selecionado" },
+                    { label: "Esc", value: "Limpar seleção e busca" },
+                    { label: "Tab", value: "Próximo controle" },
+                ]: FactLine {
+                    label: shortcut.label;
+                    value: shortcut.value;
+                }
+            }
+        }
+    }
+}

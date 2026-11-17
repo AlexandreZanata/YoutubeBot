@@ -2,8 +2,10 @@
 
 pub mod actions;
 pub mod model;
+pub mod settings;
 pub mod state;
 
 pub use actions::{CliActions, SessionActions};
 pub use model::SessionInfo;
+pub use settings::{Settings, Theme};
 pub use state::StateLoader;

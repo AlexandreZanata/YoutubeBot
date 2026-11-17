@@ -1,0 +1,495 @@
+// Reusable controls. Every interactive control is reachable with Tab, activates with
+// Enter or Space and draws a 2px focus ring in `Theme.focus` while it has keyboard focus.
+// Mouse clicks do not move focus, so the ring only appears for keyboard use.
+
+import { Theme } from "theme.slint";
+import { Notice } from "store.slint";
+
+export component FocusRing inherits Rectangle {
+    in property <bool> visible-ring;
+    in property <length> radius;
+    border-radius: self.radius + 3px;
+    border-width: self.visible-ring ? 2px : 0px;
+    border-color: Theme.focus;
+}
+
+export component Btn inherits Rectangle {
+    in property <string> text;
+    // primary | secondary | ghost
+    in property <string> kind: "secondary";
+    in property <bool> enabled: true;
+    in property <bool> active: false;
+    in property <string> description;
+    callback clicked();
+
+    property <bool> is-primary: self.kind == "primary";
+    property <bool> is-ghost: self.kind == "ghost";
+
+    min-width: label.preferred-width + 2 * Theme.space-4;
+    height: 32px;
+    horizontal-stretch: 0;
+    border-radius: Theme.radius-sm;
+    background: !self.enabled ? Theme.surface-alt
+        : self.is-primary ? Theme.primary
+        : self.active ? Theme.selected
+        : touch.has-hover ? Theme.hover
+        : self.is-ghost ? transparent : Theme.surface;
+    border-width: self.is-ghost && !self.active ? 0px : 1px;
+    border-color: !self.enabled ? Theme.border : self.is-primary ? Theme.primary : self.active ? Theme.text : Theme.border-strong;
+    opacity: touch.pressed ? 0.85 : 1;
+    accessible-role: AccessibleRole.button;
+    accessible-label: self.text;
+    accessible-description: self.description;
+    accessible-enabled: self.enabled;
+    accessible-action-default => {
+        if (self.enabled) {
+            self.clicked();
+        }
+    }
+
+    label := Text {
+        width: parent.width;
+        height: parent.height;
+        text: root.text;
+        font-family: Theme.font;
+        font-size: Theme.text-sm;
+        font-weight: root.is-primary || root.active ? 600 : 500;
+        color: !root.enabled ? Theme.text-subtle : root.is-primary ? Theme.on-primary : Theme.text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    focus := FocusScope {
+        enabled: root.enabled;
+        focus-on-click: false;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+        touch := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: root.enabled ? MouseCursor.pointer : MouseCursor.default;
+            clicked => {
+                root.clicked();
+            }
+        }
+    }
+
+    FocusRing {
+        x: -3px;
+        y: -3px;
+        width: root.width + 6px;
+        height: root.height + 6px;
+        visible-ring: focus.has-focus;
+        radius: root.border-radius;
+    }
+}
+
+export component NavItem inherits Rectangle {
+    in property <string> text;
+    in property <string> shortcut;
+    in property <bool> active;
+    callback clicked();
+
+    height: 36px;
+    border-radius: Theme.radius-sm;
+    background: self.active ? Theme.selected : touch.has-hover ? Theme.hover : transparent;
+    accessible-role: AccessibleRole.tab;
+    accessible-label: self.text;
+    accessible-description: "Atalho " + self.shortcut;
+    accessible-item-selected: self.active;
+    accessible-action-default => {
+        self.clicked();
+    }
+
+    Rectangle {
+        x: 0;
+        y: (parent.height - self.height) / 2;
+        width: 3px;
+        height: 18px;
+        border-radius: 2px;
+        background: root.active ? Theme.text : transparent;
+    }
+
+    HorizontalLayout {
+        padding-left: Theme.space-3;
+        padding-right: Theme.space-3;
+        spacing: Theme.space-2;
+
+        Text {
+            text: root.text;
+            font-family: Theme.font;
+            font-size: Theme.text-sm;
+            font-weight: root.active ? 600 : 400;
+            color: root.active ? Theme.text : Theme.text-muted;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        Text {
+            horizontal-stretch: 0;
+            text: root.shortcut;
+            font-family: Theme.font;
+            font-size: Theme.text-xs;
+            color: Theme.text-subtle;
+            vertical-alignment: center;
+        }
+    }
+
+    focus := FocusScope {
+        focus-on-click: false;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+        touch := TouchArea {
+            mouse-cursor: MouseCursor.pointer;
+            clicked => {
+                root.clicked();
+            }
+        }
+    }
+
+    FocusRing {
+        x: -3px;
+        y: -3px;
+        width: root.width + 6px;
+        height: root.height + 6px;
+        visible-ring: focus.has-focus;
+        radius: root.border-radius;
+    }
+}
+
+export component Segmented inherits HorizontalLayout {
+    in property <[string]> options;
+    in property <int> current;
+    in property <string> label;
+    callback picked(int);
+
+    spacing: Theme.space-1;
+    accessible-role: AccessibleRole.tab-list;
+    accessible-label: self.label;
+
+    for option[index] in root.options: Btn {
+        text: option;
+        active: index == root.current;
+        kind: "ghost";
+        clicked => {
+            root.picked(index);
+        }
+    }
+}
+
+// Status text with a small square mark; the word carries the meaning, the color repeats it.
+export component Badge inherits HorizontalLayout {
+    in property <string> text;
+    // 0 neutral, 1 success, 2 warning, 3 danger, 4 accent
+    in property <int> tone;
+
+    property <color> tone-color: self.tone == 1 ? Theme.success
+        : self.tone == 2 ? Theme.warning
+        : self.tone == 3 ? Theme.danger
+        : self.tone == 4 ? Theme.accent : Theme.text-subtle;
+
+    spacing: Theme.space-2;
+    horizontal-stretch: 0;
+    accessible-role: AccessibleRole.text;
+    accessible-label: self.text;
+
+    VerticalLayout {
+        alignment: center;
+        Rectangle {
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+            background: root.tone-color;
+        }
+    }
+
+    Text {
+        text: root.text;
+        font-family: Theme.font;
+        font-size: Theme.text-xs;
+        font-weight: 600;
+        color: root.tone == 0 ? Theme.text-muted : root.tone-color;
+        vertical-alignment: center;
+    }
+}
+
+export component Card inherits Rectangle {
+    // No stretch by default, but no height cap either: a short card must never limit the
+    // row it sits in (its content stays top-aligned).
+    vertical-stretch: 0;
+    max-height: 100000px;
+    background: Theme.surface;
+    border-radius: Theme.radius-md;
+    border-width: 1px;
+    border-color: Theme.border;
+    drop-shadow-blur: Theme.shadow-blur;
+    drop-shadow-color: Theme.shadow;
+    drop-shadow-offset-y: 1px;
+}
+
+export component SectionTitle inherits Text {
+    font-family: Theme.font;
+    font-size: Theme.text-md;
+    font-weight: 600;
+    color: Theme.text;
+    min-height: self.font-size * Theme.line-height;
+    vertical-alignment: center;
+    accessible-role: AccessibleRole.text;
+}
+
+export component Caption inherits Text {
+    font-family: Theme.font;
+    font-size: Theme.text-xs;
+    color: Theme.text-subtle;
+    min-height: self.font-size * Theme.line-height;
+    vertical-alignment: center;
+}
+
+export component Body inherits Text {
+    font-family: Theme.font;
+    font-size: Theme.text-sm;
+    color: Theme.text;
+    min-height: self.font-size * Theme.line-height;
+    vertical-alignment: center;
+}
+
+export component Skeleton inherits Rectangle {
+    background: Theme.skeleton;
+    border-radius: Theme.radius-sm;
+    accessible-role: AccessibleRole.text;
+    accessible-label: "Carregando";
+}
+
+export component KpiCard inherits Card {
+    in property <string> label;
+    in property <string> value;
+    in property <string> caption;
+    in property <bool> available: true;
+    in property <bool> loading;
+
+    min-height: 128px;
+    // Equal columns: every card starts from the same preferred width and stretches alike.
+    preferred-width: 1px;
+    horizontal-stretch: 1;
+    accessible-role: AccessibleRole.text;
+    accessible-label: self.label + ": " + (self.available ? self.value : "sem registro") + ". " + self.caption;
+
+    VerticalLayout {
+        padding: Theme.space-4;
+        spacing: Theme.space-1;
+        alignment: start;
+
+        Text {
+            text: root.label;
+            font-family: Theme.font;
+            font-size: Theme.text-sm;
+            color: Theme.text-muted;
+            overflow: elide;
+        }
+
+        if root.loading: Skeleton {
+            height: 36px;
+            max-width: 88px;
+        }
+        if !root.loading: Text {
+            text: root.available ? root.value : "—";
+            font-family: Theme.font;
+            font-size: Theme.text-xl;
+            font-weight: 700;
+            color: root.available ? Theme.text : Theme.text-subtle;
+            min-height: Theme.text-xl * Theme.line-height;
+        }
+
+        if root.loading: Skeleton {
+            height: 12px;
+            max-width: 160px;
+        }
+        if !root.loading: Text {
+            text: root.caption;
+            font-family: Theme.font;
+            font-size: Theme.text-xs;
+            color: root.available ? Theme.text-subtle : Theme.warning;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// Empty, missing-record and error states. `kind` follows `Notice.kind`.
+export component NoticeView inherits Rectangle {
+    in property <Notice> notice;
+    in property <string> action-text;
+    callback action();
+
+    min-height: 120px;
+    accessible-role: AccessibleRole.text;
+    accessible-label: self.notice.title + ". " + self.notice.message;
+
+    VerticalLayout {
+        alignment: center;
+        padding: Theme.space-6;
+        spacing: Theme.space-2;
+
+        Text {
+            horizontal-alignment: center;
+            text: root.notice.kind == 3 ? "ERRO" : root.notice.kind == 2 ? "SEM REGISTRO" : "VAZIO";
+            font-family: Theme.font;
+            font-size: Theme.text-xs;
+            font-weight: 700;
+            letter-spacing: 0.6px;
+            color: root.notice.kind == 3 ? Theme.danger : root.notice.kind == 2 ? Theme.warning : Theme.text-subtle;
+        }
+
+        Text {
+            horizontal-alignment: center;
+            text: root.notice.title;
+            font-family: Theme.font;
+            font-size: Theme.text-md;
+            font-weight: 600;
+            color: Theme.text;
+            wrap: word-wrap;
+        }
+
+        Text {
+            horizontal-alignment: center;
+            text: root.notice.message;
+            font-family: Theme.font;
+            font-size: Theme.text-sm;
+            color: Theme.text-muted;
+            wrap: word-wrap;
+        }
+
+        if root.action-text != "": HorizontalLayout {
+            alignment: center;
+            padding-top: Theme.space-2;
+            Btn {
+                text: root.action-text;
+                clicked => {
+                    root.action();
+                }
+            }
+        }
+    }
+}
+
+export component FactLine inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <int> tone;
+
+    spacing: Theme.space-3;
+    min-height: Theme.text-sm * Theme.line-height;
+    accessible-role: AccessibleRole.text;
+    accessible-label: self.label + ": " + self.value;
+
+    Text {
+        width: 120px;
+        text: root.label;
+        font-family: Theme.font;
+        font-size: Theme.text-sm;
+        color: Theme.text-subtle;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    Text {
+        min-width: 0px;
+        text: root.value;
+        font-family: Theme.font;
+        font-size: Theme.text-sm;
+        font-weight: root.tone == 0 ? 400 : 600;
+        color: root.tone == 1 ? Theme.success : root.tone == 2 ? Theme.warning : root.tone == 3 ? Theme.danger : Theme.text;
+        overflow: elide;
+        vertical-alignment: center;
+    }
+}
+
+// A scrollable list of fixed-height rows that keeps `current` in view. Arrow keys are handled
+// globally by the window, so the list never needs focus of its own.
+export component RowList inherits Rectangle {
+    in property <int> count;
+    in property <int> current;
+    in property <length> row-height: 48px;
+    in property <string> label;
+
+    accessible-role: AccessibleRole.list;
+    accessible-label: self.label;
+    clip: true;
+
+    changed current => {
+        if (self.current < 0) {
+            return;
+        }
+        let top = self.current * self.row-height;
+        let bottom = top + self.row-height;
+        if (top < -scroll.content-y) {
+            scroll.content-y = -top;
+        } else if (bottom > -scroll.content-y + scroll.height) {
+            scroll.content-y = -(bottom - scroll.height);
+        }
+    }
+
+    scroll := Flickable {
+        content-height: root.count * root.row-height;
+        content-width: self.width;
+        VerticalLayout {
+            spacing: 0;
+            @children
+        }
+    }
+
+    // Scroll bar hint, purely visual.
+    if scroll.content-height > scroll.height: Rectangle {
+        x: parent.width - 6px;
+        y: (-scroll.content-y / scroll.content-height) * parent.height;
+        width: 4px;
+        height: max(24px, (scroll.height / scroll.content-height) * parent.height);
+        border-radius: 2px;
+        background: Theme.border-strong;
+        opacity: 0.5;
+    }
+}
+
+export component RowFrame inherits Rectangle {
+    in property <bool> selected;
+    in property <string> label;
+    callback clicked();
+
+    background: self.selected ? Theme.selected : touch.has-hover ? Theme.hover : transparent;
+    accessible-role: AccessibleRole.list-item;
+    accessible-label: self.label;
+    accessible-item-selected: self.selected;
+    accessible-action-default => {
+        self.clicked();
+    }
+
+    Rectangle {
+        x: 0;
+        width: 3px;
+        height: parent.height;
+        background: root.selected ? Theme.text : transparent;
+    }
+
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.border;
+    }
+
+    touch := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    @children
+}

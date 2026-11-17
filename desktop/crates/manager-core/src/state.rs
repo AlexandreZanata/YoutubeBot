@@ -104,6 +104,8 @@ impl StateLoader {
                 account.id.clone()
             };
             let channel = channels.get(id.as_str()).copied().unwrap_or("");
+            let running = chrome_lock_pid(&self.root.join(".local/accounts/browser").join(&id))
+                .is_some_and(pid_alive);
             sessions.push(SessionInfo {
                 label: if account.label.is_empty() {
                     id.clone()
@@ -125,6 +127,8 @@ impl StateLoader {
                 },
                 port: account.cdp_port,
                 scope: "youtube".into(),
+                running,
+                mode: String::new(),
                 id,
             });
         }
@@ -134,12 +138,9 @@ impl StateLoader {
     fn network_sessions(&self) -> Result<Vec<SessionInfo>> {
         let mut sessions = Vec::new();
         for (scope, key, display) in NETWORKS {
-            let path = self
-                .root
-                .join(".local")
-                .join(scope)
-                .join(key)
-                .join("account.json");
+            let directory = self.root.join(".local").join(scope).join(key);
+            let path = directory.join("account.json");
+            let (running, mode) = browser_process(&directory.join("browser.pid"));
             let Ok(text) = fs::read_to_string(&path) else {
                 sessions.push(SessionInfo {
                     id: format!("{scope}:{key}"),
@@ -151,6 +152,8 @@ impl StateLoader {
                     detail: "sem sessão salva".into(),
                     port: 0,
                     scope: (*scope).to_owned(),
+                    running,
+                    mode: mode.clone(),
                 });
                 continue;
             };
@@ -174,16 +177,62 @@ impl StateLoader {
                 detail: account.verified_at.clone(),
                 port: 0,
                 scope: (*scope).to_owned(),
+                running,
+                mode,
             });
         }
         Ok(sessions)
     }
 }
 
+#[derive(Debug, Deserialize)]
+struct BrowserPid {
+    #[serde(default)]
+    pid: u32,
+    #[serde(default)]
+    mode: String,
+}
+
+/// `browser.pid` written by the commercial/social runtime: alive flag and window mode.
+fn browser_process(path: &Path) -> (bool, String) {
+    let Some(record) = fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<BrowserPid>(&text).ok())
+    else {
+        return (false, String::new());
+    };
+    if record.pid > 0 && pid_alive(record.pid) {
+        (true, record.mode)
+    } else {
+        (false, String::new())
+    }
+}
+
+/// Chrome's `SingletonLock` is a symlink to `<host>-<pid>` while the profile is open.
+fn chrome_lock_pid(profile: &Path) -> Option<u32> {
+    let target = fs::read_link(profile.join("SingletonLock")).ok()?;
+    let text = target.to_string_lossy();
+    text.rsplit('-').next()?.parse().ok()
+}
+
+/// Read-only liveness check through `/proc`; never signals the process.
+fn pid_alive(pid: u32) -> bool {
+    Path::new("/proc").join(pid.to_string()).is_dir()
+}
+
 /// Absolute root used by the desktop app: the repository above `desktop/`.
 pub fn project_root() -> Result<PathBuf> {
+    project_root_with(None)
+}
+
+/// `YTBOT_ROOT`, then the root chosen in Settings (when it has `.local/`), then the current
+/// directory, then the repository that contains this workspace.
+pub fn project_root_with(preferred: Option<&Path>) -> Result<PathBuf> {
     if let Ok(value) = std::env::var("YTBOT_ROOT") {
         return Ok(PathBuf::from(value));
+    }
+    if let Some(path) = preferred.filter(|path| path.join(".local").is_dir()) {
+        return Ok(path.to_path_buf());
     }
     let current = std::env::current_dir().context("current directory is unavailable")?;
     if current.join(".local").is_dir() {

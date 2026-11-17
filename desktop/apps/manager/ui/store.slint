@@ -1,0 +1,208 @@
+// View-model types and globals. Rust fills `Store` with display-ready strings from the
+// `reports` crate; Slint never computes a business number. `Bridge` callbacks go to Rust.
+
+export struct Notice {
+    // 0 = show content, 1 = empty, 2 = no record, 3 = error
+    kind: int,
+    title: string,
+    message: string,
+}
+
+export struct Fact {
+    label: string,
+    value: string,
+    // 0 neutral, 1 success, 2 warning, 3 danger
+    tone: int,
+}
+
+export struct Kpi {
+    label: string,
+    value: string,
+    caption: string,
+    available: bool,
+}
+
+export struct UpcomingRow {
+    when: string,
+    relative: string,
+    channel: string,
+    title: string,
+    kind: string,
+}
+
+export struct ChannelCard {
+    slug: string,
+    name: string,
+    handle: string,
+    binding: string,
+    binding-tone: int,
+    available: bool,
+    published: string,
+    scheduled: string,
+    drafts: string,
+    last-title: string,
+    last-when: string,
+    next-title: string,
+    next-when: string,
+    community: string,
+    community-tone: int,
+}
+
+export struct VideoRow {
+    title: string,
+    when: string,
+    state: string,
+    // 0 published, 1 scheduled, 2 draft
+    state-kind: int,
+    link: string,
+}
+
+export struct ShortRow {
+    title: string,
+    when: string,
+    state: string,
+    state-kind: int,
+    link: string,
+    thumb: image,
+    has-thumb: bool,
+}
+
+export struct XPostRow {
+    when: string,
+    text: string,
+    link: string,
+    state: string,
+    state-kind: int,
+}
+
+export struct ContactRow {
+    contact: string,
+    when: string,
+    text: string,
+    count: string,
+    allowed: bool,
+}
+
+export struct ProductRow {
+    title: string,
+    price: string,
+    commission: string,
+    brand: string,
+}
+
+export struct SourceRow {
+    label: string,
+    path: string,
+    state: string,
+    // 0 ok, 1 missing, 2 invalid
+    state-kind: int,
+    records: string,
+}
+
+export struct SessionRow {
+    id: string,
+    label: string,
+    network: string,
+    channel: string,
+    status: string,
+    status-tone: int,
+    detail: string,
+    key: string,
+    scope: string,
+    actionable: bool,
+    running: bool,
+    activity: string,
+    command: string,
+}
+
+export global Store {
+    // Navigation and global state
+    in-out property <int> page: 0;
+    in property <bool> loading: true;
+    in property <bool> has-data: false;
+    in property <string> status-text: "Carregando registros…";
+    in property <string> updated-text: "";
+    in property <string> login-banner: "";
+    in property <Notice> root-notice;
+    in-out property <string> search-text: "";
+
+    // Overview
+    in-out property <int> period-index: 0;
+    in property <string> period-label: "";
+    in-out property <string> custom-start: "";
+    in-out property <string> custom-end: "";
+    in property <string> period-error: "";
+    in property <[string]> channel-options: ["Todos os canais"];
+    in-out property <int> channel-index: 0;
+    in property <[Kpi]> kpis;
+    in property <[UpcomingRow]> upcoming;
+    in property <string> upcoming-summary: "";
+    in property <Notice> upcoming-notice;
+    in-out property <int> upcoming-current: -1;
+
+    // Channels
+    in property <[ChannelCard]> channels;
+    in property <Notice> channels-notice;
+    in-out property <int> channel-current: -1;
+    in-out property <bool> channel-open: false;
+    in property <ChannelCard> channel-detail;
+    in property <[VideoRow]> videos;
+    in property <Notice> videos-notice;
+    in-out property <int> video-current: -1;
+
+    // Shorts
+    in property <[ShortRow]> shorts;
+    in property <Notice> shorts-notice;
+    in property <string> shorts-summary: "";
+    in-out property <int> short-current: -1;
+
+    // Social (X)
+    in property <[Fact]> x-facts;
+    in property <[Kpi]> x-kpis;
+    in property <[XPostRow]> x-posts;
+    in property <Notice> x-notice;
+    in-out property <int> x-current: -1;
+
+    // Commercial
+    in property <[Fact]> wa-facts;
+    in property <[string]> wa-rules;
+    in property <string> wa-rules-label: "";
+    in property <[ContactRow]> wa-contacts;
+    in property <Notice> wa-notice;
+    in-out property <int> contact-current: -1;
+    in property <[Fact]> ml-facts;
+    in property <[ProductRow]> products;
+    in property <Notice> ml-notice;
+
+    // Sessions
+    in property <[SessionRow]> sessions;
+    in property <Notice> sessions-notice;
+    in-out property <int> session-current: -1;
+    in property <bool> action-busy: false;
+
+    // Settings
+    in-out property <int> refresh-index: 2;
+    in property <[string]> refresh-options: ["Desligado", "30 s", "1 min", "5 min"];
+    in-out property <string> root-input: "";
+    in property <string> root-source: "";
+    in property <string> root-error: "";
+    in property <[SourceRow]> sources;
+    in property <[Fact]> app-facts;
+    in-out property <int> source-current: -1;
+}
+
+export global Bridge {
+    callback refresh();
+    callback navigate(int);
+    callback search-changed(string);
+    callback period-picked(int);
+    callback apply-custom-period(string, string);
+    callback channel-filter-picked(int);
+    callback open-channel(int);
+    callback open-session(int);
+    callback stop-session(int);
+    callback theme-picked(bool);
+    callback refresh-interval-picked(int);
+    callback apply-root(string);
+    callback reset-root();
+}

@@ -39,6 +39,37 @@ fn loads_youtube_channels_and_network_sessions() {
         .expect("whatsapp");
     assert_eq!(whatsapp.status, "logged-in");
     assert!(whatsapp.supports_actions());
+    assert!(!whatsapp.running, "no browser.pid means no live browser");
+}
+
+#[test]
+fn a_dead_or_live_browser_pid_is_reported_without_signals() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let root = temp.path();
+    let x = root.join(".local/social/x");
+    fs::create_dir_all(&x).unwrap();
+    fs::write(x.join("account.json"), r#"{"state":"logged-in"}"#).unwrap();
+    let own = std::process::id();
+    fs::write(
+        x.join("browser.pid"),
+        format!(r#"{{"pid":{own},"port":9322,"mode":"hidden"}}"#),
+    )
+    .unwrap();
+    let whatsapp = root.join(".local/commercial/whatsapp");
+    fs::create_dir_all(&whatsapp).unwrap();
+    fs::write(
+        whatsapp.join("browser.pid"),
+        r#"{"pid":4294967294,"mode":"visible"}"#,
+    )
+    .unwrap();
+
+    let sessions = StateLoader::new(root).load().expect("load");
+    let x = sessions.iter().find(|s| s.key == "x").unwrap();
+    assert!(x.running);
+    assert_eq!(x.mode, "hidden");
+    let whatsapp = sessions.iter().find(|s| s.key == "whatsapp").unwrap();
+    assert!(!whatsapp.running);
+    assert_eq!(whatsapp.status, "não conectado");
 }
 
 #[test]
