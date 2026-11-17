@@ -86,7 +86,8 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
 - `run` scans the chat list (listener), stores incoming messages of funnel leads, answers
   them, sends due follow-ups and, with `--prospect`, opens new leads up to the daily limit.
   Without `--live` it prints the decisions and changes no lead state. It stops on the first
-  send that is not confirmed.
+  send that is not confirmed. An edited `sales_rules.toml` is reloaded before the next cycle;
+  an invalid edit is reported and the previous rules stay in use.
 - `resolve` hands a conversation back to the agent after the owner handled it; `block` adds the
   number to the do-not-contact list.
 
@@ -167,8 +168,9 @@ the model using only the facts.
    every `block`, `handoff`, `quote` or `ignore` action send the rules' text. Model text is sent
    only for `reply`, `qualify` and `close`, and only when the guard accepts it.
 6. The guard rejects any money value, number, percentage, e-mail, link, forbidden term
-   (discount, free, guarantee, installment, Pix key, password, CPF/CNPJ…) or claim to be human
-   that is not in the rules; the rules' text for that intent is sent instead. A robot question
+   (discount, free, guarantee, installment, Pix key, password, CPF/CNPJ…), claim to be human,
+   or a reply that says the quote will be made while also asking "Você gostaria que eu
+   fizesse um orçamento?"; the rules' text for that intent is sent instead. A robot question
    inside a longer message always gets the honest text first.
 7. Without a key, or when the call fails, the local intent decides with the fixed texts and
    unknown cases go to the owner.

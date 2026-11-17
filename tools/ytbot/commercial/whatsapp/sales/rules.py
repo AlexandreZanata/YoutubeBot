@@ -194,7 +194,7 @@ def build(raw: dict) -> SalesRules:
     _require(raw, "followup", ("messages",))
     _require(raw, "handoff", ("messages",))
     _require(raw, "context", ("offer_question", "affirmative", "negative"))
-    _require(raw, "guard", ("forbidden", "human_claims"))
+    _require(raw, "guard", ("forbidden", "human_claims", "quote_promises"))
     if not isinstance(raw.get("facts"), dict) or not raw["facts"]:
         raise RulesError("missing [facts]")
     if raw["llm"]["model"] not in ALLOWED_MODELS:

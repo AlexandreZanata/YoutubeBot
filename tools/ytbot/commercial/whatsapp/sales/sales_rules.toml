@@ -120,6 +120,12 @@ human_claims = [
   'sou (um |uma )?(humano|pessoa de verdade|pessoa real)',
   'nao sou (um |uma )?(robo|bot|ia|assistente)',
 ]
+# A reply that asks "Você gostaria que eu fizesse um orçamento?" may not also say the quote
+# will be made: that answers its own question (owner review, 2026-11-17).
+quote_promises = [
+  '(faco|farei|vou fazer|faremos|preparo|vou preparar|monto|vou montar|mando|vou mandar|envio|vou enviar|te passo) (o |um |seu )?orcamento',
+  'entao (eu )?faco',
+]
 
 [context]
 # Short answers are read against the last question we asked. After the offer question, an
@@ -320,7 +326,7 @@ when = "Pergunta preço, valor, quanto custa, sem dizer se é site simples ou si
 patterns = ['quanto (custa|fica|sai|e|eh|cobra)', '\bvalor', '\bpreco', 'qual o investimento', '\bcaro\b']
 messages = [
   "Um site institucional, que é só visual, fica em média R$ 500, com entrada de R$ 250, mais o servidor de R$ 39,90 por mês no boleto ou Pix (ou R$ 45 no cartão).",
-  "Sistemas e aplicativos dependem do que você precisa, então faço um orçamento.",
+  "Já sistemas e aplicativos têm o valor definido pelas funcionalidades que você precisa.",
   "Você gostaria que eu fizesse um orçamento?",
 ]
 
@@ -331,7 +337,7 @@ fixed = false
 when = "Pergunta prazo, quanto tempo demora, quando fica pronto."
 patterns = ['\bprazo', 'quanto tempo', 'demora', 'fica pronto', 'quando (fica|entrega)', 'quantos dias']
 messages = [
-  "Um site institucional fica pronto em média em 15 dias. Para sistemas e aplicativos, o prazo vem junto com o orçamento.",
+  "Um site institucional fica pronto em média em 15 dias. Para sistemas e aplicativos, o prazo depende das funcionalidades e é definido no orçamento.",
 ]
 
 [[intents]]
@@ -341,7 +347,7 @@ fixed = false
 when = "Pergunta forma de pagamento, entrada, parcelamento, cartão, boleto ou Pix do projeto."
 patterns = ['pagamento', 'parcela', 'entrada', '\bboleto\b', '\bpix\b', 'cartao', 'como (eu )?pago']
 messages = [
-  "Para começar o site institucional a entrada é de R$ 250. As demais condições eu te passo junto com o orçamento.",
+  "Para começar o site institucional a entrada é de R$ 250. As demais condições são combinadas no orçamento.",
 ]
 
 [[intents]]

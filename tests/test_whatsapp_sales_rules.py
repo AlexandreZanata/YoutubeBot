@@ -59,6 +59,31 @@ class SalesRulesTests(unittest.TestCase):
         self.assertFalse(self.rules.in_window(saturday, "opening"))
         self.assertTrue(self.rules.in_window(saturday, "reply"))
 
+    def test_running_bot_reloads_an_edited_rules_file_and_ignores_a_broken_one(self):
+        import tempfile
+        from pathlib import Path
+        from tools.ytbot.commercial.whatsapp.sales.commands import reload_if_changed
+
+        class Agent:
+            rules = None
+
+            def use_rules(self, rules):
+                self.rules = rules
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "rules.toml"
+            text = sales_rules.RULES_PATH.read_text(encoding="utf-8")
+            path.write_text(text.replace("daily_openings = 10", "daily_openings = 5"),
+                            encoding="utf-8")
+            agent = Agent()
+            seen = reload_if_changed(agent, path, 0.0)
+            self.assertEqual(agent.rules.limits["daily_openings"], 5)
+            path.write_text("broken = [", encoding="utf-8")
+            import os
+            os.utime(path, (seen + 5, seen + 5))
+            reload_if_changed(agent, path, seen)
+            self.assertEqual(agent.rules.limits["daily_openings"], 5)
+
     def test_only_deepseek_flash_is_accepted(self):
         raw = copy.deepcopy(self.raw)
         raw["llm"]["model"] = "glm-5.3"

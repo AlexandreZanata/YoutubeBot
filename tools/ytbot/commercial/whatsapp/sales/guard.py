@@ -49,6 +49,14 @@ def violations(rules: SalesRules, messages: list[str]) -> list[str]:
         problems.append(f"more than {limits['max_messages_per_reply']} messages")
     forbidden = [(term, _term(term)) for term in rules.raw["guard"]["forbidden"]]
     claims = [re.compile(pattern) for pattern in rules.raw["guard"]["human_claims"]]
+    offer = re.compile(rules.context["offer_question"])
+    promises = [re.compile(pattern) for pattern in rules.raw["guard"]["quote_promises"]]
+    sentences = [sentence for message in messages
+                 for sentence in re.findall(r"[^.!?]+[.!?]*", normalize(message))]
+    if any(offer.search(sentence) for sentence in sentences):
+        for sentence in sentences:
+            if not offer.search(sentence) and any(p.search(sentence) for p in promises):
+                problems.append("promises the quote and also offers it")
     for message in messages:
         plain = normalize(message)
         if not plain:

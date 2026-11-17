@@ -11,6 +11,7 @@ REGRAS OBRIGATÓRIAS
 8. No máximo $max_messages mensagens, cada uma com até $max_chars caracteres. Prefira uma ou duas.
 9. Resposta automática de empresa (ausência, horário de atendimento, menu de opções): escolha "auto_reply" com "messages" vazio.
 10. Se tiver qualquer dúvida sobre o que a pessoa quer ou sobre o que pode prometer, marque "handoff": true; o $agent_name responde pessoalmente.
+11. Orçamento: ofereça só com a pergunta "Você gostaria que eu fizesse um orçamento?". Antes de a pessoa aceitar, nunca diga que vai fazer, montar ou mandar o orçamento (isso responde a própria pergunta). Não repita a pergunta se ela já está no HISTÓRICO sem resposta.
 
 Responda somente com um objeto JSON, sem texto fora dele:
 {"intent": "<id da intenção>", "messages": ["<mensagem 1>", "<mensagem 2>"], "handoff": false, "do_not_contact": false, "reason": "<motivo curto em português>"}

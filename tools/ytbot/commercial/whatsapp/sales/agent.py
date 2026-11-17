@@ -105,6 +105,11 @@ class SalesAgent:
             raise ValueError("live mode needs a WhatsApp channel")
 
     # Helpers -------------------------------------------------------------------------
+    def use_rules(self, rules: SalesRules) -> None:
+        """Switch to an edited rules file between cycles (the owner tunes texts live)."""
+        self.rules = rules
+        self.pacing = SalesPacing.from_rules(rules)
+
     def now(self) -> datetime:
         return self.clock()
 

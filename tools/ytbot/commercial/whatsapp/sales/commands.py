@@ -13,7 +13,7 @@ from . import llm as sales_llm
 from .agent import SalesAgent, WhatsAppChannel, owner_block, owner_resolve, split_pending
 from .decide import decide
 from .pacing import SalesPacing
-from .rules import RulesError, load
+from .rules import RULES_PATH, RulesError, load
 from .store import AUTOMATED_STATES, SalesStore, mask, stamp
 
 OWNER_STATES = ("needs-owner", "quote-requested", "owner", "unconfirmed")
@@ -154,6 +154,23 @@ def command_simulate(args, store_factory) -> None:
                                pacing.plan(decision.messages, args.text)]})
 
 
+def reload_if_changed(agent, path: Path, seen: float) -> float:
+    """Reload the rules when the file changed; keep the current ones if the edit is invalid."""
+    try:
+        changed = path.stat().st_mtime
+    except OSError:
+        return seen
+    if changed == seen:
+        return seen
+    try:
+        agent.use_rules(load(path))
+        print(f"[sales] rules reloaded from {path.name}", flush=True)
+    except RulesError as error:
+        print(f"[sales] edited rules are invalid, keeping the previous ones: {error}",
+              flush=True)
+    return changed
+
+
 def command_run(args, store_factory, page_factory) -> None:
     rules, store, _ = _context(args, store_factory)
     model = _model(rules, store, not args.no_llm)
@@ -170,8 +187,11 @@ def command_run(args, store_factory, page_factory) -> None:
     try:
         channel = WhatsAppChannel(page, SalesPacing.from_rules(rules), store.journal_path)
         agent = SalesAgent(rules, store, channel if args.live else None, model, live=args.live)
+        rules_path = Path(args.rules) if args.rules else RULES_PATH
+        rules_seen = rules_path.stat().st_mtime
         cycles = 0
         while True:
+            rules_seen = reload_if_changed(agent, rules_path, rules_seen)
             events = whatsapp_listener.listen(page, store.base, once=True, limit=args.max_chats)
             summary = agent.cycle(events, prospect=args.prospect, limit=args.limit)
             print(json.dumps(summary, ensure_ascii=False), flush=True)

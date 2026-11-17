@@ -49,6 +49,19 @@ class SalesDecisionTests(unittest.TestCase):
         self.assertIn("link not in the rules: example.com", problems)
         self.assertIn("claims to be human", problems)
 
+    def test_reply_cannot_promise_the_quote_it_offers(self):
+        decision, _ = self.run_model("Quanto custa?", {"intent": "price", "messages": [
+            "Sistemas e aplicativos dependem do que você precisa, então eu faço um orçamento. "
+            "Você gostaria que eu fizesse um orçamento?"]})
+        self.assertEqual(decision.source, "template")
+        self.assertIn("promises the quote and also offers it", decision.violations)
+        self.assertEqual(guard.violations(self.rules, decision.messages), [])
+
+    def test_every_reference_text_passes_the_guard(self):
+        for intent in self.rules.intents:
+            self.assertEqual(guard.violations(self.rules, list(intent.messages) or ["ok"]), [],
+                             intent.id)
+
     def test_links_are_split_into_their_own_messages(self):
         self.assertEqual(guard.split_links(["Veja: https://zaflas.com.br e https://abastevo.com.br"]),
                          ["Veja", "https://zaflas.com.br", "e", "https://abastevo.com.br"])
