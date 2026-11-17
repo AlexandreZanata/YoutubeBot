@@ -126,6 +126,10 @@ profile under `.local/commercial/<network>/`; login is manual in the visible bro
 status/publishing work runs hidden. Read products and links only from the logged-in affiliate
 hub, never invent prices, commissions or links, and never commit browser state.
 
+WhatsApp Web in the commercial module is owner-operated: manual QR login in the visible
+browser, hidden sending, one chat at a time, human intervals, a `--live` gate and a journal
+that blocks repeats. It never broadcasts to lists and never feeds the Procurali pipeline.
+
 When delivering captured products from this workstation to the remote Procurali VPS (database,
 site, Telegram offers group queue, and WhatsApp Web assisted drafts), never copy VPS origin IPs,
 SSH private keys or device tokens into this repository and never post to Telegram/WhatsApp directly

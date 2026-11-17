@@ -3,6 +3,42 @@
 The commercial module keeps separate private browser sessions for affiliate networks.
 Mercado Livre is the first network.
 
+## WhatsApp Web
+
+The commercial module also carries an owner-operated WhatsApp Web session. It follows the
+Telegram commercial rules: one chat at a time, a minimum interval between messages, a live
+gate, an idempotency journal and no bulk automation.
+
+| Field | Value |
+| --- | --- |
+| Profile | `.local/commercial/whatsapp/profile` |
+| CDP port | 9325 |
+| Hidden display | `:93` |
+| Journal | `.local/commercial/whatsapp/journal.jsonl` |
+
+```bash
+python3 -m tools.ytbot commercial open --network whatsapp
+python3 -m tools.ytbot commercial status --network whatsapp
+python3 -m tools.ytbot commercial send --network whatsapp --to "Nome ou telefone" \
+  --text "Mensagem" --live
+python3 -m tools.ytbot commercial send --network whatsapp --to "Nome" \
+  --text "Mensagem" --image foto.jpg --dry-run
+```
+
+Rules:
+
+- Login is manual: the visible window shows the QR code and the session stays in the private
+  profile. Never commit those files.
+- `send` is dry-run by default; `--live` is required to actually send.
+- One message per invocation by default. Human pacing waits a random interval between
+  `--min-interval` and `--max-interval` seconds, then types in small chunks with pauses at
+  punctuation, and verifies the last outgoing bubble before reporting success.
+- A message whose journal entry is `sent` is never repeated; `--force` is the explicit
+  override.
+- Images are attached through the native attach menu.
+- This is an operator tool for the owner's own messages. Product delivery to the Procurali
+  VPS still goes through ZaturoBot; this module never feeds it automatically.
+
 ## Mercado Livre
 
 - Hub: <https://www.mercadolivre.com.br/afiliados/hub>

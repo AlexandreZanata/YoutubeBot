@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import urllib.request
+from pathlib import Path
 
 from .. import config
 from ..social import browser
@@ -10,17 +12,29 @@ from ..social.store import SocialStore
 from . import reference
 from .mercadolivre import account as mercadolivre
 from .mercadolivre import products
+from . import whatsapp
+from .whatsapp import sender as whatsapp_sender
 
-NETWORKS = ("mercadolivre",)
+NETWORKS = ("mercadolivre", "whatsapp")
 
 
 def _store() -> SocialStore:
     return SocialStore(config.ROOT / ".local" / "commercial")
 
 
+def _port_ready(port: int) -> bool:
+    try:
+        urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=2)
+        return True
+    except Exception:
+        return False
+
+
 def _network(name: str):
     if name == "mercadolivre":
         return mercadolivre
+    if name == "whatsapp":
+        return whatsapp
     raise ValueError("unsupported commercial network")
 
 
@@ -40,8 +54,9 @@ def command_status(args) -> None:
 
     store = _store()
     network = _network(args.network)
-    browser.ensure_background(store, args.network, network.LOGIN_URL, network.CDP_PORT,
-                              network.BACKGROUND_DISPLAY)
+    if not _port_ready(network.CDP_PORT):
+        browser.ensure_background(store, args.network, network.LOGIN_URL, network.CDP_PORT,
+                                  network.BACKGROUND_DISPLAY)
     with sync_playwright() as playwright:
         client = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{network.CDP_PORT}")
         context = client.contexts[0]
@@ -62,6 +77,8 @@ def command_status(args) -> None:
 def command_products(args) -> None:
     from playwright.sync_api import sync_playwright
 
+    if args.network != "mercadolivre":
+        raise SystemExit("[commercial] products is available only for mercadolivre")
     try:
         store = _store()
         network = _network(args.network)
@@ -118,7 +135,44 @@ def command_products(args) -> None:
         raise SystemExit(f"[commercial] {error}")
 
 
+def command_whatsapp_send(args) -> None:
+    from playwright.sync_api import sync_playwright
+
+    if not args.live and not args.dry_run:
+        raise SystemExit("[commercial] whatsapp sending requires --live (or --dry-run)")
+    store = _store()
+    network = _network("whatsapp")
+    image = Path(args.image) if args.image else None
+    if image is not None and not image.is_file():
+        raise SystemExit(f"[commercial] image not found: {image}")
+    messages = [{"to": args.to, "text": args.text, "image": image}]
+    pacing = whatsapp_sender.Pacing(args.min_interval, args.max_interval)
+    try:
+        if not _port_ready(network.CDP_PORT):
+            browser.ensure_background(store, "whatsapp", network.LOGIN_URL, network.CDP_PORT,
+                                      network.BACKGROUND_DISPLAY)
+        with sync_playwright() as playwright:
+            client = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{network.CDP_PORT}")
+            context = client.contexts[0]
+            page = context.new_page()
+            try:
+                state = network.inspect(page)
+                if state["state"] != "logged-in":
+                    raise RuntimeError("WhatsApp Web is not logged in; run commercial open "
+                                       "--network whatsapp and scan the QR code")
+                results = whatsapp_sender.send_batch(
+                    page, messages, pacing, args.dry_run or not args.live,
+                    store.network("whatsapp") / "journal.jsonl", force=args.force)
+            finally:
+                page.close()
+        print(json.dumps(results, ensure_ascii=False))
+    except Exception as error:
+        raise SystemExit(f"[commercial] {error}")
+
+
 def command_reference(args) -> None:
+    if args.network != "mercadolivre":
+        raise SystemExit("[commercial] reference is available only for mercadolivre")
     try:
         store = _store()
         _network(args.network)
@@ -171,6 +225,18 @@ def add_parser(sub) -> None:
     products_parser.add_argument("--refresh-ref", action="store_true",
                                  help="refresh the cached VPS reference database before comparing")
     products_parser.set_defaults(func=command_products)
+    send_parser = actions.add_parser(
+        "send", help="send one human-paced WhatsApp Web message (requires --live)")
+    send_parser.add_argument("--network", choices=("whatsapp",), required=True)
+    send_parser.add_argument("--to", required=True, help="contact name or phone number")
+    send_parser.add_argument("--text", required=True)
+    send_parser.add_argument("--image", default=None)
+    send_parser.add_argument("--live", action="store_true", help="actually send")
+    send_parser.add_argument("--dry-run", action="store_true")
+    send_parser.add_argument("--force", action="store_true", help="ignore the sent journal")
+    send_parser.add_argument("--min-interval", type=float, default=8.0)
+    send_parser.add_argument("--max-interval", type=float, default=25.0)
+    send_parser.set_defaults(func=command_whatsapp_send)
     ref_parser = actions.add_parser(
         "reference",
         help="query the fast local VPS product and price-history reference DB",
