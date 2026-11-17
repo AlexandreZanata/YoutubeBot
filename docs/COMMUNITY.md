@@ -5,8 +5,9 @@ post per calendar day, counted after 00:00 in the channel timezone. If the newes
 from today, it changes nothing. If the tab is empty or the newest post is from an earlier
 day, it publishes one question post that always carries a dedicated square art generated for
 that post in the channel's visual style, a link to the related video and, on Zaflas, the site
-https://zaflas.com.br/. An unconfirmed publish is recorded in
-`.local/ytbot/community.json` and is never retried blindly.
+https://zaflas.com.br/. The automatic flow generates that art with Codex; it never crops a
+video thumbnail, and when the art cannot be generated it publishes nothing. An unconfirmed
+publish is recorded in `.local/ytbot/community.json` and is never retried blindly.
 
 ```bash
 python3 -m tools.ytbot community --channel fallem-prince
@@ -28,7 +29,9 @@ English post on Zaflas or a Portuguese post on any other channel.
 Every post has three mandatory parts:
 
 1. A dedicated square image generated for that post, in the channel's visual style. Do not
-   reuse a video thumbnail or its crop; the post art is its own piece.
+   reuse a video thumbnail or its crop; the post art is its own piece. Each day uses its own
+   dated attempt directory, because the Codex fence rejects a changed prompt under the same
+   state.
 2. A link to the video the post is about, in the text.
 3. On Zaflas only, the site `https://zaflas.com.br/` in the text, the same one used in the
    video description.
