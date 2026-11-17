@@ -75,9 +75,31 @@ def apply_thumbnail(page, run_dir: Path) -> None:
     log("thumbnail saved")
 
 
+def _fill_field(page, parent_id: str, text: str) -> bool:
+    """Studio renders hidden duplicate #textbox nodes; fill the visible one."""
+    boxes = page.locator("#textbox")
+    for index in range(boxes.count()):
+        box = boxes.nth(index)
+        if not box.is_visible():
+            continue
+        parent = box.evaluate(
+            "el => (el.closest('ytcp-social-suggestions-textbox') || {}).id || ''")
+        if parent != parent_id:
+            continue
+        box.click()
+        page.keyboard.press("Control+A")
+        page.keyboard.press("Backspace")
+        page.keyboard.insert_text(text)
+        page.wait_for_timeout(350)
+        return True
+    return False
+
+
 def apply_details(page, run_dir: Path, meta: dict, *, custom_thumbnail: bool = True) -> None:
-    upload_dialog.fill_editable(page, 0, meta["title"])
-    upload_dialog.fill_editable(page, 1, meta["description"])
+    if not _fill_field(page, "title-textarea", meta["title"]):
+        upload_dialog.fill_editable(page, 0, meta["title"])
+    if not _fill_field(page, "description-textarea", meta["description"]):
+        upload_dialog.fill_editable(page, 1, meta["description"])
     try:
         _apply_tags(page, meta)
     except Exception as error:
