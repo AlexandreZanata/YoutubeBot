@@ -85,6 +85,22 @@ CHANNELS = {
         slots=(0,),
         interval_days=2,
     ),
+    "zanata": Channel(
+        slug="zanata",
+        name="zanata",
+        handle="@zanatareal",
+        channel_id="UCx0AE-elCyDhfY0d1hQIwdw",
+        prompts="zanata",
+        background="black",
+        language="en",
+        min_article_chars=50000,
+        article_retry=(
+            "Target narration length: 8,000 to 8,500 English words, about 50 to 55 "
+            "minutes. Keep the same book and author."
+        ),
+        max_article_chars=100000,
+        slots=(16,),
+    ),
     "whispers-from-heaven": Channel(
         slug="whispers-from-heaven",
         name="Whispers From Heaven",

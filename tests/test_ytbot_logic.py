@@ -122,6 +122,13 @@ class ChannelProfileTests(unittest.TestCase):
         self.assertEqual(channel.interval_days, 2)
         self.assertEqual(channel.language, "en")
 
+    def test_zanata_is_the_daily_book_summary_channel(self):
+        channel = channels.get("zanata")
+        self.assertEqual(channel.channel_id, "UCx0AE-elCyDhfY0d1hQIwdw")
+        self.assertEqual(channel.language, "en")
+        self.assertEqual(channel.slots, (16,))
+        self.assertEqual(channel.max_article_chars, 100000)
+
     def test_infinite_uses_the_thumbnail_as_background(self):
         channel = channels.get("infinite-random-worlds")
         self.assertEqual(channel.background, "thumbnail")

@@ -1,0 +1,1 @@
+Suggest book-summary premises for the zanata channel. Each premise must name one real book and its author, from philosophy, psychology, sociology, anthropology or classic social thought, and imply the central idea worth a 50 minute essay. Avoid books already covered, generic self-help and repeated themes. Return only a numbered list, one per line.
