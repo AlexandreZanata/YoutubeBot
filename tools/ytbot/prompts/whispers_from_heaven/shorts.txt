@@ -1,0 +1,16 @@
+Write one complete English YouTube Short for the Whispers From Heaven channel.
+
+REQUIREMENTS:
+
+- Everything must be 100% in English.
+- Length: 90 to 140 words, about 40 to 60 seconds at the channel's measured pace.
+- One biblical moment or one promise of comfort, told with warmth and reverence.
+- Open with a concrete image or line that makes the listener stop.
+- Stay faithful to Scripture. Do not invent verses, miracles, promises or facts.
+- A calm, compassionate voice. The listener should feel accompanied, not instructed.
+- End on a quiet line of hope. No slogan, no altar call, no call to action.
+- No headings, lists, labels, notes, citations or links.
+- Do not use em dashes or en dashes. Use commas, periods, colons or ordinary hyphens.
+- Output only the narration text that will be read aloud.
+
+THEME:

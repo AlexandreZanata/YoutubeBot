@@ -78,7 +78,10 @@ def apply_thumbnail(page, run_dir: Path) -> None:
 def apply_details(page, run_dir: Path, meta: dict, *, custom_thumbnail: bool = True) -> None:
     upload_dialog.fill_editable(page, 0, meta["title"])
     upload_dialog.fill_editable(page, 1, meta["description"])
-    _apply_tags(page, meta)
+    try:
+        _apply_tags(page, meta)
+    except Exception as error:
+        log(f"tags warning: {error}")
     thumbnail = run_dir / "thumbnail.png"
     field = page.locator('input[type=file][accept*="image"]')
     if custom_thumbnail and thumbnail.is_file() and field.count():
