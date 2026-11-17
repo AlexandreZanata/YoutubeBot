@@ -1,6 +1,6 @@
 # Religious Shorts
 
-Vertical Shorts for **the word of reflection** and **Whispers From Heaven**. One generated
+Vertical Shorts for **the word of reflection**, **Whispers From Heaven** and **zanata**. One generated
 background image per short, in the channel's visual style, with burned-in subtitles.
 
 ## Format
@@ -30,6 +30,7 @@ Shorts use hours different from the channel's long videos, two per day:
 | --- | --- | --- |
 | the word of reflection | 05:00 and 17:00 | 08:00 and 20:00 |
 | Whispers From Heaven | 00:00 and 12:00 | 09:00 and 21:00 |
+| zanata | 16:00 | 09:00 |
 
 America/Cuiaba. One short is never scheduled within 60 minutes of now.
 
@@ -38,6 +39,7 @@ America/Cuiaba. One short is never scheduled within 60 minutes of now.
 ```bash
 python3 -m tools.ytbot faith-shorts --channel reflection --count 5
 python3 -m tools.ytbot faith-shorts --channel whispers-from-heaven --count 5
+python3 -m tools.ytbot faith-shorts --channel zanata --count 5
 ```
 
 Optional: `--start-date YYYY-MM-DD`, `--skip-slots N` to leave the first slots to another run.
@@ -49,6 +51,8 @@ The queue lives in `tools/ytbot/faith_shorts.py` (`CHANNELS`): five premises per
 - reflection: Hannah, Elijah in the cave, Peter's nets, the widow's oil, Joseph in prison.
 - Whispers: the long night, the shepherd and the ninety-nine, the whispered prayer, the peace
   in the storm, the weary gathered one by one.
+- zanata: Goffman and performance, Karen Horney's ideal self, Girard and the scapegoat,
+  Arendt and the banality of evil, Becker and the denial of death.
 
 ## Protocol
 

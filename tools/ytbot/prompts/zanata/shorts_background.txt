@@ -1,0 +1,9 @@
+Create ONE vertical 9:16 background image for a YouTube Short from zanata, a book-summary channel.
+
+- One cinematic, bookish scene: a desk at night, a lamp, an open book, a study, a library aisle,
+  a single reader seen from behind.
+- Palette: charcoal and near-black, warm amber light, muted parchment.
+- Strong vertical composition: the subject in the middle and lower two thirds; the upper third
+  calmer for burned-in subtitles.
+- No text, no letters, no numbers, no logos, no watermark, no borders, no UI.
+- Safe, contemplative imagery; no injury, no horror, no modern branded objects.
