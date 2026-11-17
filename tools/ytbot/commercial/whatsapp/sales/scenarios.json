@@ -100,5 +100,30 @@
     "Isso é golpe?",
     "Oi?",
     "Alô"
+  ],
+  "AA funcionaria indica o dono": [
+    "Boa tarde, sou funcionária aqui",
+    "Aqui é a Paula",
+    "O número do Carlos é (65) 90000-0009"
+  ],
+  "AB funcionario nao passa o contato": [
+    "O dono não está",
+    "Vou passar pro dono, ele te chama"
+  ],
+  "AC fecha o site institucional": [
+    "Quanto custa um site simples?",
+    "Quero fechar o site, como pago a entrada?",
+    "Paguei, segue o comprovante"
+  ],
+  "AD fecha um aplicativo": [
+    "Vocês fazem aplicativo de delivery?",
+    "Quero fechar"
+  ],
+  "AE desiste depois do interesse": [
+    "Vocês fazem sistema de agendamento?",
+    "Achei que era mais barato, não tenho interesse"
+  ],
+  "AF aplicativo por 500": [
+    "Então um aplicativo sai 500 reais?"
   ]
 }

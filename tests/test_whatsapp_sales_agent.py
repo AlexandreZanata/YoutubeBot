@@ -183,8 +183,8 @@ class SalesAgentTests(unittest.TestCase):
         lead, agent, channel = self.opened_lead()
         agent.ingest([self.event("Vocês fazem sistema de agendamento?")])
         agent.reply_pending()
-        self.assertEqual([item["text"] for item in channel.sent[-2:]],
-                         ["Sim, nós podemos fazer isso.", "Você gostaria que eu fizesse um orçamento?"])
+        self.assertEqual([item["text"] for item in channel.sent[-3:]],
+                         list(self.rules.intent("system_request").messages))
         agent.ingest([self.event("Sim", event_id="e2")])
         agent.reply_pending()
         self.assertEqual(self.store.lead(lead["id"])["state"], "qualifying")
@@ -327,7 +327,8 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(self.store.handoffs()[-1]["lead"], lead["id"])
         self.assertEqual(channel.sent[-1]["text"],
                          "Que ótimo! Já te respondo pessoalmente com os próximos passos.")
-        self.assertEqual(self.store.lead(lead["id"])["state"], "needs-owner")
+        self.assertEqual(self.store.lead(lead["id"])["state"], "buying")
+        self.assertEqual(note["reason"], "Quer fechar, mas não ficou claro se é site ou sistema")
 
     def test_human_request_hands_off_instead_of_explaining_the_bot(self):
         lead, agent, channel = self.opened_lead()

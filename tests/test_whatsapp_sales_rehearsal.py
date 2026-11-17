@@ -19,7 +19,7 @@ class RehearsalTests(unittest.TestCase):
             "recusa": ["Não, obrigado"],
         }, FakeModel())
         ready, refusal = transcripts
-        self.assertEqual(ready["turns"][0]["state"], "needs-owner")
+        self.assertEqual(ready["turns"][0]["state"], "buying")
         self.assertEqual(ready["handoffs"][0]["priority"], "hot")
         self.assertEqual(ready["turns"][1]["bot"], [])
         self.assertEqual(refusal["turns"][0]["state"], "do-not-contact")

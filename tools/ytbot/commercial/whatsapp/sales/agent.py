@@ -14,26 +14,42 @@ conversation at a time with a pause between chats.
 from __future__ import annotations
 
 import random
+import re
 import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from .. import listener, sender
-from . import central, dossier
+from . import central, dossier, referral
 from . import notify as owner_notify
 from .context import effective
-from .decide import Decision, decide, stuck
+from .decide import Decision, _fixed, decide, stuck
 from .pacing import SalesPacing
 from .rules import SalesRules, normalize
 from .store import SalesStore, stamp
 from .transcribe import local_transcriber
 
-REPLYABLE = ("engaged", "qualifying")
+REPLYABLE = ("engaged", "qualifying", "gatekeeper")
 # On a new incoming message these states move to `engaged`; others only record it.
-REOPENS = ("new", "opened", "followed-up", "closed", "no-response", "engaged")
-OWNER_STATES = ("needs-owner", "quote-requested", "owner", "unconfirmed")
+REOPENS = ("new", "opened", "followed-up", "closed", "no-response", "engaged", "referred")
+OWNER_STATES = ("needs-owner", "quote-requested", "owner", "unconfirmed", "won", "buying", "lost")
+# Owner states where material the client still sends (receipt, logo) is saved silently.
+SILENT_STATES = ("quote-requested", "won")
 NEXT_STATE = {"qualify": "qualifying", "collect": "qualifying", "quote": "quote-requested",
-              "close": "closed", "block": "do-not-contact", "handoff": "needs-owner"}
+              "close": "closed", "block": "do-not-contact", "handoff": "needs-owner",
+              "won": "won", "buy": "buying", "lose": "lost", "refer": "referred"}
+OWNER_ACTIONS = ("handoff", "quote", "won", "buy", "lose")
+SYSTEM_WORDS = re.compile(r"sistema|aplicativo|\bapps?\b|loja (virtual|online)|e-?commerce|"
+                          r"agendamento|cadastro|\blogin\b|painel|delivery")
+SITE_WORDS = re.compile(r"\bsite\b|institucional|pagina")
+
+
+def interest_of(text: str) -> str:
+    """"system", "site" or "" from what a message talks about."""
+    plain = normalize(text)
+    if SYSTEM_WORDS.search(plain):
+        return "system"
+    return "site" if SITE_WORDS.search(plain) else ""
 MEDIA_TEXT = {"image": "[imagem]", "video": "[vídeo]", "document": "[documento]",
               "audio": "[áudio]"}
 
@@ -163,11 +179,13 @@ class SalesAgent:
                 return last is None or self.now() - last >= window
         return True
 
-    def openings_today(self) -> int:
+    def openings_today(self, kind: str | None = None) -> int:
+        """First contacts started today: all, only "cold" or only "referral" ones."""
         today = self.now().date()
         return sum(1 for lead in self.store.leads().values()
                    if (opened := self._parse(lead.get("opened_at")))
-                   and opened.astimezone(self.zone).date() == today)
+                   and opened.astimezone(self.zone).date() == today
+                   and (kind is None or bool(lead.get("referral")) == (kind == "referral")))
 
     def _items(self, lead: dict, tag: str, messages: list[str], incoming: str | None,
                delays: list[float] | None = None) -> list:
@@ -226,8 +244,16 @@ class SalesAgent:
                 if lead["state"] == "new":
                     listener.allow_contact(self.store.contact_rules_path,
                                            self._contact_entry(lead))
-            elif lead["state"] == "qualifying":
+            elif lead["state"] in ("qualifying", "gatekeeper"):
                 changes["awaiting"] = event.get("id")
+            elif lead["state"] == "won":
+                # After the Pix keys every message matters: a receipt or a question.
+                changes["awaiting"] = event.get("id")
+                paid = self.rules.intent("payment_sent").matches(normalize(event["text"]))
+                if paid or self._remind(lead):
+                    self._handoff(lead, self.rules.intent("payment_sent").reason if paid
+                                  else "Cliente escreveu depois de receber as chaves Pix",
+                                  event["text"], "hot", "payment_sent" if paid else "close_site")
             elif lead["state"] == "quote-requested":
                 # Late material (logo, photos, audio) still goes into the client folder.
                 changes["awaiting"] = event.get("id")
@@ -246,7 +272,7 @@ class SalesAgent:
     # Replies -------------------------------------------------------------------------
     def pending(self) -> list[dict]:
         leads = [lead for lead in self.store.leads().values()
-                 if lead.get("awaiting") and lead["state"] in REPLYABLE + ("quote-requested",)]
+                 if lead.get("awaiting") and lead["state"] in REPLYABLE + SILENT_STATES]
         return sorted(leads, key=lambda lead: lead.get("last_in_at") or "")
 
     def reply_pending(self) -> list[dict]:
@@ -411,12 +437,14 @@ class SalesAgent:
                 self.store.update_lead(lead["id"], state="owner", awaiting=None)
                 self.log(f"{lead['name']}: the owner already answered; automation paused")
                 return {**result, "state": "owner"}
-        if lead["state"] == "quote-requested":
+        if lead["state"] in SILENT_STATES:
             if not self.live:
                 return {**result, "state": "planned", "action": "refresh-ficha"}
-            ficha = self._write_dossier(lead, None, "orçamento com o dono")
+            status = {"won": "venda fechada: aguardando a entrada"}.get(lead["state"],
+                                                                         "orçamento com o dono")
+            ficha = self._write_dossier(lead, None, status)
             self.store.update_lead(lead["id"], awaiting=None, ficha=ficha)
-            return {**result, "state": "quote-requested", "ficha": ficha}
+            return {**result, "state": lead["state"], "ficha": ficha}
         prior, unanswered = split_pending(self.store.history(lead["id"]))
         text = "\n".join(entry.get("text", "") for entry in unanswered).strip()
         if not text:
@@ -424,6 +452,7 @@ class SalesAgent:
             return {**result, "state": "nothing-to-answer"}
         decision = decide(self.rules, lead, prior, text, self.llm, self.now(),
                           usage=self.store.log_usage)
+        decision = self._sales_turn(lead, decision, text)
         decision = self._check_progress(lead, decision)
         if decision.action == "collect":
             decision = self._collect(lead, decision, text)
@@ -435,10 +464,77 @@ class SalesAgent:
             return {**result, "state": "planned"}
         return self._apply(lead, decision, text, result, replies, today)
 
+    def _sales_turn(self, lead: dict, decision: Decision, text: str) -> Decision:
+        """Turn a decision into the sales outcome the conversation reached.
+
+        Closing the simple site sends the Pix keys; closing an app or a system goes to the
+        owner; a refusal after real interest is "lost" (the owner decides), not a block; a staff
+        member is asked for the decision maker's contact.
+        """
+        interest = interest_of(text) or lead.get("interest", "")
+        if decision.intent == "ready_to_buy" and interest == "site":
+            decision = _fixed(self.rules, "close_site", decision.hint, "fixed")
+        elif decision.intent == "ready_to_buy" and interest != "system":
+            decision.owner_reason = "Quer fechar, mas não ficou claro se é site ou sistema"
+        elif decision.intent == "refusal" and lead.get("interest"):
+            decision.action, decision.priority = "lose", "needed"
+            decision.owner_reason = "Desistiu da compra: você decide se retoma"
+        elif decision.intent == "gatekeeper" or (lead["state"] == "gatekeeper"
+                                                and decision.intent != "referral"):
+            decision = self._gatekeeper(lead, decision, text)
+        return decision
+
+    def _gatekeeper(self, lead: dict, decision: Decision, text: str) -> Decision:
+        found = referral.names(text, self.llm, f"zaflas-staff-{lead['id']}")
+        staff = found["staff"] or lead.get("staff_name") or ""
+        if found["staff"]:
+            self.store.update_lead(lead["id"], staff_name=found["staff"])
+        texts = self.rules.raw["referral"]
+        if lead["state"] == "gatekeeper" and decision.intent == "gatekeeper":
+            # Asked once already: close kindly instead of insisting.
+            decision.action, decision.messages = "close", [texts["gave_up"]]
+        elif lead["state"] == "gatekeeper" and found["staff"] and not lead.get("staff_name"):
+            decision.action = "reply"
+            decision.messages = [texts["ask_contact_again"].replace("{staff}", staff)]
+        elif decision.intent == "gatekeeper" and not staff:
+            decision.messages = list(decision.messages) + [texts["ask_name"]]
+        decision.intent = decision.intent if decision.intent != "gatekeeper" else "gatekeeper"
+        return decision
+
+    def _refer(self, lead: dict, decision: Decision, text: str) -> Decision:
+        """Save the number a staff member passed on as a new lead and thank them."""
+        texts = self.rules.raw["referral"]
+        numbers = referral.phones(text, own=lead["phone"])
+        if not numbers:
+            decision.action, decision.priority = "handoff", "needed"
+            decision.owner_reason = texts["contact_card"]
+            decision.messages = [texts["thanks_unnamed"].replace("{who}", texts["who_unnamed"])]
+            return decision
+        found = referral.names(text, self.llm, f"zaflas-staff-{lead['id']}")
+        staff = found["staff"] or lead.get("staff_name") or ""
+        decider = found["decider"]
+        row = {"name": f"{decider or 'Responsável'} · {lead['name']}", "phone": numbers[0],
+               "category": lead.get("category", ""), "city": lead.get("city", ""),
+               "maps_url": lead.get("maps_url", ""),
+               "note": f"Indicado por {staff or 'funcionário'} ({lead.get('label', '')})"}
+        report = self.store.import_rows(
+            [row], self.now(), "referral",
+            extra={"referral": {"from": lead["id"], "staff": staff, "company": lead["name"],
+                                "decider": decider}})
+        if report["do_not_contact"]:
+            decision.action, decision.priority = "handoff", "needed"
+            decision.owner_reason = "O número indicado está na lista de não contatar"
+        decision.referred = report["ids"][0] if report["ids"] else ""
+        who = decider or texts["who_unnamed"]
+        thanks = texts["thanks"] if staff else texts["thanks_unnamed"]
+        decision.messages = [thanks.replace("{staff}", staff).replace("{who}", who)]
+        self.store.update_lead(lead["id"], staff_name=staff or lead.get("staff_name"))
+        return decision
+
     def _check_progress(self, lead: dict, decision: Decision) -> Decision:
         """Hand off when the bot is not moving the conversation toward a quote."""
-        if decision.action not in ("reply", "qualify", "close"):
-            return decision
+        if decision.action not in ("reply", "qualify", "close") or decision.intent == "gatekeeper":
+            return decision  # the staff flow has its own kind close
         intents = lead.get("intents") or []
         if intents and intents[-1] == decision.intent:
             return stuck(self.rules, decision.hint, "pergunta repetida")
@@ -449,6 +545,9 @@ class SalesAgent:
     def _apply(self, lead: dict, decision: Decision, text: str, result: dict, replies: dict,
                today: str) -> dict:
         lead = self.store.lead(lead["id"])
+        if decision.action == "refer":
+            decision = self._refer(lead, decision, text)
+            lead = self.store.lead(lead["id"])
         if decision.messages:
             items = self._items(lead, f"reply#{lead['awaiting']}", decision.messages, text)
             results = self.channel.send(lead, items, {"kind": "sales-reply", "lead": lead["id"],
@@ -460,6 +559,8 @@ class SalesAgent:
         state = NEXT_STATE.get(decision.action, lead["state"])
         if decision.action in ("reply", "ignore"):
             state = lead["state"] if lead["state"] in REPLYABLE else "engaged"
+            if decision.intent == "gatekeeper" or lead["state"] == "gatekeeper":
+                state = "gatekeeper"
         changes = {"state": state, "awaiting": None,
                    "replies": {today: replies.get(today, 0) + (1 if decision.messages else 0)}}
         if decision.messages:
@@ -470,8 +571,18 @@ class SalesAgent:
         if decision.action == "block":
             self.store.add_dnc(lead["phone"], decision.intent, self.now())
             listener.revoke_contact(self.store.contact_rules_path, self._contact_entry(lead))
-        if decision.action in ("handoff", "quote"):
+        if decision.action in OWNER_ACTIONS:
             changes["handoff_reason"] = decision.intent
+        interest = interest_of(text) or lead.get("interest", "")
+        if decision.intent in ("system_request", "system_price", "app_at_site_price"):
+            interest = "system"
+        elif decision.intent in ("site_institutional", "hosting", "close_site") and \
+                interest != "system":
+            interest = "site"
+        if interest:
+            changes["interest"] = interest
+        if getattr(decision, "referred", ""):
+            changes["referred_to"] = decision.referred
         ficha = ""
         if decision.brief is not None:
             status = "pronta para orçamento" if decision.action == "quote" else "coletando dados"
@@ -479,9 +590,13 @@ class SalesAgent:
             changes.update(ficha=ficha, collect_turns=decision.collect_turns)
             result["ficha"] = ficha
         self.store.update_lead(lead["id"], **changes)
-        if decision.action in ("handoff", "quote"):
+        if decision.action in OWNER_ACTIONS:
             self._handoff(lead, decision.owner_reason or decision.intent, text,
                           decision.priority or "needed", decision.intent, ficha)
+        referred = getattr(decision, "referred", "")
+        if referred and self.rules.in_window(self.now(), "opening") and \
+                self.openings_today("referral") < int(self.rules.raw["referral"]["daily_limit"]):
+            result["referral_opening"] = self.open_lead(self.store.lead(referred))
         return {**result, "state": state}
 
     # Openings and follow-ups ---------------------------------------------------------
@@ -490,24 +605,30 @@ class SalesAgent:
         if not self.rules.in_window(now, "opening"):
             self.log("outside opening hours; no first contact now")
             return []
-        remaining = int(self.rules.limits["daily_openings"]) - self.openings_today()
-        if limit is not None:
-            remaining = min(remaining, limit)
-        if remaining <= 0:
+        left = {"cold": int(self.rules.limits["daily_openings"]) - self.openings_today("cold"),
+                "referral": int(self.rules.raw["referral"]["daily_limit"])
+                - self.openings_today("referral")}
+        if left["cold"] <= 0 and left["referral"] <= 0:
             self.log("daily opening limit reached")
             return []
+        # Referred numbers first: someone at the business asked us to talk to them.
         candidates = sorted((lead for lead in self.store.leads().values()
                              if lead["state"] == "new" and not lead.get("opened_at")),
-                            key=lambda lead: lead.get("imported_at") or "")
+                            key=lambda lead: (not lead.get("referral"),
+                                              lead.get("imported_at") or ""))
         results = []
-        used = 0
         for lead in candidates:
-            if used >= remaining:
+            kind = "referral" if lead.get("referral") else "cold"
+            if left[kind] <= 0:
+                continue
+            if limit is not None and sum(1 for item in results
+                                         if item["state"] in ("opened", "unconfirmed",
+                                                              "planned")) >= limit:
                 break
             outcome = self.open_lead(lead)
             results.append(outcome)
             if outcome["state"] in ("opened", "unconfirmed", "planned"):
-                used += 1
+                left[kind] -= 1
             if outcome["state"] in ("error", "unconfirmed"):
                 break
         return results
@@ -520,7 +641,10 @@ class SalesAgent:
             self.store.update_lead(lead["id"], state="do-not-contact")
             return {**result, "state": "do-not-contact"}
         now = self.now()
-        messages = self.rules.opening_messages(now)
+        source = lead.get("referral") or {}
+        messages = (self.rules.referral_opening(now, source.get("staff", ""),
+                                                source.get("company", lead["name"]))
+                    if source else self.rules.opening_messages(now))
         if not self.live:
             return {**result, "state": "planned", "messages": messages}
         items = self._items(lead, "opening", messages, None, self.rules.opening_delays())

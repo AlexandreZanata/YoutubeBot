@@ -12,10 +12,13 @@ from pathlib import Path
 RULES_PATH = Path(__file__).with_name("sales_rules.toml")
 # Owner decision 2026-11-17: only DeepSeek V4.1 Flash through OpenCode Go.
 ALLOWED_MODELS = ("deepseek-v4.1-flash",)
-ACTIONS = ("reply", "qualify", "quote", "collect", "close", "block", "handoff", "ignore")
+ACTIONS = ("reply", "qualify", "quote", "collect", "close", "block", "handoff", "ignore", "won",
+           "buy", "refer")
 REQUIRED_INTENTS = ("opt_out", "refusal", "auto_reply", "bot_question", "unknown",
                     "quote_accept", "quote_details", "system_request", "site_institutional",
-                    "human_request", "stuck")
+                    "human_request", "stuck", "ready_to_buy", "close_site", "payment_sent",
+                    "referral", "gatekeeper")
+HANDOFF_ACTIONS = ("handoff", "quote", "collect", "won", "buy", "refer")
 PRIORITIES = ("hot", "needed", "alert")
 MONEY = re.compile(r"r\$\s*(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?")
 REAIS = re.compile(r"(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?\s*reais")
@@ -140,6 +143,18 @@ class SalesRules:
         return ([float(value) for value in opening["delays"]]
                 + [float(opening["link_delay"])] * len(opening["links"]))
 
+    def referral_opening(self, now: datetime, staff: str, company: str) -> list[str]:
+        """Opening for a number a staff member passed on; names who passed it."""
+        referral = self.raw["referral"]
+        greeting = self.greeting(now)
+        texts = []
+        for text in referral["opening"]:
+            if "{staff}" in text and not staff:
+                text = referral["opening_unnamed"]
+            texts.append(text.replace("{greeting}", greeting).replace("{staff}", staff)
+                         .replace("{company}", company))
+        return texts + list(self.raw["opening"]["links"])
+
     def followup_messages(self) -> list[str]:
         return list(self.raw["followup"]["messages"])
 
@@ -203,7 +218,12 @@ def build(raw: dict) -> SalesRules:
     _require(raw, "followup", ("messages",))
     _require(raw, "handoff", ("messages",))
     _require(raw, "context", ("offer_question", "affirmative", "negative"))
-    _require(raw, "guard", ("forbidden", "human_claims", "quote_promises"))
+    _require(raw, "guard", ("forbidden", "human_claims", "quote_promises", "system_words"))
+    _require(raw, "referral", ("ask_name", "ask_contact_again", "gave_up", "thanks",
+                               "thanks_unnamed", "who_unnamed",
+                               "daily_limit", "opening", "opening_unnamed", "contact_card"))
+    if len(raw["referral"]["opening"]) != len(raw["opening"]["delays"]):
+        raise RulesError("referral.opening needs one message per opening delay")
     _require(raw, "brief", ("max_collect_turns", "required", "optional", "done_patterns",
                             "fallback_question"))
     for pattern in raw["brief"]["done_patterns"]:
@@ -255,7 +275,7 @@ def build(raw: dict) -> SalesRules:
         priority = item.get("priority", "needed")
         if priority not in PRIORITIES:
             raise RulesError(f"intent {intent_id}: priority must be one of {', '.join(PRIORITIES)}")
-        if item["action"] in ("handoff", "quote", "collect") and not item.get("reason"):
+        if item["action"] in HANDOFF_ACTIONS and not item.get("reason"):
             raise RulesError(f"intent {intent_id}: a hand-off needs a reason for the owner")
         intents.append(Intent(intent_id, item["action"], bool(item.get("fixed", False)),
                               item.get("when", ""), patterns, messages, priority,

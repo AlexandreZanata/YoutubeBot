@@ -140,7 +140,12 @@ sends at most one follow-up. It answers funnel leads by
 `deepseek-v4.1-flash` only; a price, deadline, link or promise outside that file falls back to
 its fixed text or goes to the owner. A refusal is a permanent do-not-contact entry, the robot
 question gets an honest answer, the OpenCode key stays in `.local/`, and `--live` stays
-required. See [sales agent](docs/COMMERCIAL-WHATSAPP-SALES.md).
+required. The rules' values are of the static institutional site only; apps and systems are
+always quoted by the owner and the bot must never tie the site price to them. Closing the
+institutional site sends only the Pix keys written in the rules file; closing an app or system,
+a payment message and a refusal after interest go to the owner. A staff member is asked for the
+decision maker's contact; a number they send becomes a referral lead with its own opening and
+its own daily limit. See [sales agent](docs/COMMERCIAL-WHATSAPP-SALES.md).
 
 When delivering captured products from this workstation to the remote Procurali VPS (database,
 site, Telegram offers group queue, and WhatsApp Web assisted drafts), never copy VPS origin IPs,

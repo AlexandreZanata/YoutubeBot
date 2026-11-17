@@ -14,16 +14,21 @@ from .store import SalesStore, _write_json
 
 # (state, label, group, needs the owner); the order is the order shown in the Central.
 STATES = (
+    ("won", "Venda fechada (site)", "Com você", True),
+    ("buying", "Quer comprar (sistema)", "Com você", True),
     ("needs-owner", "Precisa de você", "Com você", True),
     ("quote-requested", "Orçamento a fazer", "Com você", True),
     ("unconfirmed", "Envio não confirmado", "Com você", True),
     ("owner", "Você está atendendo", "Com você", True),
+    ("lost", "Desistiu", "Com você", True),
     ("qualifying", "Coletando dados", "Em conversa", False),
     ("engaged", "Em conversa", "Em conversa", False),
+    ("gatekeeper", "Falando com funcionário", "Em conversa", False),
     ("new", "Novo", "Prospecção", False),
     ("opening", "Abrindo conversa", "Prospecção", False),
     ("opened", "Abordado", "Prospecção", False),
     ("followed-up", "Follow-up enviado", "Prospecção", False),
+    ("referred", "Indicou o responsável", "Encerrados", False),
     ("closed", "Encerrado", "Encerrados", False),
     ("no-response", "Sem resposta", "Encerrados", False),
     ("do-not-contact", "Não contatar", "Encerrados", False),

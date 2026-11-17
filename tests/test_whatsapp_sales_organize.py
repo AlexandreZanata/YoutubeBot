@@ -103,10 +103,10 @@ class OrganizeTests(unittest.TestCase):
         self.assertEqual((first["label"], first["priority"]), ("barbearia-2", "hot"))
         self.assertEqual(first["wa_link"], "https://wa.me/5565900000002")
         counts = {item["state"]: item["count"] for item in data["states"]}
-        self.assertEqual((counts["needs-owner"], counts["opened"]), (1, 1))
+        self.assertEqual((counts["buying"], counts["opened"]), (1, 1))
         self.assertEqual(data["messages"][0]["text"], "Que ótimo! Já te respondo pessoalmente "
                                                       "com os próximos passos.")
-        self.assertEqual(len(central.STATES), 14)
+        self.assertEqual(len(central.STATES), 19)
 
 
 if __name__ == "__main__":

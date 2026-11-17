@@ -46,8 +46,15 @@ class SalesRulesTests(unittest.TestCase):
     def test_system_request_answer_is_the_owner_text(self):
         intent = self.rules.intent("system_request")
         self.assertTrue(intent.fixed)
-        self.assertEqual(intent.messages, ("Sim, nós podemos fazer isso.",
-                                           "Você gostaria que eu fizesse um orçamento?"))
+        self.assertEqual(intent.messages[0], "Sim, nós podemos fazer isso.")
+        self.assertIn("aplicativos e sistemas são feitos sob medida", intent.messages[1])
+        self.assertEqual(intent.messages[-1], "Você gostaria que eu fizesse um orçamento?")
+
+    def test_site_prices_are_stated_as_site_only(self):
+        facts = " ".join(self.rules.raw["facts"]["sistemas"])
+        self.assertIn("NÃO custam R$ 500", facts)
+        self.assertIn("SOMENTE para o site institucional",
+                      " ".join(self.rules.raw["facts"]["site_institucional"]))
 
     def test_daily_opening_limit_is_ten(self):
         self.assertEqual(self.rules.limits["daily_openings"], 10)

@@ -64,6 +64,14 @@ class SalesClassifierTests(unittest.TestCase):
         for text, expected in cases.items():
             self.check(text, expected)
 
+    def test_app_prices_are_never_confused_with_the_site(self):
+        self.check("Então um aplicativo sai 500 reais?", "app_at_site_price")
+        self.check("por 500 faz um app?", "app_at_site_price")
+        self.check("Quanto custa um aplicativo?", "system_price")
+        self.check("Vocês fazem aplicativo de delivery?", "system_request")
+        self.check("Quanto custa um site?", "site_institutional")
+        self.assertTrue(self.rules.intent("app_at_site_price").messages[0].startswith("Não"))
+
     def test_busy_or_redirecting_messages_are_never_refusals(self):
         for text in ("Agora não posso, me chama amanhã", "Não quero site, quero um aplicativo",
                      "Não me chama agora, me chama amanhã", "Nesse momento não posso falar"):

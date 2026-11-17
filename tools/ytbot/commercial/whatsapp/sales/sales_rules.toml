@@ -99,18 +99,28 @@ empresa = [
   "Exemplos de trabalhos: https://sorrifit.com, https://zaflas.com.br, https://musicalizese.com.br e https://abastevo.com.br.",
 ]
 site_institucional = [
-  "Site institucional é um site estático, só visual: funciona como a vitrine da empresa na internet, com quem são, serviços, fotos, endereço, horário e um botão para chamar no WhatsApp.",
+  "Site institucional é o site de apresentação da empresa: estático, só visual, como uma vitrine na internet com quem são, serviços, fotos, endereço, horário e um botão para chamar no WhatsApp.",
   "Ele não tem login, cadastro, agendamento nem pagamento online; por isso é mais simples e mais barato.",
+  "Os valores a seguir valem SOMENTE para o site institucional.",
   "Valor médio do site institucional: R$ 500, com entrada de R$ 250.",
   "Prazo médio de entrega do site institucional: 15 dias.",
-  "O servidor mantém o site no ar: R$ 39,90 por mês no boleto ou Pix, ou R$ 45 por mês no cartão.",
+  "Servidor do site institucional, que o mantém no ar: R$ 39,90 por mês no boleto ou Pix, ou R$ 45 por mês no cartão.",
+  "Para fechar o site institucional, a entrada é paga por Pix nas chaves que o bot envia; a construção começa depois do pagamento da entrada.",
 ]
 sistemas = [
-  "Sistemas, aplicativos e sites com muitas funcionalidades (login, cadastro, agendamento, pagamentos, estoque, painel, área do cliente) são feitos sob medida.",
-  "Preço e prazo de sistemas e aplicativos só existem depois do orçamento, que o Alexandre faz pessoalmente.",
+  "Aplicativos e sistemas NÃO custam R$ 500 e não seguem nenhum valor do site institucional.",
+  "Cada aplicativo ou sistema é feito sob medida: valor e prazo dependem das funções e dos requisitos do cliente (login, cadastro, agendamento, pagamentos, estoque, painel, área do cliente, integrações).",
+  "Por isso aplicativos e sistemas sempre passam por um orçamento, que o Alexandre faz pessoalmente.",
 ]
 
 [guard]
+# A sentence with a money value or a number of days may talk about apps or systems only when it
+# also says "institucional": the site prices must never look like an app price (owner,
+# 2026-11-17).
+system_words = [
+  'aplicativo', '\bapps?\b', 'sistema', 'loja (virtual|online)', 'e-?commerce', 'agendamento',
+  '\bcadastro', '\blogin\b', '\bpainel\b', 'area do cliente',
+]
 # Terms the model may never write (checked after removing accents).
 forbidden = [
   "desconto", "gratis", "gratuito", "de graca", "garantimos", "garantido", "garantia",
@@ -146,6 +156,26 @@ done_patterns = [
   'acho que e isso', 'ta bom assim', 'era isso', '^(obrigad[oa]|valeu|ok|blz|beleza)[!. ]*$',
 ]
 fallback_question = "Anotei! Se tiver mais alguma informação, como nome do site, logo, fotos, endereço ou horário, pode mandar por aqui. Quando terminar, é só me falar."
+
+[referral]
+# A staff member who does not decide is asked, politely, for the decision maker's contact.
+# A number sent in the chat becomes a new lead (same category, next number, vCard) and gets
+# its own opening, mentioning who passed the number. Staff chats then stop (state referred).
+ask_name = "E com quem eu falo, por gentileza?"
+ask_contact_again = "Prazer, {staff}! Você poderia me passar o contato de quem cuida das decisões sobre site e divulgação da empresa?"
+gave_up = "Sem problema! Fico à disposição: se a pessoa responsável quiser conversar, é só me chamar por aqui. Obrigado!"
+thanks = "Muito obrigado, {staff}! Vou falar com {who} agora."
+thanks_unnamed = "Muito obrigado! Vou falar com {who} agora."
+who_unnamed = "a pessoa responsável"
+daily_limit = 10                    # referral openings, apart from the 10 cold ones
+opening = [
+  "{greeting}",
+  "Tudo bem?",
+  "{staff}, da {company}, me passou o seu contato. Sou o Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. Vi que no Google Maps a {company} ainda não tem site.",
+  "Nós temos alguns exemplos de sistemas e sites que nós criamos:",
+]
+opening_unnamed = "A equipe da {company} me passou o seu contato. Sou o Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. Vi que no Google Maps a {company} ainda não tem site."
+contact_card = "Mandou o contato do responsável em cartão: salve o número e chame"
 
 [context]
 # Short answers are read against the last question we asked. After the offer question, an
@@ -320,17 +350,72 @@ messages = ["Recebi, obrigado! Vou dar uma olhada e já te respondo."]
 
 [[intents]]
 id = "ready_to_buy"
-action = "handoff"
+action = "buy"
 fixed = true
 priority = "hot"
-reason = "Quer fechar: perguntou como começar ou pagar"
-when = "Quer contratar ou começar já: 'quero fechar', 'pode começar', 'fechado', 'como faço para pagar a entrada'."
+reason = "Quer comprar um sistema ou aplicativo: feche pessoalmente"
+when = "Quer contratar ou começar já: 'quero fechar', 'pode começar', 'fechado', 'como faço para pagar a entrada'. No site institucional o bot manda as chaves Pix (close_site); em sistema ou aplicativo, o Alexandre fecha."
 patterns = [
   'quero (fechar|contratar|comecar)', 'vamos (fechar|comecar)', 'pode (comecar|fazer)[.! ]*$', '^fechado\b',
   'como (eu )?(faco|faço) (pra|para) (pagar|contratar|comecar|fechar)', 'pagar a entrada', 'onde (eu )?pago',
   'manda (o pix|a chave|os dados( para pagamento)?)',
 ]
 messages = ["Que ótimo! Já te respondo pessoalmente com os próximos passos."]
+
+[[intents]]
+id = "close_site"
+action = "won"
+fixed = true
+priority = "hot"
+reason = "Fechou o site institucional: chaves Pix enviadas, confirme a entrada"
+when = "Uso interno: quer fechar só o site institucional (a conversa é sobre o site de apresentação, não sobre sistema ou aplicativo)."
+patterns = []
+messages = [
+  "Que ótimo! Para começarmos o seu site institucional, a entrada é de R$ 250. Pode fazer o Pix para uma destas chaves:",
+  "financeiro@zaflas.com.br",
+  "8e725568-04bd-47e9-9615-cf090a1929a7",
+  "Assim que a entrada for paga, começamos a construir o seu site. Se puder, me manda o comprovante por aqui.",
+]
+
+[[intents]]
+id = "payment_sent"
+action = "handoff"
+fixed = true
+priority = "hot"
+reason = "Diz que pagou a entrada: confira o Pix e confirme"
+when = "Diz que pagou, fez o Pix ou manda o comprovante."
+patterns = [
+  '\bpaguei\b', 'fiz o (pix|pagamento)', 'pix (feito|enviado|realizado|pago)', 'comprovante', '\btransferi\b',
+  'ja (paguei|transferi|fiz o pix|mandei o pix)', 'pagamento (feito|realizado|enviado)',
+]
+messages = ["Recebido, obrigado! Vou conferir e já te confirmo por aqui."]
+
+[[intents]]
+id = "referral"
+action = "refer"
+fixed = true
+priority = "hot"
+reason = "Indicou outro número para falar"
+when = "Manda o número de outra pessoa para conversar (o dono, o gerente ou o responsável)."
+patterns = ['(?<!\d)(\+?55[\s.-]*)?\(?\d{2}\)?[\s.-]*9?[\s.-]*\d{4}[\s.-]*\d{4}(?!\d)']
+messages = ["Muito obrigado! Vou falar com a pessoa responsável agora."]
+
+[[intents]]
+id = "gatekeeper"
+action = "reply"
+fixed = true
+when = "Quem responde é funcionário ou atendente e não decide: 'sou funcionária', 'o dono não está', 'quem decide é o gerente', 'vou passar pro responsável', 'ele te chama'."
+patterns = [
+  'sou (funcionari|atendente|recepcionista|secretari|colaborador)', 'nao sou (o |a )?(dono|dona|responsavel|proprietari)',
+  '(o|a) (dono|dona|responsavel|proprietari[oa]|gerente|chefe|patra[oa]) (nao esta|nao ta|nao se encontra|esta ocupad|ta ocupad|que (decide|ve|cuida|resolve))',
+  'quem (decide|resolve|ve isso|cuida (disso|dessa parte))', 'vou (passar|repassar|mostrar|falar) (isso )?(pro|para o|pra|para a) (dono|dona|responsavel|chefe|gerente|patra[oa])',
+  'deixa eu ver com (o|a)', 'preciso ver com (o|a)', 'tenho que ver com (o|a)', 'nao sou eu que (decido|cuido)',
+  'vou (ver|falar|conversar) com (o|a) (dono|dona|responsavel|chefe|gerente|patra[oa])', '(ele|ela) (te )?(chama|retorna|liga|responde)',
+]
+messages = [
+  "Muito obrigado pelo retorno!",
+  "Você poderia me passar o contato de quem cuida das decisões sobre site e divulgação da empresa? Assim eu falo direto com a pessoa e não tomo o seu tempo.",
+]
 
 [[intents]]
 id = "negotiation"
@@ -392,6 +477,36 @@ patterns = ['vou pensar', 'mais pra frente', 'mais para frente', 'depois (eu )?(
 messages = ["Sem problema! Fico à disposição, é só me chamar quando quiser."]
 
 [[intents]]
+id = "app_at_site_price"
+action = "reply"
+fixed = true
+when = "Acha que aplicativo, sistema ou loja custa os R$ 500 do site institucional ('então um aplicativo sai 500?')."
+patterns = [
+  '(aplicativo|\bapps?\b|sistema|loja)[^.?!]{0,50}(500|quinhentos)',
+  '(500|quinhentos)[^.?!]{0,50}(aplicativo|\bapps?\b|sistema|loja)',
+]
+messages = [
+  "Não, os R$ 500 são só do site institucional, que é o site de apresentação da empresa (só visual).",
+  "Aplicativos e sistemas são feitos sob medida: o valor depende das funções e do que você precisa, e sai em um orçamento específico.",
+  "Você gostaria que eu fizesse um orçamento?",
+]
+
+[[intents]]
+id = "system_price"
+action = "reply"
+fixed = true
+when = "Pergunta quanto custa ou o prazo de um aplicativo, sistema ou loja virtual."
+patterns = [
+  '(quanto|valor|preco|prazo|demora)[^.?!]{0,50}(aplicativo|\bapps?\b|sistema|loja (virtual|online)|e-?commerce)',
+  '(aplicativo|\bapps?\b|sistema|loja (virtual|online)|e-?commerce)[^.?!]{0,50}(quanto|valor|preco|prazo|demora)',
+]
+messages = [
+  "Aplicativos e sistemas são feitos sob medida, então o valor e o prazo dependem das funções e do que você precisa. Não é o mesmo valor do site institucional, que é só o site de apresentação.",
+  "O valor certo sai em um orçamento específico.",
+  "Você gostaria que eu fizesse um orçamento?",
+]
+
+[[intents]]
 id = "system_request"
 action = "reply"
 fixed = true
@@ -401,7 +516,11 @@ patterns = [
   'pagamento online', '\bestoque\b', '\bpainel\b', 'area do cliente', 'integracao', '\blogin\b', '\bcadastro\b',
   'controle de', '\bdelivery\b', '\bcardapio digital\b',
 ]
-messages = ["Sim, nós podemos fazer isso.", "Você gostaria que eu fizesse um orçamento?"]
+messages = [
+  "Sim, nós podemos fazer isso.",
+  "Só para deixar claro: aplicativos e sistemas são feitos sob medida, então o valor depende das funções e do que você precisa. É diferente do site institucional, que é só de apresentação.",
+  "Você gostaria que eu fizesse um orçamento?",
+]
 
 [[intents]]
 id = "hosting"
@@ -421,8 +540,8 @@ when = "Quer um site simples, só para mostrar a empresa, ou pergunta como funci
 patterns = ['\bsite\b', 'pagina', 'institucional', 'so para (mostrar|divulgar)', 'aparecer no google', 'como funciona']
 messages = [
   "Um site institucional é a vitrine da sua empresa na internet: mostra quem vocês são, os serviços, fotos, endereço, horário e um botão para chamar no WhatsApp. Ele é só visual, sem login nem cadastro, por isso é mais simples.",
-  "O valor médio é R$ 500, com entrada de R$ 250, e fica pronto em média em 15 dias.",
-  "Depois tem o servidor, que mantém o site no ar: R$ 39,90 por mês no boleto ou Pix, ou R$ 45 no cartão.",
+  "O valor médio do site institucional é R$ 500, com entrada de R$ 250, e ele fica pronto em média em 15 dias. Depois tem o servidor, que mantém o site no ar: R$ 39,90 por mês no boleto ou Pix, ou R$ 45 no cartão.",
+  "Esses valores são só do site institucional. Aplicativos e sistemas são feitos sob medida e têm orçamento à parte.",
   "Você gostaria que eu fizesse um orçamento?",
 ]
 
@@ -433,8 +552,8 @@ fixed = false
 when = "Pergunta preço, valor, quanto custa, sem dizer se é site simples ou sistema."
 patterns = ['quanto (custa|fica|sai|e|eh|cobra)', '\bvalor', '\bpreco', 'qual o investimento']
 messages = [
-  "Um site institucional, que é só visual, fica em média R$ 500, com entrada de R$ 250, mais o servidor de R$ 39,90 por mês no boleto ou Pix (ou R$ 45 no cartão).",
-  "Já sistemas e aplicativos têm o valor definido pelas funcionalidades que você precisa.",
+  "Depende do que você precisa. O site institucional, que é o site de apresentação da empresa (só visual), fica em média R$ 500, com entrada de R$ 250, mais o servidor de R$ 39,90 por mês no boleto ou Pix (ou R$ 45 no cartão).",
+  "Já aplicativos e sistemas são outra coisa: cada um é feito sob medida e o valor depende das funções que você precisa, definido em um orçamento específico.",
   "Você gostaria que eu fizesse um orçamento?",
 ]
 

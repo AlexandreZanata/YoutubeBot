@@ -59,8 +59,16 @@ class SalesDecisionTests(unittest.TestCase):
 
     def test_every_reference_text_passes_the_guard(self):
         for intent in self.rules.intents:
+            if intent.fixed:
+                continue  # sent verbatim, never through the model (e.g. the Pix keys)
             self.assertEqual(guard.violations(self.rules, list(intent.messages) or ["ok"]), [],
                              intent.id)
+
+    def test_site_prices_never_describe_an_app(self):
+        decision, _ = self.run_model("E pra minha loja de roupas, quanto ficaria?", {
+            "intent": "price", "messages": ["Um aplicativo fica em média R$ 500."]})
+        self.assertIn("site price next to an app or system", decision.violations)
+        self.assertNotIn("Um aplicativo fica em média R$ 500.", decision.messages)
 
     def test_links_are_split_into_their_own_messages(self):
         self.assertEqual(guard.split_links(["Veja: https://zaflas.com.br e https://abastevo.com.br"]),

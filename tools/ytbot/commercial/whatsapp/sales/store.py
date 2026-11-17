@@ -32,7 +32,7 @@ AUTOMATED_STATES = ("opened", "followed-up", "engaged", "qualifying", "closed")
 TERMINAL_STATES = ("do-not-contact", "no-response", "invalid-number")
 # Where leads come from; the acquisition module (Receita Federal, manual Maps search) adds rows
 # through `import_rows` with its own source so numbering and contact export stay the same.
-SOURCES = ("google-maps-reviewed", "google-maps-manual", "receita-federal", "manual")
+SOURCES = ("google-maps-reviewed", "google-maps-manual", "receita-federal", "manual", "referral")
 
 
 def stamp(now: datetime) -> str:
@@ -315,7 +315,7 @@ class SalesStore:
         return self.import_rows(rows, now, source, first_line=2)
 
     def import_rows(self, rows: list[dict], now: datetime, source: str = "manual",
-                    first_line: int = 1) -> dict:
+                    first_line: int = 1, extra: dict | None = None) -> dict:
         """Add approved leads, number them per category and export their contacts.
 
         The single entry point for every acquisition path (reviewed Maps list, manual search,
@@ -324,7 +324,7 @@ class SalesStore:
         if source not in SOURCES:
             raise ValueError(f"source must be one of {', '.join(SOURCES)}")
         report = {"imported": 0, "duplicates": 0, "do_not_contact": 0, "rejected": [],
-                  "labels": [], "contacts_file": None}
+                  "labels": [], "contacts_file": None, "ids": []}
         leads = self.ensure_labels(self.leads())
         added = []
         for line, row in enumerate(rows, start=first_line):
@@ -347,13 +347,14 @@ class SalesStore:
                 "source": source, "state": "new",
                 "imported_at": stamp(now), "opened_at": None, "followups": 0,
                 "last_out_at": None, "last_in_at": None, "awaiting": None,
-                "replies": {}, "handoff_reason": None, "chat": None,
+                "replies": {}, "handoff_reason": None, "chat": None, **(extra or {}),
             }
             self.ensure_labels(leads)
             added.append(leads[identifier])
             report["imported"] += 1
         self.save_leads(leads)
         report["labels"] = [f"{lead['label']} {lead['name']}" for lead in added]
+        report["ids"] = [lead["id"] for lead in added]
         if added:
             report["contacts_file"] = str(self.export_contacts(added, now, "novos"))
             self.export_contacts(None, now, "todos")

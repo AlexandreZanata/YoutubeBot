@@ -89,17 +89,17 @@ do-not-contact check, numbering and vCard apply to all of them.
 ## Central snapshot
 
 After every cycle and every owner command the agent writes `sales/central.json` for the desktop
-manager's Central page: `states` (14 states with Portuguese label, group and count),
+manager's Central page: `states` (19 states with Portuguese label, group and count),
 `interventions` (conversations with the owner, hot first, with label, name, phone, wa.me link,
 reason, last message and ficha), `messages` (the 100 most recent, both directions) and
 `leads`. `sales central` refreshes it and prints what needs the owner.
 
 | Group | States |
 | --- | --- |
-| Com você | `needs-owner` Precisa de você, `quote-requested` Orçamento a fazer, `unconfirmed` Envio não confirmado, `owner` Você está atendendo |
-| Em conversa | `qualifying` Coletando dados, `engaged` Em conversa |
+| Com você | `won` Venda fechada (site), `buying` Quer comprar (sistema), `needs-owner` Precisa de você, `quote-requested` Orçamento a fazer, `unconfirmed` Envio não confirmado, `owner` Você está atendendo, `lost` Desistiu |
+| Em conversa | `qualifying` Coletando dados, `engaged` Em conversa, `gatekeeper` Falando com funcionário |
 | Prospecção | `new` Novo, `opening` Abrindo conversa, `opened` Abordado, `followed-up` Follow-up enviado |
-| Encerrados | `closed` Encerrado, `no-response` Sem resposta, `do-not-contact` Não contatar, `invalid-number` Número sem WhatsApp |
+| Encerrados | `referred` Indicou o responsável, `closed` Encerrado, `no-response` Sem resposta, `do-not-contact` Não contatar, `invalid-number` Número sem WhatsApp |
 
 ## Commands
 
@@ -203,6 +203,63 @@ the model using only the facts.
 | Message outside 07:00–21:00 | — | — | Stored; answered at the start of the next reply window |
 | The owner typed in the chat | — | — | Detected when the chat opens; state `owner`, automation pauses |
 | A refused contact writes again | — | — | No automated answer; owner notified |
+
+## Staff, referral, closing and end states (owner, 2026-11-17)
+
+```text
+A staff member answers ("sou funcionária", "o dono não está", "vou passar pro dono")
+  └─▶ gatekeeper · state gatekeeper (the bot keeps the chat)
+      "Muito obrigado pelo retorno!"
+      "Você poderia me passar o contato de quem cuida das decisões sobre site e divulgação
+       da empresa? Assim eu falo direto com a pessoa e não tomo o seu tempo."
+      "E com quem eu falo, por gentileza?"          (only while the name is unknown)
+      their name → "Prazer, Paula! Você poderia me passar o contato …"
+      no contact again ("ele te chama") → kind close, state closed
+
+The chat receives a number ("o número do Carlos é (65) 9…")
+  └─▶ referral (only a valid Brazilian number from the text, never the chat's own)
+      to the staff member: "Muito obrigado, Paula! Vou falar com Carlos agora."  → referred
+      new lead: next number of the same category (barbearia-2 "Carlos · Barbearia X"),
+      source referral, vCard batch, linked to the staff chat
+      opening to the new number, in the opening window, own daily limit (10), first in line:
+        greeting → "Tudo bem?" → "Paula, da Barbearia X, me passou o seu contato. Sou o
+        Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. Vi que no
+        Google Maps a Barbearia X ainda não tem site." → examples → links
+      a contact card without a visible number → owner: "salve o número e chame"
+
+"Quero fechar" / "como pago a entrada" (checked before the quote "sim")
+  ├─ the conversation is about the institutional site → close_site, state won:
+  │     "Que ótimo! Para começarmos o seu site institucional, a entrada é de R$ 250. Pode
+  │      fazer o Pix para uma destas chaves:" → "financeiro@zaflas.com.br" →
+  │     "8e725568-04bd-47e9-9615-cf090a1929a7" → "Assim que a entrada for paga, começamos a
+  │      construir o seu site. Se puder, me manda o comprovante por aqui."   🔥 owner
+  ├─ about an app or a system → state buying ("Quer comprar"), no keys        🔥 owner
+  └─ unclear → state buying with "não ficou claro se é site ou sistema"       🔥 owner
+"Paguei / fiz o Pix / comprovante" in won → 🔥 "confira o Pix" at once; receipts are saved
+A refusal after real interest (site or system) → state lost ("Desistiu"), thanks, owner
+decides; it does not block the number. An opt-out or a refusal at the opening still blocks.
+```
+
+The interest of a lead (`site` or `system`) comes from what the conversation talked about:
+system requests and app/system prices mark `system`; the institutional site, hosting and the
+site close mark `site`, never overriding `system`. In `won`, `buying`, `lost` (and every owner
+state) the bot stops answering; the Central lists them under "Com você".
+
+### Prices: the site only
+
+All values in the rules (R$ 500, R$ 250, R$ 39,90, R$ 45, 15 dias) are of the static
+institutional site. Apps and systems are made to measure; their price and time depend on the
+features and requirements and come only from the owner's quote. The rules state it in the facts,
+in every price reference text and in the context model, and two fixed answers make it plain:
+
+| Client | Intent | Answer |
+| --- | --- | --- |
+| "Então um aplicativo sai 500 reais?" | `app_at_site_price` | "Não, os R$ 500 são só do site institucional…", then made to measure, then the quote offer |
+| "Quanto custa um aplicativo?" | `system_price` | Made to measure, not the site price, value in a specific quote, quote offer |
+| "Vocês fazem aplicativo de delivery?" | `system_request` | "Sim, nós podemos fazer isso." + the made-to-measure note + quote offer |
+
+The guard rejects any model sentence with a money value or a number of days that mentions an
+app, system, store or scheduling without also saying "institucional".
 
 ## Client folder (ficha) and quote collection
 

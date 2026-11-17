@@ -20,7 +20,7 @@ from .rules import SalesRules
 
 BLOCKING = ("opt_out", "refusal")
 MODEL_TEXT_ACTIONS = ("reply", "qualify", "close")
-HANDOFF_ACTIONS = ("handoff", "quote")
+HANDOFF_ACTIONS = ("handoff", "quote", "buy", "won", "refer")
 RANK = {"needed": 1, "alert": 1, "hot": 2}
 
 
@@ -49,6 +49,7 @@ class Decision:
     owner_reason: str = ""
     brief: dict | None = None
     collect_turns: int = 0
+    referred: str = ""
 
     def record(self) -> dict:
         return {"intent": self.intent, "action": self.action, "source": self.source,

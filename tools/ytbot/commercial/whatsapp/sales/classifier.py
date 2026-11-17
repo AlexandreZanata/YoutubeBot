@@ -11,13 +11,17 @@ import re
 from .rules import SalesRules, normalize
 
 SAFETY = ("opt_out", "refusal", "auto_reply")
+# Checked right after the safety intents: a number, a payment or a staff member answering says
+# more about the conversation than any word they contain ("vou falar com o dono").
+FIRST = ("referral", "payment_sent", "ready_to_buy", "gatekeeper")
 # While qualifying, these still win over "the text is the project description".
 # Media and short thanks while qualifying are part of the project details (logo, photos, "ok").
 QUALIFYING_OVERRIDES = ("human_request", "bot_question", "how_got_number", "trust_concern",
-                        "call_request", "callback_later", "sticker")
+                        "call_request", "callback_later", "sticker", "ready_to_buy")
 # Intents the local classifier decides alone for short messages (no model call).
 DECISIVE = ("opt_out", "refusal", "auto_reply", "bot_question", "sticker", "thanks",
-            "audio", "media", "human_request", "trust_concern", "callback_later")
+            "audio", "media", "human_request", "trust_concern", "callback_later", "referral",
+            "payment_sent", "gatekeeper", "app_at_site_price", "system_price")
 SHORT = 80
 # A photo or document with a caption arrives as "Photo\n<caption>": the caption is the message.
 MEDIA_LABEL = re.compile(r"^(photo|foto|image|imagem|video|document|documento)\s+(?=\S)")
@@ -51,6 +55,9 @@ def classify(rules: SalesRules, text: str, history: list[dict] | None = None,
     for intent_id in SAFETY:
         if rules.intent(intent_id).matches(plain):
             return intent_id
+    for intent_id in FIRST:
+        if rules.has_intent(intent_id) and rules.intent(intent_id).matches(plain):
+            return intent_id
     context = rules.context
     if re.search(context["offer_question"], normalize(last_outgoing(history or []))):
         if _any(context["affirmative"], plain):
@@ -63,7 +70,7 @@ def classify(rules: SalesRules, text: str, history: list[dict] | None = None,
                 return intent_id
         return "quote_details"
     for intent in rules.intents:
-        if intent.id not in SAFETY and intent.matches(plain):
+        if intent.id not in SAFETY + FIRST and intent.matches(plain):
             return intent.id
     return "unknown"
 
