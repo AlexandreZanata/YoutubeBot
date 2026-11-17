@@ -27,6 +27,7 @@ retry the Codex thumbnail.
 | Upload stuck | no `Envio concluído` for 15 minutes | Log every 60s; `UploadBlocked` | Check connection/Studio; record any ID |
 | Video ID missing | edit URL and share link both lack an ID | Poll both for 90 seconds; log the page URL | Open Studio content and find the draft |
 | Title becomes the filename | edit-page title differs after reload | `video_details` reapplies title/description and verifies | Block; fix in Studio manually |
+| Details do not persist on a draft | title/description revert on the edit page | schedule first, then re-apply the details on the scheduled video | Never edit a draft inline; the wizard is the only editable surface |
 | Draft scheduled without a custom thumbnail | a recovery used the upload dialog and skipped the details pass | `video_details.apply_thumbnail` on the edit page and save | Reapply before the slot; never schedule a recovered draft without it |
 | Description empty | edit-page description empty | Same details pass | Block; regenerate metadata |
 | SEO tags empty | `input[aria-label=Tags]` empty | Description keeps the `TAGS:` line; report tags separately | Fill tags manually when the UI allows |
