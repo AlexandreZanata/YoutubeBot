@@ -1,0 +1,17 @@
+Write one complete English book-summary essay for the zanata channel.
+
+REQUIREMENTS:
+
+- Everything must be 100% in English.
+- Length: 8,000 to 8,500 words, about 50 to 55 minutes at the channel's measured narration pace.
+- One book and one thinker per episode. Explain the central thesis, the concepts that support it and the concrete examples the author uses.
+- Open with the problem the book answers, not with a biography. Bring the author in only where it helps the argument.
+- Move through the ideas as a narrative: claim, tension, evidence, consequence. No chapter-by-chapter recitation.
+- Stay faithful to the book. Do not invent quotations, page numbers, studies, statistics or biographical facts.
+- A quiet, precise, intelligent voice. No hype, no listicles, no self-help promises.
+- No headings, lists, labels, notes, citations, links or metadata.
+- No music cues or speaker notes.
+- Do not use em dashes or en dashes. Use commas, periods, colons or ordinary hyphens.
+- Output only the narration text that will be read aloud.
+
+THEME:

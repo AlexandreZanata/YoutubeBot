@@ -1,0 +1,18 @@
+Create ONE finished 16:9 YouTube thumbnail for the zanata channel, a book-summary channel.
+
+LAYOUT, EXACT:
+- Left 45 percent: a solid black panel.
+- Top left: a yellow rounded pill badge with a small open-book line icon, followed by "BOOK SUMMARY" in black ultra condensed uppercase.
+- Under the badge: the video title in 3 to 4 stacked lines of white ultra condensed heavy uppercase, left aligned, with one or two key words in saturated yellow (#F2C230).
+- Under the title: a thin white or yellow horizontal rule, then the author name in white, letterspaced uppercase, and one short yellow subtitle line with the book's theme.
+- Center: a dark cinematic scene that illustrates the book's idea, with a human figure seen from behind or a symbolic place.
+- Right 30 percent: a realistic 3D mockup of the book cover, standing, with its title and author printed on the cover. The cover must look like a real printed book.
+- Palette: black, white, yellow, muted cinematic browns and grays.
+
+TEXT RULES:
+- Use the exact book title and author. Spell every word correctly.
+- Keep all text inside safe margins, fully legible, no placeholder and no gibberish.
+- No channel name, no logos other than the book cover, no watermark.
+
+FORBIDDEN:
+- Bright flat backgrounds, cluttered collages, more than two text zones, glowing or 3D title text, distorted letters, misspelled words.

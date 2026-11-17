@@ -19,8 +19,8 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   Zaflas before audio, render or upload. The Read aloud voice remains Cove as selected by
   the owner. Operator/browser interface language never changes content language.
 - `tools/ytbot` keeps channel prompts, deduplication, resumable stage records and sequential
-  upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`
-  and `infinite-random-worlds`.
+  upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`,
+  `infinite-random-worlds`, `vocal-pages` and `zanata`.
   Whispers uses 2,400 to 2,800 words (15 to 17 minutes), Sacred Brown Engraving thumbnails,
   brown stippling background and the metadata/tag patterns in
   [its channel profile](docs/channels/whispers-from-heaven.md). Zaflas uses Brazilian
@@ -30,6 +30,9 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   12:00 America/Cuiaba. Its dedicated profile is upload-only; generation stays in legacy.
   Zaflas articles target 4,000 to 4,800 words (26,000 to 34,000 characters) with one bounded
   rewrite above the ceiling.
+- zanata is English-only book summaries at 16:00 daily, 50 to 55 minutes, with the yellow
+  BOOK SUMMARY thumbnail formula in [its channel profile](docs/channels/zanata.md). It shares
+  the Google account with Fallem Prince: switch the brand channel in Studio, never sign out.
 - Infinite Random Worlds is English-only and has no background video: the episode thumbnail
   is the still background under the burned-in subtitles. It keeps no music, the five-second
   quick finish and a free per-episode thumbnail style. Stories target 4,500 to 6,000 words
