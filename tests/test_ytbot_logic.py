@@ -122,6 +122,12 @@ class ChannelProfileTests(unittest.TestCase):
         self.assertEqual(channel.interval_days, 2)
         self.assertEqual(channel.language, "en")
 
+    def test_reflection_is_the_biblical_story_channel(self):
+        channel = channels.get("reflection")
+        self.assertEqual(channel.channel_id, "UCISw6UDaFINPRuuMr0s7tpA")
+        self.assertEqual(channel.language, "en")
+        self.assertEqual(channel.slots, (5, 17))
+
     def test_zanata_is_the_daily_book_summary_channel(self):
         channel = channels.get("zanata")
         self.assertEqual(channel.channel_id, "UCx0AE-elCyDhfY0d1hQIwdw")

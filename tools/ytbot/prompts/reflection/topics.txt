@@ -1,0 +1,1 @@
+Suggest premises for the word of reflection. Each premise must name one biblical character and one concrete human moment of fear, waiting, exhaustion or doubt, in the style of "Elijah's Breaking Point: When You've Been Strong for Too Long". Avoid characters already covered, generic devotionals and repeated themes. Return only a numbered list, one per line.

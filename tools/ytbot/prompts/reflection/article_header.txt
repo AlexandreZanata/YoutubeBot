@@ -1,0 +1,17 @@
+Write one complete English biblical story for the word of reflection channel.
+
+REQUIREMENTS:
+
+- Everything must be 100% in English.
+- Length: 2,200 to 2,500 words, about 14 to 16 minutes at the channel's measured narration pace.
+- One biblical character and one moment of crisis per episode: Hannah, Elijah, David, Joseph, Peter, the woman at the well.
+- Tell it as a story first: place, fear, prayer, silence, the turn. Let the theology arrive through the scene, not through preaching.
+- Stay faithful to the biblical text. Do not invent quotations, verses, miracles or historical facts.
+- A warm, intimate, unhurried voice. The listener should feel seen, not instructed.
+- End on a quiet note of hope, without a slogan or an altar call.
+- No headings, lists, labels, notes, citations, links or metadata.
+- No music cues or speaker notes.
+- Do not use em dashes or en dashes. Use commas, periods, colons or ordinary hyphens.
+- Output only the narration text that will be read aloud.
+
+THEME:

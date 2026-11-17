@@ -20,7 +20,7 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   the owner. Operator/browser interface language never changes content language.
 - `tools/ytbot` keeps channel prompts, deduplication, resumable stage records and sequential
   upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`,
-  `infinite-random-worlds`, `vocal-pages` and `zanata`.
+  `infinite-random-worlds`, `vocal-pages`, `zanata` and `reflection`.
   Whispers uses 2,400 to 2,800 words (15 to 17 minutes), Sacred Brown Engraving thumbnails,
   brown stippling background and the metadata/tag patterns in
   [its channel profile](docs/channels/whispers-from-heaven.md). Zaflas uses Brazilian
@@ -30,6 +30,10 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   12:00 America/Cuiaba. Its dedicated profile is upload-only; generation stays in legacy.
   Zaflas articles target 4,000 to 4,800 words (26,000 to 34,000 characters) with one bounded
   rewrite above the ceiling.
+- the word of reflection is English-only biblical stories at 05:00 and 17:00 daily, 14 to 16
+  minutes, full-bleed cinematic thumbnails with a two or three word white title. It shares the
+  Google account with Vocal Pages. See
+  [its channel profile](docs/channels/the-word-of-reflection.md).
 - zanata is English-only book summaries at 16:00 daily, 50 to 55 minutes, with the yellow
   BOOK SUMMARY thumbnail formula in [its channel profile](docs/channels/zanata.md). It shares
   the Google account with Fallem Prince: switch the brand channel in Studio, never sign out.
