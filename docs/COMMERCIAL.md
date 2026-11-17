@@ -5,7 +5,9 @@ Mercado Livre is the first network.
 
 ## WhatsApp Web
 
-The commercial module also carries an owner-operated WhatsApp Web session. It follows the
+The full structure, state machine, failure matrix and troubleshooting live in
+[WHATSAPP](COMMERCIAL-WHATSAPP.md). The commercial module also carries an owner-operated
+WhatsApp Web session. It follows the
 Telegram commercial rules: one chat at a time, a minimum interval between messages, a live
 gate, an idempotency journal and no bulk automation.
 
