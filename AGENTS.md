@@ -156,6 +156,14 @@ confirms) so the owner receives the complete ficha. A staff member is asked for 
 decision maker's contact; a number they send becomes a referral lead with its own opening and
 its own daily limit. See [sales agent](docs/COMMERCIAL-WHATSAPP-SALES.md).
 
+The separate Brasa & Pão ordering agent inherits the same WhatsApp sender, listener, journal,
+store, pacing and free-first model router, but keeps its own rules, state machine, menu and
+private root under `.local/commercial/whatsapp/lanchonete/`. It only replies to customers who
+wrote first, confirms every order item, extra, fee, payment and change before writing the
+kitchen ficha, and never invents a price or sends a Pix key. Run it with
+`python3 -m tools.ytbot commercial lanchonete ... --network whatsapp`; `--live` is required to
+send. See [ordering agent](docs/COMMERCIAL-WHATSAPP-LANCHONETE.md).
+
 Google Maps lead research runs with `python3 -m tools.ytbot commercial maps
 login|status|research|verify|export`: one tab, a person's pace, the owner's manual Google login,
 hidden Chrome after login, a stop at any challenge, read-only on Google, a confirmation search

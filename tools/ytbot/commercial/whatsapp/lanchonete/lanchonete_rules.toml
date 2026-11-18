@@ -1,0 +1,842 @@
+# Brasa & Pão WhatsApp ordering rules.
+#
+# Contract: docs/COMMERCIAL-WHATSAPP-LANCHONETE.md. This file is the only source of menu
+# items, prices, extras, fees, payment methods, hours and promises. The model may only read
+# free-form text and choose catalog ids; every price, total and reply is written here or
+# calculated from here. Prices are integer cents to keep the arithmetic exact.
+#
+# Patterns are Python regular expressions matched against the incoming text after lowercasing,
+# removing accents and collapsing spaces ("Quero 2 X-Bacon!" -> "quero 2 x bacon!").
+
+version = 1
+company = "Brasa & Pão"
+tagline = "Lanches artesanais, feitos na hora"
+agent_name = "Nina"
+order_prefix = "BP"
+language = "pt-BR"
+timezone = "America/Cuiaba"
+# Replace the address with the owner's real one before going live.
+address = "Avenida das Acácias, 1280 — Jardim das Américas, Cuiabá/MT"
+
+[limits]
+max_replies_per_customer_per_day = 20  # stops loops with other bots; the owner takes over
+max_bot_replies_before_owner = 15      # a long chat without a confirmed order goes to the owner
+max_unknown = 2                        # two answers the bot did not understand: owner takes over
+max_confirmations = 2                  # correction rounds on the order summary
+max_messages_per_reply = 8             # the menu is sent in a few bubbles, links do not count
+max_message_chars = 1200
+max_qty_per_item = 10                  # a larger quantity goes to the owner
+max_extras_per_item = 6
+max_lines = 20                         # a larger order goes to the owner
+max_order_cents = 30000                # a larger order goes to the owner
+owner_reminder_minutes = 30            # one reminder per window for a chat with the owner
+closed_notice_minutes = 60             # one closed notice per hour, not one per message
+
+[hours]
+# Weekday numbers: 0 = Monday ... 6 = Sunday. Times are local (America/Cuiaba).
+ordering_days = [0, 1, 2, 3, 4, 5, 6]
+ordering_start = "18:00"
+ordering_end = "23:00"
+
+[delivery]
+fee_cents = 500
+free_above_cents = 6000
+min_order_cents = 1500
+estimate = "40 a 60 minutos"
+pickup_estimate = "20 a 30 minutos"
+note = "Entregamos em Cuiabá. Bairros distantes podem ter o prazo confirmado pelo atendente."
+
+[payment]
+# No key is stored here: the attendant sends the Pix key when the order is confirmed.
+[[payment.methods]]
+id = "pix"
+name = "Pix"
+aliases = ["pix", "pix copia e cola", "transferencia"]
+note = "O atendente envia a chave Pix ao confirmar o pedido."
+change = false
+
+[[payment.methods]]
+id = "cash"
+name = "Dinheiro"
+aliases = ["dinheiro", "em especie", "nota", "cedula", "troco"]
+note = "No dinheiro, informe para quanto precisa de troco."
+change = true
+
+[[payment.methods]]
+id = "card"
+name = "Cartão (débito ou crédito)"
+aliases = ["cartao", "debito", "credito", "maquininha", "cartao de debito",
+           "cartao de credito"]
+note = "O cartão é passado na entrega ou na retirada."
+change = false
+
+[pacing]
+typing_chars_per_second = 26.0
+min_seconds = 1.5
+max_seconds = 8.0
+reading_chars_per_second = 45.0
+reading_min_seconds = 1.0
+reading_max_seconds = 3.0
+jitter = 0.15
+link_preview_seconds = 3.0
+between_chats_min_seconds = 4.0
+between_chats_max_seconds = 12.0
+
+[llm]
+# Reuses the sales model router: free models first, then the owner's paid fallback.
+base_url = "https://opencode.ai/inference/go/openai/v1"
+models_url = "https://opencode.ai/inference/go/v1/models"
+api_key_env = "OPENCODE_GO_API_KEY"
+fallback = ["deepseek-v4.1-flash", "muse-spark-1.3-contributor"]
+exclude = []
+temperature = 0.1
+max_output_tokens = 1200
+free_timeout_seconds = 12
+timeout_seconds = 45
+probe_timeout_seconds = 8
+quick_timeout_seconds = 8
+quick_attempts = 2
+long_timeout_seconds = 30
+long_max_output_tokens = 4096
+long_race = 2
+long_reasoning_effort = "low"
+cooldown_seconds = 120
+no_credit_cooldown_seconds = 1800
+catalog_refresh_seconds = 3600
+
+[greetings]
+morning = "Bom dia"
+afternoon = "Boa tarde"
+evening = "Boa noite"
+
+[context]
+# Short answers are read against the question the bot just asked.
+affirmative = [
+  '^(sim|s|isso|isso mesmo|isso ai|exato|exatamente|certo|correto|perfeito|confirmo|pode|pode sim|pode ser|ok|okay|beleza|blz|fechado|fecha|manda|bora|vamo|quero|aceito|esta certo|ta certo|tudo certo|pode mandar|pode fechar)\b',
+]
+negative = ['^(nao|n|nop|negativo|errado|nao esta certo|nao e isso)\b']
+# "Fechar o pedido" is the end of the item list, not a refusal.
+done = [
+  '^(so isso|e so isso|isso|por enquanto e isso|fechar|fecha|fechar o pedido|fecha o pedido|fechar pedido|pode fechar|pode fechar o pedido|pode confirmar|pode seguir|finalizar|encerrar|e isso|acabou|terminei|pronto|so esses|por enquanto so|nada mais|mais nada)\b',
+]
+cancel = [
+  'cancela(r)? (o |meu )?pedido', 'desisti do pedido', 'nao quero mais (o )?pedido',
+  'pode cancelar', 'deixa pra (outra|depois)',
+]
+change_exact = ['sem troco', 'nao preciso de troco', 'valor exato', 'tenho o valor exato',
+                'pago o valor exato']
+
+[facts]
+empresa = [
+  "A {company} é uma lanchonete de bairro: lanches artesanais, hot dogs, porções e sobremesas feitos na hora.",
+  "O atendimento por este WhatsApp é feito pela {agent_name}, uma assistente virtual; o atendente acompanha as conversas e assume quando precisa.",
+  "Endereço: {address}.",
+]
+horario = [
+  "Funcionamos todos os dias, das 18h às 23h.",
+  "Pedidos para entrega são aceitos até as 23h.",
+]
+entrega = [
+  "A taxa de entrega é R$ 5,00.",
+  "Pedidos de entrega acima de R$ 60,00 não pagam a taxa.",
+  "O pedido mínimo para entrega é R$ 15,00.",
+  "O prazo médio de entrega é de 40 a 60 minutos.",
+  "Entregamos em Cuiabá; bairros distantes podem ter o prazo confirmado pelo atendente.",
+]
+retirada = [
+  "A retirada é no balcão, na {address}.",
+  "Não há taxa de retirada.",
+  "O pedido fica pronto em 20 a 30 minutos.",
+]
+pagamento = [
+  "Aceitamos Pix, dinheiro e cartão de débito ou crédito.",
+  "No dinheiro, o cliente informa para quanto precisa de troco.",
+  "No Pix, o atendente envia a chave ao confirmar o pedido.",
+  "No cartão, o pagamento é feito na entrega ou na retirada.",
+]
+cardapio = [
+  "O cardápio tem burgers artesanais, hot dogs, porções, combos, bebidas e sobremesas.",
+  "Os itens podem receber adicionais pagos, como bacon, cheddar, queijo, ovo, maionese da casa, cebola caramelizada e catupiry.",
+  "Cada adicional tem um valor próprio, informado no cardápio.",
+]
+
+[texts]
+greeting = "{greeting}! Aqui é a {agent_name}, atendente virtual da {company}. 😊"
+menu_intro = "Esse é o nosso cardápio:"
+menu_question = "Me diga o que você quer e a quantidade. Se preferir, já pode mandar o pedido completo de uma vez."
+closed = "{greeting}! Agora estamos fechados. Funcionamos todos os dias das 18h às 23h e aceitamos pedidos para entrega até as 23h. Fale comigo nesse horário que eu anoto seu pedido. 😊"
+cart_empty = "Seu pedido está vazio. Me diga qual item do cardápio você quer e a quantidade."
+cart_header = "Seu pedido até agora:"
+cart_subtotal = "Subtotal: {subtotal}"
+cart_question = "Quer mais alguma coisa ou posso fechar o pedido?"
+ask_type = "O pedido é para entrega ou retirada?"
+ask_address = "Qual o endereço completo da entrega? Inclua rua, número, bairro e um ponto de referência."
+ask_name = "Qual o nome para o pedido?"
+ask_payment = "Como você prefere pagar: Pix, dinheiro ou cartão (débito ou crédito)?"
+ask_change = "Para quanto você precisa de troco? Se for pagar o valor exato, é só dizer \"sem troco\"."
+summary_intro = "Confere seu pedido? 🧾"
+summary_question = "Está tudo certo? Responda *SIM* para confirmar ou me diga o que quer ajustar."
+confirmed_title = "Pedido confirmado! ✅"
+confirmed_number = "Pedido *{number}* — {kind}."
+confirmed_total = "Total: {total} — pagamento: {payment}."
+confirmed_pix = "O atendente envia a chave Pix por aqui."
+confirmed_delivery = "Tempo médio de entrega: {estimate}."
+confirmed_pickup = "Retirada no balcão em {address}. Fica pronto em {estimate}."
+confirmed_thanks = "Obrigado pela preferência! 😊"
+cancelled = "Pedido cancelado. Se quiser começar de novo, é só me chamar. 😊"
+cancelled_after_kitchen = "Seu pedido já foi enviado para a cozinha. Vou chamar o atendente para ajustar com você."
+not_understood = "Desculpa, não entendi. Pode me dizer qual item do cardápio você quer e a quantidade? 😊"
+ask_what_to_adjust = "O que você quer ajustar? Pode dizer, por exemplo: \"tira a coca\" ou \"troca para retirada\"."
+below_min = "O pedido mínimo para entrega é R$ 15,00. Faltam {missing}. Você pode pedir mais alguma coisa ou escolher retirada, que não tem pedido mínimo."
+below_min_question = "Quer adicionar mais alguma coisa ou prefere retirar no balcão?"
+max_qty = "Consigo anotar até {max} unidades de cada item por pedido. Para uma quantidade maior, chamo o atendente."
+max_order = "Esse pedido ficou maior do que o atendimento automático consegue fechar. Vou chamar o atendente para confirmar com você."
+item_not_found = "Não encontrei esse item no cardápio. Me diga o nome como está no cardápio que eu anoto certinho."
+extra_not_found = "Esse adicional não está no cardápio. Os adicionais disponíveis são: {extras}."
+payment_unknown = "Não entendi a forma de pagamento. Pode escolher Pix, dinheiro ou cartão?"
+change_too_low = "O total do pedido é {total}. Preciso de um valor maior para o troco, ou você pode pagar o valor exato."
+handoff_ack = "Vou confirmar com o atendente e já te respondo por aqui."
+large_order = "Vou chamar o atendente para confirmar esse pedido maior com você."
+owner_reason_unknown = "O cliente pediu algo que o bot não entendeu"
+owner_reason_confirm = "O cliente não confirmou o resumo do pedido"
+owner_reason_large = "Pedido acima do limite automático: confirme valores e prazo"
+owner_reason_cancel = "Cliente quer cancelar um pedido que já foi confirmado"
+owner_reason_status = "Cliente quer saber do pedido confirmado"
+owner_reason_complaint = "Reclamação de pedido"
+owner_reason_human = "Cliente pediu para falar com uma pessoa"
+owner_reason_media = "Cliente enviou mídia ou áudio que o bot não conseguiu ler"
+
+[guard]
+# Terms the bot may never write (checked after removing accents). "sem taxa" is the delivery
+# wording; the bot never says "gratis" or invents a discount.
+forbidden = [
+  "desconto", "cupom", "promocao", "promo", "gratis", "gratuito", "de graca",
+  "brinde", "garantia", "garantimos", "reembolso garantido", "sem juros", "parcelamos",
+  "senha", "cpf", "cnpj", "100%",
+]
+human_claims = [
+  'sou (um |uma )?(humano|pessoa de verdade|pessoa real)',
+  'nao sou (um |uma )?(robo|bot|ia|assistente)',
+]
+
+[context_rules]
+# The same mandatory rules are repeated in context.md, the model's context file.
+model_only_reads = true
+never_invent_item = true
+never_invent_price = true
+confirm_before_kitchen = true
+pix_key_only_from_owner = true
+
+[menu.categories]
+burgers = "Burgers artesanais"
+hotdogs = "Hot dogs"
+portions = "Porções"
+combos = "Combos"
+drinks = "Bebidas"
+desserts = "Sobremesas"
+
+[[menu.items]]
+id = "x-burger"
+name = "X-Burger"
+category = "burgers"
+price_cents = 1800
+aliases = ["x burger", "xburger", "x-burguer", "xburguer", "cheeseburger", "cheese burger"]
+description = "Pão brioche, hambúrguer de 120 g, queijo, alface, tomate e molho da casa."
+
+[[menu.items]]
+id = "x-salada"
+name = "X-Salada"
+category = "burgers"
+price_cents = 2100
+aliases = ["x salada", "xsalada", "x-saladinha"]
+description = "Pão brioche, hambúrguer de 120 g, queijo, presunto, alface, tomate, milho, ervilha e molho da casa."
+
+[[menu.items]]
+id = "x-bacon"
+name = "X-Bacon"
+category = "burgers"
+price_cents = 2400
+aliases = ["x bacon", "xbacon", "x-bacon", "bacon burger"]
+description = "Pão brioche, hambúrguer de 120 g, queijo, bacon crocante, alface, tomate e molho da casa."
+
+[[menu.items]]
+id = "x-tudo"
+name = "X-Tudo"
+category = "burgers"
+price_cents = 3000
+aliases = ["x tudo", "xtudo", "x-tudo"]
+description = "Pão brioche, hambúrguer de 120 g, presunto, queijo, bacon, ovo, calabresa, alface, tomate, milho, ervilha e molho da casa."
+
+[[menu.items]]
+id = "cheddar-bacon"
+name = "Cheddar Bacon"
+category = "burgers"
+price_cents = 2700
+aliases = ["cheddar bacon", "cheddarbacon", "cheddar com bacon"]
+description = "Pão brioche, hambúrguer de 120 g, cheddar cremoso, bacon crocante e cebola caramelizada."
+
+[[menu.items]]
+id = "veggie-burger"
+name = "Veggie Burger"
+category = "burgers"
+price_cents = 2200
+aliases = ["veggie", "veggie burger", "vegetariano", "hamburguer vegetariano"]
+description = "Pão brioche, hambúrguer de grão-de-bico, queijo, alface, tomate e molho da casa."
+
+[[menu.items]]
+id = "frango-crispy"
+name = "Frango Crispy"
+category = "burgers"
+price_cents = 2300
+aliases = ["frango crispy", "crispy", "frango crispy burger", "burger de frango"]
+description = "Pão brioche, frango empanado crocante, queijo, alface, tomate e maionese da casa."
+
+[[menu.items]]
+id = "podrao"
+name = "Podrão da Casa"
+category = "burgers"
+price_cents = 3200
+aliases = ["podrao", "podrão", "podrao da casa", "podrão da casa"]
+description = "Pão brioche, dois hambúrgueres de 120 g, presunto, queijo, bacon, ovo, calabresa, alface, tomate e molho da casa."
+
+[[menu.items]]
+id = "hot-dog"
+name = "Hot Dog"
+category = "hotdogs"
+price_cents = 1200
+aliases = ["hot dog", "hotdog", "hot dog simples", "cachorro quente", "cachorro quente simples"]
+description = "Pão de hot dog, salsicha, purê, milho, batata palha e molho da casa."
+
+[[menu.items]]
+id = "hot-dog-completo"
+name = "Hot Dog Completo"
+category = "hotdogs"
+price_cents = 1600
+aliases = ["hot dog completo", "hotdog completo", "cachorro quente completo", "dog completo"]
+description = "Pão de hot dog, salsicha, purê, milho, queijo, bacon, cebola e batata palha."
+
+[[menu.items]]
+id = "dog-cheddar"
+name = "Dog Cheddar"
+category = "hotdogs"
+price_cents = 1700
+aliases = ["dog cheddar", "cachorro quente cheddar", "hot dog cheddar", "dog de cheddar"]
+description = "Pão de hot dog, salsicha, cheddar cremoso, bacon, cebola caramelizada e batata palha."
+
+[[menu.items]]
+id = "batata-frita"
+name = "Batata Frita"
+category = "portions"
+price_cents = 1800
+aliases = ["batata frita", "fritas", "porcao de batata"]
+description = "Batata frita crocante com sal e orégano. Serve 2 pessoas."
+
+[[menu.items]]
+id = "batata-cheddar-bacon"
+name = "Batata Cheddar e Bacon"
+category = "portions"
+price_cents = 2600
+aliases = ["batata cheddar", "batata com cheddar e bacon", "batata cheddar bacon"]
+description = "Batata frita coberta com cheddar cremoso e bacon crocante. Serve 2 pessoas."
+
+[[menu.items]]
+id = "polenta-frita"
+name = "Polenta Frita"
+category = "portions"
+price_cents = 2000
+aliases = ["polenta", "polenta frita", "porcao de polenta"]
+description = "Polenta frita crocante com queijo ralado. Serve 2 pessoas."
+
+[[menu.items]]
+id = "calabresa-acebolada"
+name = "Calabresa Acebolada"
+category = "portions"
+price_cents = 2400
+aliases = ["calabresa acebolada", "calabresa", "porcao de calabresa"]
+description = "Calabresa fatiada na chapa com cebola e pão. Serve 2 pessoas."
+
+[[menu.items]]
+id = "frango-passarinho"
+name = "Frango a Passarinho"
+category = "portions"
+price_cents = 2800
+aliases = ["frango a passarinho", "passarinho", "frango passarinho"]
+description = "Frango a passarinho crocante com alho e limão. Serve 2 pessoas."
+
+[[menu.items]]
+id = "onion-rings"
+name = "Onion Rings"
+category = "portions"
+price_cents = 1900
+aliases = ["onion rings", "aneis de cebola", "anéis de cebola", "cebola empanada"]
+description = "Anéis de cebola empanados e crocantes com molho da casa. Serve 2 pessoas."
+
+[[menu.items]]
+id = "combo-x-burger"
+name = "Combo X-Burger"
+category = "combos"
+price_cents = 2400
+aliases = ["combo x burger", "combo xburger", "combo burger", "combo do x burger"]
+description = "X-Burger, batata frita pequena e refrigerante lata."
+
+[[menu.items]]
+id = "combo-x-bacon"
+name = "Combo X-Bacon"
+category = "combos"
+price_cents = 3000
+aliases = ["combo x bacon", "combo xbacon", "combo bacon"]
+description = "X-Bacon, batata frita pequena e refrigerante lata."
+
+[[menu.items]]
+id = "combo-x-tudo"
+name = "Combo X-Tudo"
+category = "combos"
+price_cents = 3600
+aliases = ["combo x tudo", "combo xtudo", "combo tudo"]
+description = "X-Tudo, batata frita pequena e refrigerante lata."
+
+[[menu.items]]
+id = "coca-lata"
+name = "Coca-Cola lata 350 ml"
+category = "drinks"
+price_cents = 600
+aliases = ["coca", "coca cola", "coca-cola", "refrigerante coca", "coca lata"]
+description = "Refrigerante Coca-Cola lata 350 ml, gelado."
+
+[[menu.items]]
+id = "guarana-lata"
+name = "Guaraná lata 350 ml"
+category = "drinks"
+price_cents = 500
+aliases = ["guarana", "guaraná", "guarana antarctica", "refrigerante guarana"]
+description = "Refrigerante Guaraná Antarctica lata 350 ml, gelado."
+
+[[menu.items]]
+id = "fanta-lata"
+name = "Fanta Laranja lata 350 ml"
+category = "drinks"
+price_cents = 500
+aliases = ["fanta", "fanta laranja", "refrigerante fanta"]
+description = "Refrigerante Fanta Laranja lata 350 ml, gelado."
+
+[[menu.items]]
+id = "sprite-lata"
+name = "Sprite lata 350 ml"
+category = "drinks"
+price_cents = 500
+aliases = ["sprite", "refrigerante sprite"]
+description = "Refrigerante Sprite lata 350 ml, gelado."
+
+[[menu.items]]
+id = "agua-mineral"
+name = "Água Mineral 500 ml"
+category = "drinks"
+price_cents = 300
+aliases = ["agua", "água", "agua mineral", "agua sem gas", "agua com gas"]
+description = "Água mineral 500 ml, sem gás."
+
+[[menu.items]]
+id = "suco-laranja"
+name = "Suco de Laranja 500 ml"
+category = "drinks"
+price_cents = 800
+aliases = ["suco de laranja", "suco laranja", "laranja", "suco natural de laranja"]
+description = "Suco de laranja feito na hora, 500 ml."
+
+[[menu.items]]
+id = "suco-maracuja"
+name = "Suco de Maracujá 500 ml"
+category = "drinks"
+price_cents = 800
+aliases = ["suco de maracuja", "suco maracuja", "maracuja", "suco natural de maracuja"]
+description = "Suco de maracujá feito na hora, 500 ml."
+
+[[menu.items]]
+id = "mate"
+name = "Chá Mate 500 ml"
+category = "drinks"
+price_cents = 500
+aliases = ["mate", "cha mate", "chá mate", "mate gelado"]
+description = "Chá mate gelado com limão, 500 ml."
+
+[[menu.items]]
+id = "milk-shake"
+name = "Milk-Shake 400 ml"
+category = "desserts"
+price_cents = 1400
+aliases = ["milk shake", "milkshake", "shake", "milk-shake"]
+description = "Milk-shake cremoso 400 ml nos sabores chocolate, morango ou ovomaltine."
+
+[[menu.items]]
+id = "acai-300"
+name = "Açaí 300 ml"
+category = "desserts"
+price_cents = 1600
+aliases = ["acai 300", "açaí 300", "acai pequeno", "acai 300 ml"]
+description = "Açaí 300 ml com banana e granola."
+
+[[menu.items]]
+id = "acai-500"
+name = "Açaí 500 ml"
+category = "desserts"
+price_cents = 2200
+aliases = ["acai", "açaí", "acai grande", "acai 500", "acai 500 ml"]
+description = "Açaí 500 ml com banana, granola e leite condensado."
+
+[[menu.items]]
+id = "petit-gateau"
+name = "Petit Gâteau"
+category = "desserts"
+price_cents = 1500
+aliases = ["petit gateau", "petit gâteau", "bolo de chocolate", "petit"]
+description = "Bolinho de chocolate quente com sorvete de creme."
+
+[[menu.extras]]
+id = "bacon"
+name = "Bacon extra"
+price_cents = 400
+aliases = ["bacon", "bacon extra", "mais bacon"]
+categories = ["burgers", "hotdogs", "portions", "combos"]
+
+[[menu.extras]]
+id = "cheddar"
+name = "Cheddar cremoso extra"
+price_cents = 350
+aliases = ["cheddar", "cheddar extra", "mais cheddar"]
+categories = ["burgers", "hotdogs", "portions", "combos"]
+
+[[menu.extras]]
+id = "queijo"
+name = "Queijo extra"
+price_cents = 250
+aliases = ["queijo", "queijo extra", "mais queijo"]
+categories = ["burgers", "hotdogs", "combos"]
+
+[[menu.extras]]
+id = "ovo"
+name = "Ovo frito"
+price_cents = 200
+aliases = ["ovo", "ovo frito", "mais ovo"]
+categories = ["burgers", "hotdogs", "combos"]
+
+[[menu.extras]]
+id = "maionese"
+name = "Maionese da casa"
+price_cents = 200
+aliases = ["maionese", "maionese da casa", "maionese artesanal"]
+categories = ["burgers", "hotdogs", "portions", "combos"]
+
+[[menu.extras]]
+id = "cebola-caramelizada"
+name = "Cebola caramelizada"
+price_cents = 250
+aliases = ["cebola caramelizada", "cebola", "mais cebola"]
+categories = ["burgers", "hotdogs", "combos"]
+
+[[menu.extras]]
+id = "presunto"
+name = "Presunto extra"
+price_cents = 250
+aliases = ["presunto", "presunto extra", "mais presunto"]
+categories = ["burgers", "hotdogs", "combos"]
+
+[[menu.extras]]
+id = "calabresa"
+name = "Calabresa extra"
+price_cents = 300
+aliases = ["calabresa extra", "mais calabresa"]
+categories = ["burgers", "hotdogs", "combos"]
+
+[[menu.extras]]
+id = "molho-especial"
+name = "Molho especial"
+price_cents = 150
+aliases = ["molho especial", "molho da casa", "molho"]
+categories = ["burgers", "hotdogs", "portions", "combos"]
+
+[[menu.extras]]
+id = "batata-palha"
+name = "Batata palha extra"
+price_cents = 200
+aliases = ["batata palha", "mais batata palha"]
+categories = ["burgers", "hotdogs", "combos"]
+
+[[menu.extras]]
+id = "extra-hamburguer"
+name = "Hambúrguer extra"
+price_cents = 700
+aliases = ["hamburguer extra", "carne extra", "mais um hamburguer", "extra de carne"]
+categories = ["burgers", "combos"]
+
+[[menu.extras]]
+id = "extra-frango"
+name = "Frango extra"
+price_cents = 600
+aliases = ["frango extra", "mais frango", "extra de frango"]
+categories = ["burgers", "combos"]
+
+[[menu.extras]]
+id = "catupiry"
+name = "Catupiry extra"
+price_cents = 350
+aliases = ["catupiry", "catupiry extra", "mais catupiry"]
+categories = ["burgers", "hotdogs", "combos"]
+
+[[menu.extras]]
+id = "ovomaltine"
+name = "Ovomaltine"
+price_cents = 200
+aliases = ["ovomaltine", "ovomaltine extra", "com ovomaltine"]
+categories = ["desserts"]
+
+[[menu.extras]]
+id = "calda-chocolate"
+name = "Calda de chocolate"
+price_cents = 200
+aliases = ["calda de chocolate", "calda", "chocolate extra"]
+categories = ["desserts"]
+
+[[menu.extras]]
+id = "chantilly"
+name = "Chantilly"
+price_cents = 150
+aliases = ["chantilly", "chantili", "com chantilly"]
+categories = ["desserts"]
+
+# Intents. `action` decides what happens after the messages:
+#   reply   send the messages and keep the conversation going
+#   menu    send the generated menu
+#   handoff send the messages, then the owner answers
+#   close   send the messages and stop until the customer writes again
+#   cancel  cancel the order being assembled (the agent checks the order state)
+#   block   send the fixed messages, then never contact again (do-not-contact list)
+#   ignore  record the message and send nothing
+
+[[intents]]
+id = "opt_out"
+action = "block"
+fixed = true
+when = "A pessoa pede para parar de receber mensagens, chama de spam ou ameaça denunciar."
+priority = "alert"
+reason = "Pediu para parar de receber mensagens"
+patterns = [
+  'para de (me )?mandar', 'nao quero (mais )?(receber|mensagens)', 'me (tira|remove) da lista',
+  'nao me mande mais', 'spam', 'bloque(ar|eio)', 'vou denunciar', 'pare de enviar',
+]
+messages = [
+  "Entendi. Vou parar de te enviar mensagens por aqui. Obrigado pelo contato!",
+]
+
+[[intents]]
+id = "bot_question"
+action = "reply"
+fixed = true
+when = "A pessoa pergunta se é robô, bot, IA ou atendimento automático."
+priority = "needed"
+patterns = [
+  'voce e (um |uma )?(robo|bot|ia|assistente)', 'e (um |uma )?(robo|bot|ia)',
+  'atendimento (e )?automatico', 'isso e (um )?(robo|bot|ia)', 'falo com (um )?robo',
+  'tem (alguem|gente) ai',
+]
+messages = [
+  "Sou a assistente virtual da {company}. O atendente acompanha as conversas e assume quando precisa. 😊",
+]
+
+[[intents]]
+id = "human_request"
+action = "handoff"
+fixed = true
+when = "A pessoa pede para falar com o atendente, responsável, gerente ou uma pessoa."
+priority = "hot"
+reason = "Cliente pediu para falar com uma pessoa"
+patterns = [
+  'falar com (um |o |a )?(atendente|humano|pessoa|responsavel|dono|gerente|atendimento)',
+  'quero (um |o )?atendente', 'atendimento humano', 'chama (o )?(atendente|responsavel|gerente)',
+  'quero falar com alguem', 'me passa para (um |o )?(atendente|responsavel)',
+]
+messages = ["Claro! Já chamo o atendente e ele continua com você por aqui. 😊"]
+
+[[intents]]
+id = "complaint"
+action = "handoff"
+fixed = true
+when = "A pessoa reclama de pedido errado, faltando item, frio, atrasado ou quer reembolso."
+priority = "hot"
+reason = "Reclamação de pedido"
+patterns = [
+  'pedido (errado|incompleto|frio|veio errado|veio frio)', 'faltou (um|uma|o|a|um item)',
+  'veio (errado|frio|sem)', 'reclama', 'pessimo', 'horrivel', 'quero (meu )?dinheiro de volta',
+  'quero reembolso', 'nao chegou (o )?pedido',
+]
+messages = ["Sinto muito por isso! Vou chamar o responsável agora para resolver com você."]
+
+[[intents]]
+id = "status"
+action = "handoff"
+fixed = true
+when = "A pessoa pergunta do pedido já confirmado: se saiu, se chegou, quanto falta ou reclama de atraso."
+priority = "hot"
+reason = "Cliente quer saber do pedido confirmado"
+patterns = [
+  'cade (o )?(meu )?pedido', 'meu pedido (ja )?(saiu|chegou|esta pronto|foi)',
+  'quanto tempo (para|falta|demora)', 'atras(ou|ado)', 'ja mandou (o )?pedido',
+  'o pedido (ja )?(saiu|chegou)',
+]
+messages = ["Vou confirmar com a cozinha e já te respondo por aqui."]
+
+[[intents]]
+id = "cancel"
+action = "cancel"
+fixed = true
+when = "A pessoa cancela o pedido que está sendo montado ou já confirmado."
+priority = "needed"
+patterns = [
+  'cancela(r)? (o |meu )?pedido', 'desisti do pedido', 'nao quero mais (o )?pedido',
+  'pode cancelar', 'deixa pra (outra|depois)',
+]
+messages = ["Pedido cancelado. Se quiser começar de novo, é só me chamar. 😊"]
+
+[[intents]]
+id = "menu"
+action = "menu"
+fixed = true
+when = "A pessoa pede o cardápio, o menu ou pergunta o que a lanchonete tem."
+priority = "needed"
+patterns = [
+  'cardapio', 'menu', 'o que (voces )?(tem|vende|oferece)', 'quais (sao )?(os )?(lanches|itens|opcoes)',
+  'me manda (o )?(cardapio|menu)', 'quero ver (o )?(cardapio|menu)', 'opcoes',
+]
+messages = []
+
+[[intents]]
+id = "price"
+action = "reply"
+fixed = true
+when = "A pessoa pergunta o preço de um item ou quanto custa."
+priority = "needed"
+patterns = [
+  'quanto (custa|e|sai|ta|fica)', 'qual (o |e o )?(preco|valor)', 'preco', 'valor',
+  'ta quanto', 'quanto sai',
+]
+messages = ["Os preços estão no cardápio. Me diga o item que você quer que eu confirmo o valor."]
+
+[[intents]]
+id = "item_info"
+action = "reply"
+fixed = true
+when = "A pessoa pergunta o que vem em um item, os ingredientes ou como ele é."
+priority = "needed"
+patterns = [
+  'o que (e|vem|tem) (o |no |na )?', 'ingredientes', 'vem com (o que|que)',
+  'como (e|que e) (o |a )?', 'esse item tem',
+]
+messages = ["Me diz qual item do cardápio você quer saber que eu te explico. 😊"]
+
+[[intents]]
+id = "hours"
+action = "reply"
+fixed = true
+when = "A pessoa pergunta o horário de funcionamento ou se está aberto."
+priority = "needed"
+patterns = [
+  'que horas (abre|fecha|funciona|voces abrem)', 'horario', 'abre (hoje|amanha|agora)',
+  'fecha (hoje|amanha|que horas)', 'esta aberto', 'ta aberto', 'funciona (hoje|agora)',
+  'voces estao abertos',
+]
+messages = ["Funcionamos todos os dias, das 18h às 23h. Pedidos para entrega até as 23h. 😊"]
+
+[[intents]]
+id = "address"
+action = "reply"
+fixed = true
+when = "A pessoa pergunta o endereço, onde fica ou onde retira."
+priority = "needed"
+patterns = [
+  'onde (fica|voces ficam|e voces|retira)', 'endereco', 'como chego', 'localizacao',
+  'qual o local', 'retirar onde', 'retirada onde', 'posso buscar',
+]
+messages = [
+  "Estamos na {address}. A retirada é no balcão, sem taxa. 😊",
+]
+
+[[intents]]
+id = "delivery"
+action = "reply"
+fixed = true
+when = "A pessoa pergunta sobre entrega, taxa, prazo, bairro ou pedido mínimo."
+priority = "needed"
+patterns = [
+  'entregam', 'entrega', 'delivery', 'taxa de entrega', 'frete', 'levam',
+  'pedido minimo', 'quanto tempo (demora|leva) para entregar', 'entregam no bairro',
+]
+messages = [
+  "A entrega custa R$ 5,00. Pedidos acima de R$ 60,00 não pagam a taxa, e o pedido mínimo para entrega é R$ 15,00.",
+  "O prazo médio é de 40 a 60 minutos. Entregamos em Cuiabá; bairros distantes podem ter o prazo confirmado pelo atendente.",
+]
+
+[[intents]]
+id = "payment"
+action = "reply"
+fixed = true
+when = "A pessoa pergunta as formas de pagamento, Pix, cartão, dinheiro ou troco."
+priority = "needed"
+patterns = [
+  'paga(r)? (como|com|no|na)', 'pagamento', 'formas? de pagamento', 'aceita (pix|cartao|dinheiro)',
+  'pix', 'cartao', 'dinheiro', 'debito', 'credito', 'troco', 'maquininha',
+]
+messages = [
+  "Aceitamos Pix, dinheiro e cartão de débito ou crédito.",
+  "No dinheiro, me diga para quanto precisa de troco. No Pix, o atendente envia a chave ao confirmar o pedido. No cartão, o pagamento é na entrega ou na retirada.",
+]
+
+[[intents]]
+id = "no_order"
+action = "close"
+fixed = true
+when = "A pessoa diz que não quer pedir nada agora, só está olhando ou pede para chamar depois."
+priority = "needed"
+patterns = [
+  'nao quero (nada|pedir) (agora|hoje)?', 'so (estou )?olhando', 'depois eu peco',
+  'agora nao', 'nao vou pedir', 'so vim ver',
+]
+messages = ["Tudo bem! Quando quiser, é só chamar por aqui. 😊"]
+
+[[intents]]
+id = "thanks"
+action = "ignore"
+fixed = true
+when = "A pessoa agradece, diz ok ou valeu sem pedir mais nada."
+priority = "needed"
+patterns = ['obrigad', 'valeu', 'agradec', 'brigad', 'vlw']
+messages = []
+
+[[intents]]
+id = "auto_reply"
+action = "ignore"
+fixed = true
+when = "Resposta automática de outro número."
+priority = "needed"
+patterns = [
+  'mensagem automatica', 'resposta automatica', 'no momento nao podemos atender',
+  'fora do horario de atendimento', 'deixe sua mensagem',
+]
+messages = []
+
+[[intents]]
+id = "media"
+action = "handoff"
+fixed = true
+when = "A pessoa manda foto, vídeo, documento ou áudio que o bot não conseguiu ler."
+priority = "needed"
+reason = "Cliente enviou mídia ou áudio que o bot não conseguiu ler"
+patterns = ['^\[(imagem|video|documento|audio)\]$']
+messages = ["Recebi seu arquivo! Vou pedir para o atendente dar uma olhada e já te respondo."]
+
+[[intents]]
+id = "unknown"
+action = "reply"
+fixed = true
+when = "Nada acima se aplica."
+priority = "needed"
+patterns = []
+messages = ["Desculpa, não entendi. Pode me dizer qual item do cardápio você quer e a quantidade? 😊"]
