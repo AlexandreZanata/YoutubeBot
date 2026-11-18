@@ -50,6 +50,7 @@ Terminal=false
 Categories=System;Monitor;
 Keywords=YouTube;YoutubeBot;Shorts;WhatsApp;Mercado Livre;
 StartupNotify=true
+StartupWMClass=ytbot-manager
 EOF
 
 update-desktop-database "${APPS_DIR}" 2>/dev/null || true

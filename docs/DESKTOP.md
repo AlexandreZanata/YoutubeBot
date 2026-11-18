@@ -12,6 +12,11 @@ window, stop the hidden browser). Commands and layout of the code are in [deskto
   verification time). The only file it writes is the owner's preferences:
   `$XDG_CONFIG_HOME/ytbot-manager/settings.json` (theme, refresh interval, project root);
   `YTBOT_MANAGER_CONFIG` overrides that path.
+- **Taskbar identity and initial size.** The installer writes `Icon=ytbot-manager` and
+  `StartupWMClass=ytbot-manager`; the app selects the winit backend, sets
+  `slint::set_xdg_app_id("ytbot-manager")` before the first window and requests 1280×800
+  before `show()`. Keep the size request before the window is mapped: a post-show resize left
+  a tiny surface with no usable taskbar entry on COSMIC (owner report, 2026-11-18).
 - **Bounded actions.** "Abrir janela" and "Parar navegador" run
   `python3 -m tools.ytbot commercial|social open|stop --network <key>` with a fixed argument
   list on a worker thread. No shell, no arbitrary command. YouTube profiles have no action
