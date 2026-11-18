@@ -19,8 +19,8 @@ timezone = "America/Cuiaba"
 address = "Avenida das Acácias, 1280 — Jardim das Américas, Cuiabá/MT"
 
 [limits]
-max_replies_per_customer_per_day = 20  # stops loops with other bots; the owner takes over
-max_bot_replies_before_owner = 15      # a long chat without a confirmed order goes to the owner
+max_replies_per_customer_per_day = 40  # stops loops with other bots; the owner takes over
+max_bot_replies_before_owner = 30      # a long chat without a confirmed order goes to the owner
 max_unknown = 2                        # two answers the bot did not understand: owner takes over
 max_confirmations = 2                  # correction rounds on the order summary
 max_messages_per_reply = 8             # the menu is sent in a few bubbles, links do not count
@@ -122,6 +122,7 @@ done = [
   '\b(?:e )?so isso\b',
 ]
 cancel = [
+  '^(cancela|cancelar|desisto|esquece isso|esquece o pedido)[!. ]*$',
   'cancela(r)? (o |meu )?pedido', 'desisti do pedido', 'nao quero mais (o )?pedido',
   'pode cancelar', 'deixa pra (outra|depois)',
 ]
@@ -214,6 +215,10 @@ value_jump_question = "Vi um salto grande no pedido ({summary}). Foi isso mesmo?
 audio_uncertain_question = "No seu áudio entendi {summary}. A quantidade está certa? Responda *SIM* para confirmar ou me diga por texto."
 alive_reply = "Estou por aqui sim! Sou a {agent_name}, atendente virtual da {company}."
 handoff_waiting = "Seu atendimento já foi encaminhado para o responsável, que vai te responder por aqui."
+not_in_cart = "{item} não está no seu pedido."
+max_extras = "Consigo anotar até {max} adicionais por item. Anotei os primeiros; para mais, o atendente ajusta com você."
+item_offer_question = "Quer que eu anote esse item no seu pedido?"
+confirmed_followup = "Seu pedido já está com a cozinha. Avisei o atendente para ver isso com você."
 first_welcome = "Me diga o que você quer pedir ou peça o cardápio (ou me diga se quer ver lanches, hot dogs, porções, combos, bebidas ou sobremesas)."
 menu_link = "Confira nosso cardápio no link: {url}"
 ask_address_payment = "Para entrega, me envie seu endereço completo (rua, número e bairro) e como prefere pagar (Pix, dinheiro ou cartão — se precisar de troco, já avisa)."

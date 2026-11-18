@@ -46,9 +46,37 @@ WAITING_PING = re.compile(
     r"tem gente|alguem ai|estao ai|responde ai)\b"
 )
 ALIVE_PING = re.compile(
-    r"^(?:oi+|ola+|alo+|ei+|bom dia|boa tarde|boa noite|tudo bem|tudo bom|"
-    r"cade (?:o )?atendimento|ninguem responde|tem alguem|tem gente|alguem ai)[?!.\s]*$"
+    r"^(?:oi+e*|oie+|ola+|alo+|ei+|opa+|eae+|e a[ií]|fala|salve|bom dia|boa tarde|boa noite|"
+    r"tudo bem|tudo bom|como vai|cade (?:o )?atendimento|ninguem responde|tem alguem|"
+    r"tem gente|alguem ai)"
+    r"(?:\s+(?:tudo\s+(?:bem|bom)|como\s+vai|td\s+bem|tudo\s+certo))?[?!.\s]*$"
 )
+SHOW_CART = re.compile(
+    r"\b(?:qual (?:e )?(?:o )?total|quanto (?:fica|ficou|deu|da|esta|vai ficar)(?: tudo| o total| no total)?|"
+    r"o que (?:eu )?pedi|meu pedido|ver (?:o )?pedido|resumo(?: do pedido)?|"
+    r"o que (?:tem|ta|esta) (?:no|em) (?:meu )?pedido)\b")
+YES_EMOJI = set("👍👌✅🙌👏🤝💪🙏😉😊🆗")
+NO_EMOJI = set("👎❌🚫🙅")
+
+
+def emoji_answer(text: str) -> str:
+    """"yes"/"no" for a reply made only of thumbs/check emoji ("👍", "✅✅"), else ""."""
+    chars = [ch for ch in (text or "") if not ch.isspace() and ch not in "\ufe0f\u200d"
+             and not 0x1F3FB <= ord(ch) <= 0x1F3FF]
+    if not chars:
+        return ""
+    if all(ch in YES_EMOJI for ch in chars):
+        return "yes"
+    if all(ch in NO_EMOJI for ch in chars):
+        return "no"
+    return ""
+
+
+def is_show_cart(text: str) -> bool:
+    plain = normalize(text)
+    if re.search(r"\b(?:cade|saiu|chegou|atrasa\w*|demora\w*)\b", plain):
+        return False
+    return bool(SHOW_CART.search(plain))
 
 
 @dataclass
@@ -115,6 +143,17 @@ def _top_category(rules: RestaurantRules, category: str, count: int = 2) -> list
         key=lambda item: item.price_cents,
         reverse=True,
     )[:count]
+
+
+CATEGORY_HEADERS = {
+    "burgers": "Nossos lanches (burgers artesanais):", "hotdogs": "Nossos hot dogs:",
+    "combos": "Nossos combos:", "portions": "Nossas porções:",
+    "desserts": "Nossas sobremesas:", "drinks": "Nossas bebidas disponíveis:",
+}
+
+
+def category_reply(rules: RestaurantRules, category: str) -> list[str]:
+    return _category_list(rules, category, CATEGORY_HEADERS.get(category, "Opções:"))
 
 
 def _category_list(rules: RestaurantRules, category: str, header: str) -> list[str]:
@@ -266,11 +305,13 @@ def detect_semantic(rules: RestaurantRules, text: str) -> SemanticReply | None:
                 )
         msgs = _category_list(rules, "drinks", "Nossas bebidas disponíveis:")
         if msgs:
-            return SemanticReply(msgs, intent="category_info", last_question="menu_question")
+            return SemanticReply(
+                msgs, intent="category_info", last_question="clarify_choice",
+                candidates=tuple(item.id for item in rules.items if item.category == "drinks"))
 
     category_specs = (
         ("burgers",
-         r"\b(?:lanche|lanches|hamburguer\w*|burger\w*|sanduiche\w*)\b",
+         r"\b(?:lanche|lanches|hamburg\w*|burger\w*|sanduiche\w*)\b",
          "Nossos lanches (burgers artesanais):",
          True),
         ("hotdogs",
@@ -290,22 +331,22 @@ def detect_semantic(rules: RestaurantRules, text: str) -> SemanticReply | None:
          "Nossas sobremesas:",
          False),
     )
-    has_modifier = bool(re.search(r"\bcom\s+[a-z]+", plain))
-    browse_verb = bool(re.search(r"\b(?:quais|tem|ver|manda|lista|sao|opcoes)\b", plain))
+    browse_verb = bool(re.search(
+        r"\b(?:quais|tem|ver|manda|lista|sao|opcoes|quero|queria|gostaria|me ve|vou querer|"
+        r"preciso|pedir)\b", plain))
     for cat, pat, header, guard_plural_order in category_specs:
         if not re.search(pat, plain):
             continue
-        if has_modifier:
-            continue
-        if guard_plural_order and not browse_verb and re.search(r"\b(?:dois|duas|tres|\d+)\b", plain):
+        if guard_plural_order and re.search(r"\b(?:dois|duas|tres|\d+)\b", plain) and not re.search(
+                r"\b(?:quais|tem|ver|lista|opcoes)\b", plain):
             continue
         if browse_verb or re.match(
-                rf"^(?:quero(?:\s+ver)?(?:\s+(?:um|uma|o|os|as))?\s+|"
-                rf"me\s+(?:ve|manda)\s+(?:(?:os|as)\s+)?)?(?:{pat.strip()})[?!.\s]*$",
-                plain):
+                rf"^(?:{pat.strip()})[?!.\s]*$", plain):
             msgs = _category_list(rules, cat, header)
             if msgs:
-                return SemanticReply(msgs, intent="category_info", last_question="menu_question")
+                return SemanticReply(
+                    msgs, intent="category_info", last_question="clarify_choice",
+                    candidates=tuple(item.id for item in rules.items if item.category == cat))
 
     return None
 
@@ -322,12 +363,21 @@ def resolve_clarify_choice(rules: RestaurantRules, candidates: list[str],
     if not valid:
         return None
     plain = normalize(text)
-    if re.search(r"\b(?:o )?(?:primeiro|primeira|opcao 1)\b|^1$", plain):
-        return valid[0].id
-    if len(valid) >= 2 and re.search(r"\b(?:o )?(?:segundo|segunda|opcao 2)\b|^2$", plain):
-        return valid[1].id
-    if len(valid) >= 3 and re.search(r"\b(?:o )?(?:terceiro|terceira|opcao 3)\b|^3$", plain):
-        return valid[2].id
+    words = {"primeiro": 1, "primeira": 1, "segundo": 2, "segunda": 2, "terceiro": 3,
+             "terceira": 3, "quarto": 4, "quarta": 4, "quinto": 5, "quinta": 5, "sexto": 6,
+             "sexta": 6, "setimo": 7, "setima": 7, "oitavo": 8, "oitava": 8, "nono": 9,
+             "decimo": 10}
+    index = None
+    for word, number in words.items():
+        if re.search(rf"\b{word}\b", plain):
+            index = number
+            break
+    if index is None:
+        match = re.fullmatch(r"(?:opcao\s*|numero\s*|n\s*)?(\d{1,2})", plain)
+        if match:
+            index = int(match.group(1))
+    if index is not None:
+        return valid[index - 1].id if 1 <= index <= len(valid) else None
     if re.search(r"\b(?:o )?(?:mais caro|maior|maior deles|mais completo)\b", plain):
         return max(valid, key=lambda item: item.price_cents).id
     if re.search(r"\b(?:o )?(?:mais barato|menor)\b", plain):

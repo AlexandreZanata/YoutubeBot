@@ -143,23 +143,24 @@ Texts are in the rules file. The important cases:
 | Customer says | Behaviour |
 | --- | --- |
 | "oi", "boa noite" | Greeting and prompt asking for items, a category or the menu (never dumps the full menu unasked) |
-| "quero 2 x-bacon com bacon extra e uma coca" | Adds both lines with the exact extra price and shows the cart |
-| "quero um lanche", "bebidas" | Sends only the requested category options and prices |
+| "quero 2 x-bacon com bacon extra e uma coca" | Adds both lines with the exact extra price and shows the cart (plurals and trailing `x2`/`2x` match; `"sem cebola"` stays `"sem cebola"`) |
+| "quero um lanche", "bebidas" | Sends only the requested category options and prices (preserving choices for ordinal/item replies) |
 | "tira a coca", "sem a batata", "mais um x-salada" | Removes or adds the line and shows the new cart |
 | "coloca bacon" | Adds the extra to the last line (or asks for an item if the cart is empty) |
-| "quanto custa o x-bacon?" | Item description and price; does not add it |
+| "quanto custa o x-bacon?", "tem x-tudo?" | Item description/price or ingredient/availability answer and offer question; does not add unasked |
+| "qual o total?", "o que eu pedi?" | Shows the current cart and subtotal without treating it as a complaint |
 | "me manda o cardápio" | Sends the configured `menu.url` website/app link or the text menu |
 | "entrega ou retirada?" | Answers the delivery fee, minimum, free threshold and estimate |
 | "aceita pix?" | Pix, cash and card; Pix key comes from the attendant |
-| "pode fechar", "só isso" | Asks delivery/pickup, combines address + payment (re-asking only what is missing), then full summary |
-| "cadê meu pedido?" after confirmation | Owner hand-off, no invented status |
+| "pode fechar", "só isso" | Asks delivery/pickup, combines address + payment (re-asking only what is missing, including higher cash change), then full summary (accepts `👍`/`👎` on yes/no prompts) |
+| "cadê meu pedido?" after confirmation | One holding reply (`confirmed_followup`), then silent owner hand-off, no invented status |
 | "faltou item", "veio frio" | Owner hand-off (complaint) |
 | "quero falar com o atendente" | Owner hand-off |
 | "para de mandar mensagem" | Blocked and removed from the reply rules forever |
 | "é robô?" | Honest answer: virtual attendant, owner follows the chat |
 | Audio | Transcribed locally; the transcript is the order text |
 | Photo, video, document | Owner hand-off; a caption is read as text |
-| Anything outside the menu | Does not invent; asks for an item from the menu or hands to the owner |
+| Anything outside the menu or size/diet variant ("coca zero") | Never invents or silently substitutes regular drinks; offers the matching category or hands to the owner |
 
 The bot never writes a price, discount, free item, guarantee, Pix key or delivery promise
 outside the rules. The guard checks every outgoing batch against the catalog and the current
@@ -245,8 +246,14 @@ python3 -m tools.ytbot commercial lanchonete run       --network whatsapp --live
   composer; nothing was sent" may be retried, because no bubble was created.
 - Refusal or opt-out goes to the do-not-contact store and the reply rules; no message ever
   again, including after a restart.
-- At most 20 automated replies per customer per day; then the owner takes over.
+- At most 40 automated replies per customer per day and 30 bot replies per open order before the
+  owner takes over; pure punctuation/emoji noise (`"???"`, `"👀"`) does not consume `max_unknown` strikes.
 - A pending cart is persisted; the bot only confirms after the explicit summary confirmation.
+  Orders exceeding `max_order_cents` or `max_lines` hand off to the owner immediately rather than
+  collecting checkout fields first.
+- Closed-hours messages after the single hourly notice write an internal `closed-ack` (`suppressed`)
+  marker so unanswered out-of-hours messages never replay into the cart when the shop opens.
+- Extras beyond `max_extras_per_item` truncate to the limit with a notice rather than dropping the item.
 - The Pix key is never written to the rules, the ficha, the journal or the logs.
 - One conversation at a time, human pacing between bubbles and between chats; no paste, no
   broadcast, no detection evasion.

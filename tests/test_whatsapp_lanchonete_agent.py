@@ -156,7 +156,7 @@ class LanchoneteAgentTests(unittest.TestCase):
         self.assertEqual(len(self.notes), 1)
         self.assertIn("não entendeu", self.notes[0]["reason"].lower())
 
-    def test_status_of_a_confirmed_order_goes_to_the_owner_without_a_bot_reply(self):
+    def test_status_of_a_confirmed_order_gets_one_holding_reply_and_goes_to_the_owner(self):
         self.say("oi")
         self.say("quero um x-tudo")
         self.say("fechar")
@@ -166,7 +166,11 @@ class LanchoneteAgentTests(unittest.TestCase):
         self.say("sim")
         before = len(self.sent())
         self.say("cadê meu pedido?")
-        self.assertEqual(len(self.sent()), before)
+        # One honest holding bubble (no invented status), then silence for further messages.
+        self.assertEqual(len(self.sent()), before + 1)
+        self.assertIn("Avisei o atendente", self.sent()[-1])
+        self.say("e aí??")
+        self.assertEqual(len(self.sent()), before + 1)
         self.assertEqual(self.notes[-1]["priority"], "hot")
         self.assertIn("pedido confirmado", self.notes[-1]["reason"].lower())
 
@@ -303,7 +307,7 @@ class LanchoneteAgentTests(unittest.TestCase):
         self.say("quero um milk-shake de chocolate e um x-tudo sem cebola")
         cart = {line["item_id"]: line for line in self.customer()["cart"]}
         self.assertEqual(cart["milk-shake"]["note"], "chocolate")
-        self.assertEqual(cart["x-tudo"]["note"], "cebola")
+        self.assertEqual(cart["x-tudo"]["note"], "sem cebola")
 
     def test_large_order_goes_to_the_owner_without_confirming(self):
         self.say("oi")

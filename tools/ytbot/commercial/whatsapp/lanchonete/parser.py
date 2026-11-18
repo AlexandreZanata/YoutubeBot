@@ -58,6 +58,18 @@ DISH_FOOD = re.compile(
 INDEPENDENT_ITEM = re.compile(
     r"^(?:um|uma|dois|duas|tres|quatro|cinco|mais|\d+)\s+[a-z]{3,}"
 )
+TRAILING_QTY = re.compile(r"^\s*(?:x\s*(\d{1,2})|(\d{1,2})\s*x)\b")
+DRINK_VARIANT = re.compile(
+    r"^\s*(zero|diet|light|sem acucar|\d+\s*l(?:itros?)?|litros?|600\s*ml|garrafa|pet|grande)\b")
+# A generic noun ("um lanche", "uma bebida") that names no catalog item: the customer gets the
+# options of that category instead of the noun being ignored.
+CATEGORY_NOUNS = {
+    "burgers": re.compile(r"\b(?:lanche|lanches|hamburg\w*|burger\w*|sanduiche\w*)\b"),
+    "combos": re.compile(r"\bcombos?\b"),
+    "portions": re.compile(r"\bporc(?:ao|oes)\b"),
+    "desserts": re.compile(r"\b(?:sobremesas?|doces?)\b"),
+    "drinks": re.compile(r"\b(?:bebidas?|refrigerantes?|refris?|sucos?)\b"),
+}
 PAYMENT_WORDS = ("pix", "cartao", "dinheiro", "debito", "credito", "maquininha", "troco",
                  "transferencia", "especie")
 
@@ -81,6 +93,8 @@ class Parsed:
     question_items: list[str] = field(default_factory=list)
     unknown_parts: list[str] = field(default_factory=list)
     unknown_wants_extras: bool = False
+    generic_categories: list[str] = field(default_factory=list)
+    unknown_category: str = ""
 
     @property
     def changed(self) -> bool:
@@ -163,7 +177,7 @@ def _note(segment: str, rules: RestaurantRules, item: Item) -> str:
             continue
         for cue in re.findall(r"\bsem\s+([a-z]{3,}(?:\s+(?!com\b)[a-z]{3,}){0,2})", clean_part):
             if not FORBIDDEN_NOTE.search(cue):
-                notes.append(re.sub(r"\br\$?\s*\d+(?:[,.]\d+)?\b", "", cue).strip())
+                notes.append("sem " + re.sub(r"\br\$?\s*\d+(?:[,.]\d+)?\b", "", cue).strip())
         for cue in re.findall(r"\b(?:de|com|sabor)\s+([a-z]{3,}(?:\s+(?!sem\b|com\b|e\b)"
                               r"[a-z]{3,}){0,2})", clean_part):
             plain = normalize(cue)
@@ -198,8 +212,14 @@ def parse_change(text: str) -> tuple[int | None, bool]:
     return _money_cents(match.group(1), match.group(2)), False
 
 
+PAY_PLACE = re.compile(
+    r"\b(?:pag\w*|paga\w*|cartao|dinheiro|pix|debito|credito)\s+(?:\w+\s+){0,2}?"
+    r"(?:na|no|em)\s+(?:entrega|retirada|balcao)\b")
+
+
 def parse_kind(text: str) -> str:
-    plain = normalize(text)
+    # "pago na entrega no débito" says WHEN to pay, not that the order is a delivery.
+    plain = PAY_PLACE.sub(" ", normalize(text))
     if re.search(r"\b(retirar|retirada|retiro|retira|buscar|busco|balcao|vou pegar|pego ai|"
                  r"passo ai)\b", plain):
         return "pickup"
@@ -294,6 +314,11 @@ def parse_name(text: str) -> str:
         found = _single_name(line)
         if found:
             return found
+    clauses = [part for part in re.split(r"[,;]+", collapsed) if part.strip()]
+    if len(clauses) > 1:
+        found = _single_name(clauses[0])
+        if found and not STREET_WORDS.search(normalize(found)):
+            return found
     explicit = re.match(
         r"^(?:(?:o\s+)?meu\s+nome\s+[eé]|nome:|me\s+chamo|sou\s+[oa])\s+([^,\n;]+)",
         collapsed,
@@ -304,34 +329,43 @@ def parse_name(text: str) -> str:
     return ""
 
 
+STREET_WORDS = re.compile(
+    r"\b(rua|avenida|av|travessa|alameda|rodovia|estrada|passagem|beco)\b")
+ADDRESS_STOP = re.compile(r"\b(pix|dinheiro|cartao|debito|credito|troco|pagamento|pagar)\b")
+
+
+def _address_clause(clause: str) -> str:
+    """The clause stripped of its lead-in ("entrega em", "moro na") when it looks like a street."""
+    stripped = _strip_prefix(clause.strip(" .,:;-"), ADDRESS_PREFIXES)
+    plain = normalize(stripped)
+    if len(stripped) < 3 or not ADDRESS_CUE.search(plain):
+        return ""
+    if STREET_WORDS.search(plain) or re.search(r"\d", stripped):
+        return stripped
+    return ""
+
+
 def parse_address(text: str) -> str:
+    """The address inside a free message: from the first street-like clause up to the
+    payment/kind clauses, so "2 x-bacon, entrega, rua A 10, centro, pix" keeps only the street."""
     collapsed = _collapse_repeated_lines(text)
     if not collapsed:
         return ""
-    candidates = [re.sub(r"\s+", " ", collapsed)]
-    candidates.extend(collapsed.splitlines())
-    for raw in candidates:
-        stripped = raw.strip(" .,:;-")
-        if len(stripped) < 5 or len(stripped) > 220:
+    clauses = [part.strip(" .,:;-") for part in re.split(r"[\n;,]+", collapsed)
+               if part.strip(" .,:;-")]
+    for index, clause in enumerate(clauses):
+        first = _address_clause(clause)
+        if not first:
             continue
-        stripped = re.sub(
-            r"^(?:(?:o\s+)?meu\s+nome\s+[eé]|me\s+chamo|sou\s+[oa])\s+[^,;]+\s*[,;]\s*",
-            "",
-            stripped,
-            flags=re.IGNORECASE,
-        )
-        stripped = _strip_prefix(stripped, ADDRESS_PREFIXES)
-        stripped = TRAILING_PAYMENT_RE.sub("", stripped).strip(" .,:;-")
-        if len(stripped) < 5 or len(stripped) > 200:
-            continue
-        plain = normalize(stripped)
-        if not ADDRESS_CUE.search(plain):
-            continue
-        strong = re.search(
-            r"\b(rua|avenida|travessa|alameda|rodovia|estrada|passagem|beco)\b", plain)
-        if not strong and not re.search(r"\d", stripped):
-            continue
-        return stripped[:200]
+        parts = [first]
+        for follow in clauses[index + 1:]:
+            plain = normalize(follow)
+            if ADDRESS_STOP.search(plain) or parse_kind(follow) and len(plain.split()) <= 3:
+                break
+            parts.append(follow)
+        address = TRAILING_PAYMENT_RE.sub("", ", ".join(parts)).strip(" .,:;-")
+        if 5 <= len(address) <= 200:
+            return address
     return ""
 
 
@@ -352,13 +386,25 @@ def parse(rules: RestaurantRules, text: str) -> Parsed:
         return result
 
     mentions = item_mentions(rules, plain)
+    variant_parts: list[str] = []
     for index, (start, end, item) in enumerate(mentions):
         previous_end = mentions[index - 1][1] if index else 0
         before = plain[previous_end:start]
         next_start = mentions[index + 1][0] if index + 1 < len(mentions) else len(plain)
         segment = plain[end:next_start]
         remove = bool(REMOVE_TAIL.search(before[-28:]))
+        variant = None if remove else DRINK_VARIANT.match(segment)
+        if variant and item.category == "drinks":
+            # "coca zero", "guaraná 2 litros": the catalog has only the listed size, so the
+            # customer is told instead of silently receiving a different product.
+            variant_parts.append(f"{plain[start:end]} {variant.group(1)}".strip())
+            result.unknown_category = item.category
+            continue
         qty = quantity(before)
+        if not numbers(re.sub(r"r\$\s*\d+(?:[,.]\d+)?", " ", before)):
+            trailing = TRAILING_QTY.match(segment)
+            if trailing:
+                qty = int(trailing.group(1) or trailing.group(2))
         segment_extras = [] if remove else _extra_matches(rules, item, segment)
         before_extras = []
         modify = False
@@ -395,6 +441,12 @@ def parse(rules: RestaurantRules, text: str) -> Parsed:
     if QUESTION_CUE.search(plain) and mentions:
         result.question_items = list(dict.fromkeys(item.id for _, _, item in mentions))
 
+    for category, pattern in CATEGORY_NOUNS.items():
+        for match in pattern.finditer(plain):
+            if not any(start <= match.start() < end for start, end, _ in mentions):
+                result.generic_categories.append(category)
+                break
+
     result.fields = {
         "kind": parse_kind(text),
         "payment": parse_payment(rules, text),
@@ -413,10 +465,14 @@ def parse(rules: RestaurantRules, text: str) -> Parsed:
         result.cancel = True
     result.unknown_parts, result.unknown_wants_extras = _extract_unknown_parts(
         rules, plain, mentions, result)
+    if variant_parts:
+        result.unknown_parts = list(dict.fromkeys(variant_parts + result.unknown_parts))
     return result
 
 
-GENERIC_NOUNS = {"lanche", "lanches", "burger", "hamburguer", "item", "itens",
+GENERIC_NOUNS = {"lanche", "lanches", "burger", "hamburguer", "hamburger", "item", "itens",
+                 "bebida", "bebidas", "refrigerante", "refri", "suco", "sucos", "sobremesa",
+                 "doce", "combo", "combos", "porcao", "porcoes", "sanduiche",
                  "coisa", "coisas", "pessoa", "pessoas", "unidade", "unidades", "nota"}
 
 

@@ -46,7 +46,16 @@ def _alias_pattern(aliases: list[str] | tuple[str, ...]) -> re.Pattern:
                     if normalize(alias)}, key=len, reverse=True)
     if not parts:
         raise RulesError("an alias list is empty")
-    return re.compile(r"(?<![a-z0-9])(?:" + "|".join(re.escape(part) for part in parts)
+
+    def plural(part: str) -> str:
+        # "cocas", "hot dogs completos", "batatas fritas": every word of an alias may be plural.
+        words = []
+        for word in part.split(" "):
+            escaped = re.escape(word)
+            words.append(escaped + "(?:e?s)?" if len(word) >= 3 and word.isalpha() else escaped)
+        return r"\ ".join(words)
+
+    return re.compile(r"(?<![a-z0-9])(?:" + "|".join(plural(part) for part in parts)
                       + r")(?![a-z0-9])")
 
 
@@ -345,7 +354,8 @@ def build(raw: dict) -> RestaurantRules:
                             "alive_reply", "handoff_waiting", "first_welcome",
                             "menu_link", "ask_address_payment", "clarify_type",
                             "clarify_address", "clarify_address_payment",
-                            "clarify_name", "clarify_change",
+                            "clarify_name", "clarify_change", "not_in_cart", "confirmed_followup", "max_extras",
+                            "item_offer_question",
                             "owner_reason_unknown", "owner_reason_confirm",
                             "owner_reason_large", "owner_reason_cancel",
                             "owner_reason_status", "owner_reason_complaint",
