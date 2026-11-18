@@ -627,7 +627,9 @@ class LanchoneteAgent:
 
     def _ask(self, order: Order, field_name: str, include_cart: bool = True) -> Turn:
         texts = self.rules.texts
-        question = {"type": texts["ask_type"], "address": texts["ask_address"],
+        address_prompt = (texts["ask_address_payment"] if not order.payment
+                          else texts["ask_address"])
+        question = {"type": texts["ask_type"], "address": address_prompt,
                     "name": texts["ask_name"], "payment": texts["ask_payment"],
                     "change": texts["ask_change"]}[field_name]
         messages = [order.cart_text(self.rules)] if include_cart and not order.is_empty() else []
@@ -681,7 +683,7 @@ class LanchoneteAgent:
             return Turn([self.rules.texts["cancelled_after_kitchen"]], "needs-owner", {},
                         "cancel", self.rules.texts["owner_reason_cancel"], "hot", order=order)
         updates = {"awaiting_field": "", "confirmations": 0, "unknown_count": 0,
-                   "closing": False, "pending_replace": None,
+                   "bot_replies": 0, "closing": False, "pending_replace": None,
                    "memory": {"last_question": "", "harassment_strikes": 0}}
         updates.update(Order().to_lead_fields())
         return Turn([self.rules.texts["cancelled"]], "cancelled", updates, "cancel")
@@ -778,11 +780,13 @@ class LanchoneteAgent:
 
         fields = parsed.fields
         words = plain.split()
-        short_answer = len(words) <= 4 and "?" not in plain
+        has_question = ("?" in text) or bool(parsed.question_items)
+        short_answer = len(words) <= 4 and not has_question
         kind = fields.get("kind") or ""
         kind_short = short_answer and bool(re.search(r"\b(entrega|retirada|retirar|delivery)\b",
                                                      plain))
-        if kind and kind != order.kind and (awaiting == "type" or select or kind_short):
+        if kind and kind != order.kind and (
+                awaiting == "type" or (awaiting in FIELDS and kind_short) or select or kind_short):
             order.kind = kind
             if kind == "pickup":
                 order.address = ""
@@ -791,8 +795,9 @@ class LanchoneteAgent:
         payment_short = short_answer and bool(re.match(
             r"^(pix|dinheiro|cartao|debito|credito|pago|paguei|pagarei|no pix|na entrega|"
             r"em dinheiro|com cartao)\b", plain))
-        if payment and payment != order.payment and (awaiting == "payment" or select
-                                                     or payment_short):
+        in_checkout = awaiting in ("payment", "address", "name", "type")
+        if payment and payment != order.payment and not has_question and (
+                in_checkout or select or payment_short):
             order.payment = payment
             if payment != "cash":
                 order.change_for_cents = None
@@ -800,18 +805,21 @@ class LanchoneteAgent:
             changed = True
         name_hint = re.search(r"\b(meu nome|nome e|aqui e|me chamo|sou o|sou a|pode ser|"
                               r"no nome)\b", plain)
-        if fields.get("name") and fields["name"] != order.customer_name and \
-                (awaiting == "name" or name_hint):
+        if fields.get("name") and fields["name"] != order.customer_name and (
+                awaiting == "name" or name_hint
+                or (fields.get("address") and awaiting in ("address", "type"))):
             order.customer_name = fields["name"]
             changed = True
         address_hint = re.search(r"\b(rua|avenida|travessa|alameda|rodovia|estrada|passagem|"
                                  r"beco|quadra|lote|bairro|moro|endereco|entrega em|"
                                  r"entregar em)\b", plain)
-        if fields.get("address") and fields["address"] != order.address and \
-                (awaiting == "address" or address_hint):
+        if fields.get("address") and fields["address"] != order.address and not has_question and (
+                awaiting in ("address", "payment", "name", "type") or address_hint):
             order.address = fields["address"]
             changed = True
-        if order.payment == "cash" and (awaiting == "change" or "troco" in plain):
+        if order.payment == "cash" and (awaiting == "change" or "troco" in plain
+                                        or ("change_for_cents" in fields and awaiting in FIELDS)
+                                        or (fields.get("change_exact") and awaiting in FIELDS)):
             if fields.get("change_exact"):
                 order.change_exact = True
                 order.change_for_cents = None
@@ -825,11 +833,11 @@ class LanchoneteAgent:
             kind = parser.parse_kind(text)
             if kind:
                 order.kind, changed = kind, True
-        if awaiting == "payment" and not order.payment:
+        if awaiting in ("payment", "address", "name") and not order.payment and not has_question:
             payment = parser.parse_payment(self.rules, text)
             if payment:
                 order.payment, changed = payment, True
-        if awaiting == "address" and not order.address:
+        if awaiting in ("address", "payment", "name") and not order.address and not has_question:
             address = parser.parse_address(text)
             if address:
                 order.address, changed = address, True
@@ -1153,6 +1161,7 @@ class LanchoneteAgent:
             order = Order()
             updates.update(order.to_lead_fields())
             updates["order_number"] = ""
+            updates["bot_replies"] = 0
             updates["pending_replace"] = None
             memory.clear()
             last_question = ""
@@ -1228,7 +1237,7 @@ class LanchoneteAgent:
             if self._is_yes(text):
                 extra_or_menu = ([semantics.extras_menu(self.rules)]
                                  if memory.get("unknown_wants_extras")
-                                 else list(self.rules.menu_messages()))
+                                 else list(self.rules.menu_reply_messages()))
                 messages = warn_prefix + extra_or_menu + [self.rules.texts["cart_question"]]
                 return Turn(self._with_greeting(customer, messages, now), base_state,
                             {**updates, "memory": {**memory, "last_question": "cart_question"}},
@@ -1305,7 +1314,7 @@ class LanchoneteAgent:
                             "clarify_qty": sem.qty}
                 return Turn(self._with_greeting(customer, warn_prefix + sem.messages, now),
                             base_state, {**updates, "memory": next_mem}, sem.intent, order=order)
-            messages = warn_prefix + list(self.rules.menu_messages())
+            messages = warn_prefix + list(self.rules.menu_reply_messages())
             if not order.is_empty():
                 messages.append(self.rules.texts["cart_question"])
             messages += self._pending_question(order, awaiting)
@@ -1582,7 +1591,7 @@ class LanchoneteAgent:
                         updates, "harassment_warn", order=order)
 
         if first:
-            messages = list(self.rules.menu_messages()) + [self.rules.texts["menu_question"]]
+            messages = [self.rules.fill(self.rules.texts["first_welcome"])]
             return Turn(self._with_greeting(customer, messages, now), "ordering", updates,
                         "greeting")
 
@@ -1594,6 +1603,19 @@ class LanchoneteAgent:
                       or ([order.cart_text(self.rules), self.rules.texts["cart_question"]]
                           if not order.is_empty() else [self.rules.texts["menu_question"]]))
             return Turn([alive] + follow, base_state, updates, "alive_check", order=order)
+
+        if awaiting in FIELDS:
+            clarify = {
+                "type": self.rules.texts["clarify_type"],
+                "address": (self.rules.texts["clarify_address"] if order.payment
+                            else self.rules.texts["clarify_address_payment"]),
+                "name": self.rules.texts["clarify_name"],
+                "payment": self.rules.texts["payment_unknown"],
+                "change": self.rules.texts["clarify_change"],
+            }[awaiting]
+            return Turn([self.rules.fill(clarify, total=brl(order.total_cents(self.rules)))],
+                        "ordering", {**updates, "awaiting_field": awaiting, "closing": True},
+                        "ask_" + awaiting, order=order)
 
         if awaiting:
             result = self._ask(order, awaiting, include_cart=False)
@@ -1726,13 +1748,17 @@ class LanchoneteAgent:
         if not text:
             self.store.update_lead(customer["id"], awaiting=None)
             return {**result, "state": "nothing-to-answer"}
+        over_replies = customer.get("bot_replies", 0) >= int(
+            self.rules.limits["max_bot_replies_before_owner"])
+        confirming_yes = customer["state"] == "confirming" and self._is_yes(text)
         if customer["state"] == "needs-owner":
             memory = dict(customer.get("memory") or {})
             memory["needs_owner_pinged"] = True
             turn = Turn([self.rules.texts["handoff_waiting"]], "needs-owner",
                         {"memory": memory}, "waiting")
-        elif customer.get("bot_replies", 0) >= int(self.rules.limits["max_bot_replies_before_owner"]) \
-                and customer["state"] in ("ordering", "confirming"):
+        elif over_replies and (
+                customer["state"] == "ordering"
+                or (customer["state"] == "confirming" and not confirming_yes)):
             turn = Turn([self.rules.texts["handoff_ack"]], "needs-owner", {},
                         "long_chat", self.rules.texts["owner_reason_unknown"], "needed")
         else:
@@ -1909,7 +1935,7 @@ def owner_resolve(store: LanchoneteStore, customer_id: str, state: str) -> dict:
         memory["clarify_candidates"] = []
     return store.update_lead(customer_id, state=state, awaiting=awaiting,
                              handoff_reason=None, unknown_count=0, confirmations=0,
-                             memory=memory)
+                             bot_replies=0, memory=memory)
 
 
 def owner_block(store: LanchoneteStore, customer_id: str, now: datetime) -> dict:

@@ -29,7 +29,12 @@ QUESTION_CUE = re.compile(r"\b(quanto|qual|quais|preco|valor|custa|sai|tem|vem|i
 ADDRESS_CUE = re.compile(r"\b(rua|avenida|av|travessa|alameda|rodovia|estrada|passagem|"
                          r"beco|quadra|lote|setor|bairro|jardim|centro|casa|apto|"
                          r"apartamento|bloco|condominio|residencial|vila)\b")
-NAME = re.compile(r"^[\wÀ-ÿ' .-]{2,60}$")
+NAME = re.compile(r"^[\wÀ-ÿ' .-]{2,120}$")
+NON_NAME_WORDS = {
+    "sim", "s", "nao", "n", "ok", "okay", "oi", "ola", "bom", "boa", "dia", "tarde",
+    "noite", "entrega", "retirada", "delivery", "retirar", "pix", "cartao", "dinheiro",
+    "debito", "credito", "fechar", "pode", "obrigado", "obrigada", "valeu", "beleza", "blz",
+}
 FORBIDDEN_NOTE = re.compile(r"\b(desconto|cupom|promocao|promo|gratis|gratuito|de graca|"
                             r"brinde|garantia|reembolso|senha|cpf|cnpj|"
                             r"safad[oa]s?|gostos[oa]s?|maior salsicha|se e que me entende)\b")
@@ -184,9 +189,9 @@ def parse_change(text: str) -> tuple[int | None, bool]:
            (r"sem troco", r"nao preciso de troco", r"valor exato", r"tenho o valor exato",
             r"pago o valor exato")):
         return None, True
-    if "troco" not in plain and "nota" not in plain and "para" not in plain:
+    if "troco" not in plain and "nota" not in plain and "para" not in plain and "pra" not in plain:
         return None, False
-    match = re.search(r"(?:troco para|nota de|para|tenho|pago com|paguei com)\s*"
+    match = re.search(r"(?:troco\s+pa?ra|nota\s+de|pa?ra|tenho|pago\s+com|paguei\s+com)\s*"
                       r"r?\$?\s*(\d{1,4})(?:[,.](\d{1,2}))?", plain)
     if not match:
         return None, False
@@ -212,56 +217,122 @@ def parse_payment(rules: RestaurantRules, text: str) -> str:
     return found[0] if len(set(found)) == 1 else ""
 
 
-NAME_PREFIXES = ("meu nome e", "nome e", "aqui e", "pode colocar no nome de",
-                 "pode colocar no nome do", "pode colocar no nome da", "pode por no nome de",
-                 "pode por no nome do", "no nome de", "no nome do", "no nome da", "me chamo",
+NAME_PREFIXES = ("o meu nome e", "o nome e", "meu nome e", "nome e", "nome:", "aqui e",
+                 "pode colocar no nome de", "pode colocar no nome do", "pode colocar no nome da",
+                 "pode por no nome de", "pode por no nome do", "pode por no nome da",
+                 "coloca no nome de", "coloca no nome do", "coloca no nome da",
+                 "no nome de", "no nome do", "no nome da", "me chamo",
                  "sou o", "sou a", "pode ser", "e o", "e a")
-ADDRESS_PREFIXES = ("meu endereco e", "endereco e", "endereco:", "entrega em", "entregar em",
-                    "moro na", "moro no", "moro em", "e na", "e no", "pode ser na",
+ADDRESS_PREFIXES = ("para entrega", "meu endereco e", "endereco e", "endereco:", "entrega em",
+                    "entregar em", "moro na", "moro no", "moro em", "e na", "e no", "pode ser na",
                     "pode ser no", "pode entregar na", "pode entregar no",
                     "pode mandar na", "pode mandar no", "pode mandar em")
+TRAILING_PAYMENT_RE = re.compile(
+    r"(?:\s*(?:,|;|\s+-|\s+e)\s*|\s+(?:no|na|em|com|pagamento)\s+)"
+    r"(?:(?:forma\s+de\s+)?pagamento\s*:?\s*(?:no|na|em|com)?\s*)?"
+    r"(?:pix|dinheiro(?:\s*,?\s*(?:sem\s+troco|troco\s+(?:pa?ra\s*)?r?\$?\s*\d+(?:[,.]\d+)?))?|"
+    r"cart[aã]o(?:\s+(?:de\s+)?(?:d[eé]bito|cr[eé]dito))?|d[eé]bito|cr[eé]dito)"
+    r"(?:\s*,?\s*(?:sem\s+troco|troco\s+(?:pa?ra\s*)?r?\$?\s*\d+(?:[,.]\d+)?))?.*$",
+    re.IGNORECASE,
+)
+
+
+def _collapse_repeated_lines(text: str) -> str:
+    kept: list[str] = []
+    seen_norm: set[str] = set()
+    for line in (text or "").splitlines():
+        clean = re.sub(r"\s+", " ", line.strip())
+        if not clean:
+            continue
+        norm = normalize(clean)
+        if norm and norm in seen_norm:
+            continue
+        if norm:
+            seen_norm.add(norm)
+        kept.append(clean)
+    return "\n".join(kept).strip()
 
 
 def _strip_prefix(value: str, prefixes: tuple[str, ...]) -> str:
     plain = normalize(value)
-    for prefix in prefixes:
+    for prefix in sorted(prefixes, key=len, reverse=True):
         if plain.startswith(prefix):
-            rest = value[len(prefix):].strip(" .,:;-")
+            rest = value[len(prefix):].strip(" .,:;-*")
             if rest:
                 return rest
-    return value.strip(" .,:;-")
+    return value.strip(" .,:;-*")
 
 
-def parse_name(text: str) -> str:
-    stripped = re.sub(r"\s+", " ", text.strip())
+def _single_name(candidate: str) -> str:
+    stripped = re.sub(r"\s+", " ", candidate.strip(" .,:;-*_~\"'!?"))
     if not stripped:
         return ""
     stripped = _strip_prefix(stripped, NAME_PREFIXES)
+    stripped = TRAILING_PAYMENT_RE.sub("", stripped).strip(" .,:;-*_~\"'!?")
     plain = normalize(stripped)
-    if not stripped or len(stripped) > 60 or not NAME.match(stripped):
+    if not stripped or len(stripped) > 120 or not NAME.match(stripped):
+        return ""
+    if set(plain.split()) <= NON_NAME_WORDS:
         return ""
     if ADD_CUE.search(plain) or QUESTION_CUE.search(plain) or REMOVE_CUE.search(plain):
         return ""
+    if ADDRESS_CUE.search(plain):
+        return ""
     if any(word in plain.split() for word in PAYMENT_WORDS) or numbers(plain):
         return ""
-    return stripped[:60]
+    return stripped[:120]
+
+
+def parse_name(text: str) -> str:
+    collapsed = _collapse_repeated_lines(text)
+    if not collapsed:
+        return ""
+    direct = _single_name(re.sub(r"\s+", " ", collapsed))
+    if direct:
+        return direct
+    for line in collapsed.splitlines():
+        found = _single_name(line)
+        if found:
+            return found
+    explicit = re.match(
+        r"^(?:(?:o\s+)?meu\s+nome\s+[eé]|nome:|me\s+chamo|sou\s+[oa])\s+([^,\n;]+)",
+        collapsed,
+        re.IGNORECASE,
+    )
+    if explicit:
+        return _single_name(explicit.group(1))
+    return ""
 
 
 def parse_address(text: str) -> str:
-    stripped = re.sub(r"\s+", " ", text.strip())
-    if len(stripped) < 5 or len(stripped) > 200:
+    collapsed = _collapse_repeated_lines(text)
+    if not collapsed:
         return ""
-    stripped = _strip_prefix(stripped, ADDRESS_PREFIXES)
-    if len(stripped) < 5:
-        return ""
-    plain = normalize(stripped)
-    if not ADDRESS_CUE.search(plain):
-        return ""
-    strong = re.search(r"\b(rua|avenida|travessa|alameda|rodovia|estrada|passagem|beco)\b",
-                       plain)
-    if not strong and not re.search(r"\d", stripped):
-        return ""
-    return stripped[:200]
+    candidates = [re.sub(r"\s+", " ", collapsed)]
+    candidates.extend(collapsed.splitlines())
+    for raw in candidates:
+        stripped = raw.strip(" .,:;-")
+        if len(stripped) < 5 or len(stripped) > 220:
+            continue
+        stripped = re.sub(
+            r"^(?:(?:o\s+)?meu\s+nome\s+[eé]|me\s+chamo|sou\s+[oa])\s+[^,;]+\s*[,;]\s*",
+            "",
+            stripped,
+            flags=re.IGNORECASE,
+        )
+        stripped = _strip_prefix(stripped, ADDRESS_PREFIXES)
+        stripped = TRAILING_PAYMENT_RE.sub("", stripped).strip(" .,:;-")
+        if len(stripped) < 5 or len(stripped) > 200:
+            continue
+        plain = normalize(stripped)
+        if not ADDRESS_CUE.search(plain):
+            continue
+        strong = re.search(
+            r"\b(rua|avenida|travessa|alameda|rodovia|estrada|passagem|beco)\b", plain)
+        if not strong and not re.search(r"\d", stripped):
+            continue
+        return stripped[:200]
+    return ""
 
 
 def parse(rules: RestaurantRules, text: str) -> Parsed:
@@ -335,7 +406,8 @@ def parse(rules: RestaurantRules, text: str) -> Parsed:
         result.fields["change_for_cents"] = change
     if exact:
         result.fields["change_exact"] = True
-    if any(re.search(pattern, plain) for pattern in rules.context.get("done", [])):
+    clauses = [plain] + [part.strip() for part in re.split(r"\s*(?:,|;|\n)\s*", plain) if part.strip()]
+    if any(re.search(pattern, part) for pattern in rules.context.get("done", []) for part in clauses):
         result.done = True
     if any(re.search(pattern, plain) for pattern in rules.context.get("cancel", [])):
         result.cancel = True

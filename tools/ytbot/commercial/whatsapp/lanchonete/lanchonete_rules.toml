@@ -118,6 +118,8 @@ negative = ['^(nao|n|nop|negativo|errado|nao esta certo|nao e isso)\b']
 # "Fechar o pedido" is the end of the item list, not a refusal.
 done = [
   '^(so isso|e so isso|isso|por enquanto e isso|fechar|fecha|fechar o pedido|fecha o pedido|fechar pedido|pode fechar|pode fechar o pedido|pode confirmar|pode seguir|finalizar|encerrar|e isso|acabou|terminei|pronto|so esses|por enquanto so|nada mais|mais nada)\b',
+  '\b(?:pode )?fechar (?:o |meu )?pedido\b',
+  '\b(?:e )?so isso\b',
 ]
 cancel = [
   'cancela(r)? (o |meu )?pedido', 'desisti do pedido', 'nao quero mais (o )?pedido',
@@ -212,6 +214,14 @@ value_jump_question = "Vi um salto grande no pedido ({summary}). Foi isso mesmo?
 audio_uncertain_question = "No seu áudio entendi {summary}. A quantidade está certa? Responda *SIM* para confirmar ou me diga por texto."
 alive_reply = "Estou por aqui sim! Sou a {agent_name}, atendente virtual da {company}."
 handoff_waiting = "Seu atendimento já foi encaminhado para o responsável, que vai te responder por aqui."
+first_welcome = "Me diga o que você quer pedir ou peça o cardápio (ou me diga se quer ver lanches, hot dogs, porções, combos, bebidas ou sobremesas)."
+menu_link = "Confira nosso cardápio no link: {url}"
+ask_address_payment = "Para entrega, me envie seu endereço completo (rua, número e bairro) e como prefere pagar (Pix, dinheiro ou cartão — se precisar de troco, já avisa)."
+clarify_type = "Para fechar o pedido, me diga se prefere entrega ou retirada no balcão."
+clarify_address = "Não consegui identificar o endereço. Me envie a rua, número e bairro, por favor."
+clarify_address_payment = "Não consegui identificar o endereço. Me envie a rua, número e bairro, junto com a forma de pagamento (Pix, dinheiro ou cartão)."
+clarify_name = "Não consegui anotar o nome. Me envie apenas o nome para o pedido, por favor."
+clarify_change = "Para quanto você precisa de troco? Se não precisar, diga \"sem troco\"."
 owner_reason_unknown = "O cliente pediu algo que o bot não entendeu"
 owner_reason_confirm = "O cliente não confirmou o resumo do pedido"
 owner_reason_large = "Pedido acima do limite automático: confirme valores e prazo"
@@ -243,6 +253,10 @@ never_invent_item = true
 never_invent_price = true
 confirm_before_kitchen = true
 pix_key_only_from_owner = true
+
+[menu]
+# Optional website/app menu URL. Leave empty to send the catalog text directly on WhatsApp.
+url = ""
 
 [menu.categories]
 burgers = "Burgers artesanais"
@@ -723,8 +737,9 @@ fixed = true
 when = "A pessoa pede o cardápio, o menu ou pergunta o que a lanchonete tem."
 priority = "needed"
 patterns = [
-  'cardapio', 'menu', 'o que (voces )?(tem|vende|oferece)', 'quais (sao )?(os )?(lanches|itens|opcoes)',
+  'cardapio', 'menu', 'o que (voces )?(tem|vende|oferece)', 'quais (sao )?(os )?(itens|opcoes)',
   'me manda (o )?(cardapio|menu)', 'quero ver (o )?(cardapio|menu)', 'opcoes',
+  'link do (cardapio|menu)', 'site do (cardapio|menu)', 'cardapio (no |em )?(site|link|app|aplicativo)',
   'quero fazer (um |o )?pedido', 'fazer (um |o )?pedido', 'quero pedir',
 ]
 messages = []

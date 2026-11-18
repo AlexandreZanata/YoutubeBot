@@ -109,6 +109,22 @@ class LanchoneteRulesTests(unittest.TestCase):
                          {intent.id for intent in self.rules.intents})
         self.assertEqual(set(mirror.texts), set(self.rules.texts))
         self.assertEqual(mirror.texts["closed"], self.rules.texts["closed"])
+        self.assertEqual(mirror.menu_url, self.rules.menu_url)
+
+    def test_menu_url_is_validated_and_allowed_only_when_configured(self):
+        from tools.ytbot.commercial.whatsapp.lanchonete import guard
+
+        raw = copy.deepcopy(self.raw)
+        raw["menu"]["url"] = "https://cardapio.brasaepao.com.br"
+        linked = lanchonete_rules.build(raw)
+        msg = linked.fill(linked.texts["menu_link"], url=linked.menu_url)
+        self.assertEqual(guard.violations(linked, [msg]), [])
+        self.assertTrue(guard.violations(linked, ["https://outro.site.com"]))
+
+        bad = copy.deepcopy(self.raw)
+        bad["menu"]["url"] = "javascript:alert(1)"
+        with self.assertRaises(lanchonete_rules.RulesError):
+            lanchonete_rules.build(bad)
 
     def test_neutral_texts_have_no_robot_blame_and_no_money(self):
         for key in ("correction_notice", "swap_question", "removed_item"):

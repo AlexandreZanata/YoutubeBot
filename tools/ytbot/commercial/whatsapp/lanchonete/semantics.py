@@ -268,21 +268,44 @@ def detect_semantic(rules: RestaurantRules, text: str) -> SemanticReply | None:
         if msgs:
             return SemanticReply(msgs, intent="category_info", last_question="menu_question")
 
-    if re.search(r"\b(?:sobremesa|sobremesas|doce|doces)\b", plain):
-        msgs = _category_list(rules, "desserts", "Nossas sobremesas:")
-        if msgs:
-            return SemanticReply(msgs, intent="category_info", last_question="menu_question")
-
-    if re.search(r"\bcombos?\b", plain) and re.search(r"\b(?:quais|tem|ver|manda|sao)\b", plain):
-        msgs = _category_list(rules, "combos", "Nossos combos:")
-        if msgs:
-            return SemanticReply(msgs, intent="category_info", last_question="menu_question")
-
-    if re.search(r"\b(?:porcao|porcoes)\b", plain) and re.search(r"\b(?:quais|tem|ver|manda)\b",
-                                                                 plain):
-        msgs = _category_list(rules, "portions", "Nossas porções:")
-        if msgs:
-            return SemanticReply(msgs, intent="category_info", last_question="menu_question")
+    category_specs = (
+        ("burgers",
+         r"\b(?:lanche|lanches|hamburguer\w*|burger\w*|sanduiche\w*)\b",
+         "Nossos lanches (burgers artesanais):",
+         True),
+        ("hotdogs",
+         r"\b(?:hot\s*dogs?|hotdogs?|cachorros?\s*quentes?)\b",
+         "Nossos hot dogs:",
+         False),
+        ("combos",
+         r"\bcombos?\b",
+         "Nossos combos:",
+         False),
+        ("portions",
+         r"\bporc(?:ao|oes)\b",
+         "Nossas porções:",
+         False),
+        ("desserts",
+         r"\b(?:sobremesa|sobremesas|doce|doces)\b",
+         "Nossas sobremesas:",
+         False),
+    )
+    has_modifier = bool(re.search(r"\bcom\s+[a-z]+", plain))
+    browse_verb = bool(re.search(r"\b(?:quais|tem|ver|manda|lista|sao|opcoes)\b", plain))
+    for cat, pat, header, guard_plural_order in category_specs:
+        if not re.search(pat, plain):
+            continue
+        if has_modifier:
+            continue
+        if guard_plural_order and not browse_verb and re.search(r"\b(?:dois|duas|tres|\d+)\b", plain):
+            continue
+        if browse_verb or re.match(
+                rf"^(?:quero(?:\s+ver)?(?:\s+(?:um|uma|o|os|as))?\s+|"
+                rf"me\s+(?:ve|manda)\s+(?:(?:os|as)\s+)?)?(?:{pat.strip()})[?!.\s]*$",
+                plain):
+            msgs = _category_list(rules, cat, header)
+            if msgs:
+                return SemanticReply(msgs, intent="category_info", last_question="menu_question")
 
     return None
 

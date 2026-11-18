@@ -45,13 +45,16 @@ class LanchoneteAgentTests(unittest.TestCase):
     def sent(self):
         return [item["text"] for item in self.channel.sent]
 
-    def test_first_contact_sends_the_menu_without_an_order(self):
+    def test_first_contact_greets_without_dumping_the_menu_until_asked(self):
         self.say("oi")
         texts = self.sent()
         self.assertIn("Brasa", texts[0])
-        self.assertTrue(any("X-Bacon" in text for text in texts))
+        self.assertIn("Nina", texts[0])
+        self.assertFalse(any("X-Bacon" in text for text in texts))
         self.assertEqual(self.customer()["state"], "ordering")
         self.assertEqual(self.store.orders(), [])
+        self.say("me manda o cardápio")
+        self.assertTrue(any("X-Bacon" in text for text in self.sent()))
 
     def test_full_delivery_order_with_extras_cash_and_change(self):
         self.say("oi")
@@ -331,10 +334,11 @@ class LanchoneteAgentTests(unittest.TestCase):
 
     def test_owner_typing_in_the_chat_pauses_the_automation(self):
         self.say("oi")
+        before = len(self.sent())
         self.channel.bubbles = [{"dir": "out", "text": "Já te respondo por aqui", "id": "o1"}]
         self.say("e aí?")
         self.assertEqual(self.customer()["state"], "human")
-        self.assertEqual(len(self.sent()), 7)
+        self.assertEqual(len(self.sent()), before)
 
     def test_cheaper_acai_proposes_a_swap_instead_of_adding(self):
         self.say("oi")
@@ -697,6 +701,138 @@ class LanchoneteAgentTests(unittest.TestCase):
         self.agent.transcriber = fail_transcriber
         self.say("0:09", chat=other)
         self.assertEqual(self.store.find_lead(other)["state"], "needs-owner")
+
+    def test_menu_url_sends_configured_link_only_when_requested(self):
+        import copy
+        import tomllib
+        from tools.ytbot.commercial.whatsapp.lanchonete import rules as lanchonete_rules
+
+        raw = tomllib.loads(lanchonete_rules.RULES_PATH.read_text(encoding="utf-8"))
+        linked_raw = copy.deepcopy(raw)
+        linked_raw["menu"]["url"] = "https://cardapio.brasaepao.com.br"
+        linked_rules = lanchonete_rules.build(linked_raw)
+        self.agent.use_rules(linked_rules)
+
+        self.say("oi")
+        self.assertFalse(any("https://" in text or "X-Bacon" in text for text in self.sent()))
+        self.say("me manda o cardápio")
+        self.assertTrue(any("https://cardapio.brasaepao.com.br" in text for text in self.sent()))
+        self.assertFalse(any("X-Bacon" in text for text in self.sent()))
+
+    def test_scoped_category_menus_send_only_requested_category(self):
+        self.say("oi")
+        before = len(self.sent())
+        self.say("quero um lanche")
+        burger_reply = "\n".join(self.sent()[before:])
+        self.assertIn("X-Bacon", burger_reply)
+        self.assertNotIn("Coca-Cola", burger_reply)
+        self.assertNotIn("Açaí", burger_reply)
+
+        before = len(self.sent())
+        self.say("bebidas")
+        drinks_reply = "\n".join(self.sent()[before:])
+        self.assertIn("Coca-Cola", drinks_reply)
+        self.assertNotIn("X-Bacon", drinks_reply)
+
+        before = len(self.sent())
+        self.say("quero uma porção")
+        portions_reply = "\n".join(self.sent()[before:])
+        self.assertIn("Batata Frita", portions_reply)
+        self.assertNotIn("Coca-Cola", portions_reply)
+
+    def test_delivery_asks_address_and_payment_together_across_reply_cases(self):
+        # Case A: address + payment together in one message -> asks only missing name.
+        self.say("quero um x-tudo")
+        self.say("fechar")
+        self.say("entrega")
+        prompt = self.sent()[-1].casefold()
+        self.assertIn("endereço", prompt)
+        self.assertIn("como prefere pagar", prompt)
+        self.say("Rua Florença, 922, pix")
+        c = self.customer()
+        self.assertEqual(c["order_address"], "Rua Florença, 922")
+        self.assertEqual(c["order_payment"], "pix")
+        self.assertEqual(c["awaiting_field"], "name")
+
+        # Case B: only payment provided first -> asks ONLY address next (not payment again).
+        other = "(65) 90000-0055"
+        self.say("quero um x-tudo", chat=other)
+        self.say("fechar", chat=other)
+        self.say("entrega", chat=other)
+        self.say("cartão", chat=other)
+        c2 = self.store.find_lead(other)
+        self.assertEqual(c2["order_payment"], "card")
+        self.assertEqual(c2["awaiting_field"], "address")
+        addr_only_prompt = self.sent()[-1].casefold()
+        self.assertIn("qual o endereço", addr_only_prompt)
+        self.assertNotIn("como prefere pagar", addr_only_prompt)
+        self.assertNotIn("pix", addr_only_prompt)
+
+        # Case C: name + address + payment + cash change all at once -> straight to summary!
+        third = "(65) 90000-0044"
+        self.say("quero um x-tudo", chat=third)
+        self.say("fechar", chat=third)
+        self.say("entrega", chat=third)
+        self.say("Meu nome é Lucas, Rua das Flores 123, dinheiro troco pra 50", chat=third)
+        c3 = self.store.find_lead(third)
+        self.assertEqual(c3["state"], "confirming")
+        self.assertEqual(c3["order_name"], "Lucas")
+        self.assertEqual(c3["order_address"], "Rua das Flores 123")
+        self.assertEqual(c3["order_payment"], "cash")
+        self.assertEqual(c3["order_change_for_cents"], 5000)
+
+    def test_felipe_live_checkout_failure_cases_are_all_fixed(self):
+        self.say("quero fazer um pedido")
+        self.say("1 hot doc completo e 1 coca")
+        # 1) Profanity / clause closing still hits done cleanly.
+        self.say("cu de amolar ferro, eu disse que pode fechar o pedido")
+        self.assertEqual(self.customer()["awaiting_field"], "type")
+
+        # 2) Replying "sim" to delivery/pickup prompt clarifies delivery vs pickup (no "qual item").
+        before = len(self.sent())
+        self.say("sim")
+        reply = "\n".join(self.sent()[before:]).casefold()
+        self.assertNotIn("qual item do cardápio", reply)
+        self.assertIn("entrega ou retirada", reply)
+
+        self.say("entrega")
+        # 3) Preview + bubble address never duplicates into "rua florença, 922 rua florença, 922".
+        self.agent.ingest([{"id": "addr1", "chat": self.chat, "text": "rua florença, 922"}])
+        self.agent.store.remember(self.customer()["id"], {
+            "at": self.clock.now.isoformat(timespec="seconds"), "dir": "in",
+            "kind": "incoming", "source": "chat", "message_id": "addrm1",
+            "replaces": ["addr1"], "text": "rua florença, 922",
+        })
+        self.agent.reply_pending()
+        self.assertEqual(self.customer()["order_address"], "rua florença, 922")
+
+        # 4) Invalid name fallback never says "qual item do cardápio"; clarifies name cleanly.
+        before = len(self.sent())
+        self.say("???")
+        name_clarify = "\n".join(self.sent()[before:]).casefold()
+        self.assertNotIn("qual item do cardápio", name_clarify)
+        self.assertIn("nome", name_clarify)
+
+        # 5) 60-char full name and prefixed "* " name both work natively without failing.
+        self.say("pdiddy tinau epstein flavio zanata henrique garcia das neves")
+        self.assertEqual(self.customer()["order_name"],
+                         "pdiddy tinau epstein flavio zanata henrique garcia das neves")
+        # Prefix + trailing asterisk also parses directly cleanly.
+        self.say("cartão")
+        self.assertEqual(self.customer()["state"], "confirming")
+
+        # 6) High historical bot_replies never aborts final "sim" on confirming summary!
+        self.store.update_lead(self.customer()["id"], bot_replies=20)
+        self.say("sim")
+        self.assertEqual(self.customer()["state"], "confirmed")
+        self.assertEqual(len(self.store.orders()), 1)
+
+        # Standalone prefixed + asterisk 61-char name check.
+        from tools.ytbot.commercial.whatsapp.lanchonete.parser import parse_name
+        self.assertEqual(
+            parse_name("o meu nome é pdiddy tinau epstein flavio zanata henrique garcia das neves*"),
+            "pdiddy tinau epstein flavio zanata henrique garcia das neves",
+        )
 
 
 if __name__ == "__main__":

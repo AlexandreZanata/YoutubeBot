@@ -142,15 +142,16 @@ Texts are in the rules file. The important cases:
 
 | Customer says | Behaviour |
 | --- | --- |
-| "oi", "boa noite" | Greeting, full menu in five bubbles, ordering question |
+| "oi", "boa noite" | Greeting and prompt asking for items, a category or the menu (never dumps the full menu unasked) |
 | "quero 2 x-bacon com bacon extra e uma coca" | Adds both lines with the exact extra price and shows the cart |
+| "quero um lanche", "bebidas" | Sends only the requested category options and prices |
 | "tira a coca", "sem a batata", "mais um x-salada" | Removes or adds the line and shows the new cart |
 | "coloca bacon" | Adds the extra to the last line (or asks for an item if the cart is empty) |
 | "quanto custa o x-bacon?" | Item description and price; does not add it |
-| "me manda o cardápio" | The menu again |
+| "me manda o cardápio" | Sends the configured `menu.url` website/app link or the text menu |
 | "entrega ou retirada?" | Answers the delivery fee, minimum, free threshold and estimate |
 | "aceita pix?" | Pix, cash and card; Pix key comes from the attendant |
-| "pode fechar", "só isso" | Asks the missing fields, then the full summary |
+| "pode fechar", "só isso" | Asks delivery/pickup, combines address + payment (re-asking only what is missing), then full summary |
 | "cadê meu pedido?" after confirmation | Owner hand-off, no invented status |
 | "faltou item", "veio frio" | Owner hand-off (complaint) |
 | "quero falar com o atendente" | Owner hand-off |
