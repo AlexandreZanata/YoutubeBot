@@ -253,7 +253,8 @@ def verify_run(page, run: Run, rules: MapsRules, log=print,
                sleep=time.sleep, rng=random, fetcher=verify.fetch) -> dict:
     """Confirmation Google searches in the same tab, then the bounded own-site checks."""
     pending = [listing for listing in run.pending_checks()
-               if score.city_matches(listing, run.city)]
+               if score.city_matches(listing, run.city)
+               and not score.category_exclusion(listing, rules)]
     page.set_default_timeout(float(rules.pacing["page_timeout_seconds"]) * 1000)
     first = True
     done = 0
