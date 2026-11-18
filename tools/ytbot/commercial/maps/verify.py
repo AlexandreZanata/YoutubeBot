@@ -194,6 +194,48 @@ def evaluate(name: str, city: str, phone: str, maps_website: str,
             "weak_url": weak_url, "evidence": evidence}
 
 
+def reclassify(check: dict, rules: MapsRules) -> dict:
+    """Apply the current ignore lists to saved evidence, without another Google request."""
+    if not check.get("evidence"):
+        return check
+    maps_class = check.get("maps_class") or "none"
+    own_url = weak_url = ""
+    for item in check.get("evidence") or []:
+        source = item.get("source")
+        url = item.get("url") or item.get("final_url") or ""
+        if not url or ignored(url, rules):
+            continue
+        if source == "maps" and maps_class != "own":
+            continue
+        status = int(item.get("status") or 0)
+        https = bool(item.get("https"))
+        parking = bool(item.get("parking"))
+        name_signal = bool(item.get("name_signal"))
+        page_signal = bool(item.get("page_signal"))
+        working = status == 200 and not item.get("error") and not parking
+        if source == "maps":
+            is_own = working and https
+            is_weak = not is_own
+        elif source == "domain" and status == 0:
+            is_own = False
+            is_weak = False
+        else:
+            is_own = working and https and name_signal and page_signal
+            is_weak = name_signal and (not is_own and (not working or parking
+                                                       or (page_signal and not https)))
+        if is_own and not own_url:
+            own_url = item.get("final_url") or url
+        if is_weak and not weak_url:
+            weak_url = item.get("final_url") or url
+    if own_url:
+        outcome = "has-site" if maps_class == "own" else "site-not-on-maps"
+    elif weak_url:
+        outcome = "weak-site"
+    else:
+        outcome = "no-site"
+    return {**check, "outcome": outcome, "own_url": own_url, "weak_url": weak_url}
+
+
 def confirm(listing: dict, search_results: list[dict], rules: MapsRules,
             fetcher=fetch) -> dict:
     return evaluate(listing.get("name", ""), listing.get("city", ""),

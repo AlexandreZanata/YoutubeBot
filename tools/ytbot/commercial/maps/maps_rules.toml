@@ -107,7 +107,8 @@ ignore_domains = [
   "mercadolivre.com.br", "cnpj.biz", "cnpj.ws", "jusbrasil.com.br",
   "serasaexperian.com.br", "wikipedia.org", "gov.br", "cadeodentista.com.br",
   "magicpin.com", "agendarconsulta.com", "dentmap.com.br", "mechameaqui.com.br",
-  "boaconsulta.com",
+  "boaconsulta.com", "mechamenozap.com.br", "b2bseg.com.br", "loqal.com.br",
+  "studioadamas.com.br",
 ]
 parking_markers = [
   "dominio a venda", "dominio esta a venda", "this domain is for sale",
