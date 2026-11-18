@@ -169,7 +169,8 @@ def load(path: Path | None = None) -> MapsRules:
             raise RulesError(f"selectors.{key} is required")
     labels = {key: _strings(value, f"labels.{key}") for key, value in raw["labels"].items()}
     for key in ("unclaimed", "closed_permanently", "closed_temporarily", "no_results",
-                "challenge", "login", "account", "newest_reviews", "search_no_results"):
+                "challenge", "login", "account", "newest_reviews", "reviews_sort",
+                "photos", "search_no_results"):
         if not labels.get(key):
             raise RulesError(f"labels.{key} is required")
     website = {}

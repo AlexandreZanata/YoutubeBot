@@ -34,8 +34,8 @@ cdp_port = 9326
 background_display = ":94"
 
 [selectors]
-search_box = "input[id='searchboxinput']"
-search_button = "button[id='searchbox-searchbutton']"
+search_box = "input[role='combobox']"
+search_button = "button[aria-label='Pesquisar']"
 feed = "div[role='feed']"
 listing_link = "a[href*='/maps/place/']"
 detail_root = "div[role='main']"
@@ -43,13 +43,13 @@ detail_name = "h1"
 address = "button[data-item-id='address']"
 phone = "button[data-item-id^='phone:tel:']"
 website = "a[data-item-id='authority']"
-category = "button[jsaction*='pane.rating.category']"
+category = "button[jsaction*='category']"
 rating = ["span[role='img'][aria-label*='estrelas']", "div[role='img'][aria-label*='estrelas']"]
 reviews = ["span[aria-label*='avalia']", "button[aria-label*='avalia']"]
-hours = ["button[data-item-id='oh']", "button[data-item-id^='oh']"]
+hours = ["[aria-label*='Horário de funcionamento']", "button[data-item-id='oh']", "button[data-item-id^='oh']"]
 photos = ["button[aria-label*='Foto']", "button[aria-label*='foto']"]
 reviews_tab = ["button[role='tab'][aria-label*='Avalia']", "button[aria-label='Avaliações']"]
-reviews_sort = "button[aria-label*='Classificar']"
+reviews_sort = ["button[aria-label*='Ordenar']", "[aria-label*='Ordenar']"]
 login_link = "a[href*='accounts.google.com']"
 account_button = ["button[aria-label*='Conta do Google']", "a[aria-label*='Conta do Google']"]
 challenge_frame = ["iframe[src*='recaptcha/api2/bframe']", "iframe[src*='recaptcha/enterprise/bframe']"]
@@ -71,6 +71,8 @@ challenge = [
 login = ["fazer login", "sign in"]
 account = ["conta do google"]
 newest_reviews = ["mais recentes"]
+reviews_sort = ["ordenar"]
+photos = ["ver fotos"]
 search_no_results = ["nao encontrou nenhum documento", "did not match any documents",
                      "sua pesquisa nao encontrou"]
 
@@ -83,7 +85,7 @@ social = [
 marketplace = [
   "ifood.com.br", "aiqfome.com", "anota.ai", "goomer.app", "goomer.com.br",
   "doctoralia.com.br", "booking.com", "trinks.com", "agendei.com.br",
-  "appbarber.com.br", "withflow.com.br", "salaovip.com.br",
+  "appbarber.com.br", "withflow.com.br", "salaovip.com.br", "salonsoft.com.br",
 ]
 free_builder = ["business.site", "sites.google.com"]
 

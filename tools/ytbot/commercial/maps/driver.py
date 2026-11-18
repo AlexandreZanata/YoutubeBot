@@ -121,20 +121,24 @@ def _detail(page, rules: MapsRules, timeout: float) -> tuple[dict, str]:
 
 def _review_age(page, rules: MapsRules) -> int | None:
     """Newest review in the reviews panel; optional when Google changes that sub-layout."""
+    settle = int(float(rules.pacing["settle_seconds"]) * 1000)
     try:
-        tab = page.locator(rules.selector("reviews_tab"))
-        if not tab.count():
-            return None
-        tab.first.click()
-        page.wait_for_timeout(int(float(rules.pacing["settle_seconds"]) * 1000))
-        sort = page.locator(rules.selector("reviews_sort"))
-        if sort.count():
-            sort.first.click()
-            page.wait_for_timeout(int(float(rules.pacing["settle_seconds"]) * 1000))
-            newest = page.get_by_text(rules.labels["newest_reviews"][0], exact=False)
-            if newest.count():
-                newest.first.click()
-                page.wait_for_timeout(int(float(rules.pacing["settle_seconds"]) * 1000))
+        for _ in range(2):
+            trigger = page.get_by_text(rules.labels["reviews_sort"][0], exact=True)
+            if trigger.count() and trigger.first.is_visible():
+                trigger.first.click()
+                page.wait_for_timeout(settle)
+                option = page.get_by_role("menuitemradio",
+                                          name=rules.labels["newest_reviews"][0], exact=False)
+                if option.count():
+                    option.first.click()
+                    page.wait_for_timeout(settle)
+                    break
+            tab = page.locator(rules.selector("reviews_tab"))
+            if not tab.count():
+                break
+            tab.first.click()
+            page.wait_for_timeout(settle)
         panel = page.locator(rules.selector("detail_root"))
         text = panel.first.inner_text() if panel.count() else page.locator("body").inner_text()
         return extract.newest_review_age(text)

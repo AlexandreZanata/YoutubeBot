@@ -68,7 +68,7 @@ class FakePage:
         return fixture("feed.html")
 
     def count(self, selector):
-        if "searchboxinput" in selector:
+        if "combobox" in selector:
             return 1
         if "role='feed'" in selector:
             return 1 if self.state == "feed" else 0

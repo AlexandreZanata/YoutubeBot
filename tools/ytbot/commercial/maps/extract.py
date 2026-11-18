@@ -153,6 +153,8 @@ def parse_listing(page_html: str, url: str, rules: MapsRules) -> dict:
 
     website = _website_field(website_node)
     photos, photos_bucket = _photos(_first(root.select(rules.selector("photos"))))
+    if not photos and _has_label(root, rules.labels["photos"]):
+        photos, photos_bucket = 1, "1-9"
     hours = any(root.select(selector) for selector in rules.selectors["hours"])
     if not hours:
         hours = "horario de funcionamento" in normalize(root.text)
@@ -246,8 +248,10 @@ def layout(page_html: str, rules: MapsRules) -> str:
     return "unknown"
 
 
-AGE = re.compile(r"\bha\s+(?:(um|uma|1)\s+)?(\d+)?\s*(dia|dias|semana|semanas|mes|meses|"
-                 r"ano|anos)\b")
+HACE = re.compile(r"\bha\s+(?:(um|uma|1)\s+)?(\d+)?\s*(dia|dias|semana|semanas|mes|meses|"
+                  r"ano|anos)\b")
+AGO = re.compile(r"\b(?:(um|uma|1)\s+)?(\d+)?\s*(dia|dias|semana|semanas|mes|meses|"
+                 r"ano|anos)\s+atras\b")
 
 
 def _unit_days(unit: str) -> int:
@@ -260,6 +264,12 @@ def _unit_days(unit: str) -> int:
     return 365
 
 
+def _match_days(match) -> int:
+    amount = match.group(2)
+    number = int(amount) if amount else 1
+    return number * _unit_days(match.group(3))
+
+
 def review_age_days(text: str) -> int | None:
     """`há 2 semanas` -> 14; `hoje` -> 0; `ontem` -> 1."""
     plain = normalize(text)
@@ -267,12 +277,10 @@ def review_age_days(text: str) -> int | None:
         return 0
     if "ontem" in plain:
         return 1
-    match = AGE.search(plain)
+    match = HACE.search(plain) or AGO.search(plain)
     if not match:
         return None
-    amount = match.group(2)
-    number = 1 if amount is None else int(amount)
-    return number * _unit_days(match.group(3))
+    return _match_days(match)
 
 
 def newest_review_age(text: str) -> int | None:
@@ -283,8 +291,7 @@ def newest_review_age(text: str) -> int | None:
         ages.append(0)
     if "ontem" in plain:
         ages.append(1)
-    for match in AGE.finditer(plain):
-        amount = match.group(2)
-        number = 1 if amount is None else int(amount)
-        ages.append(number * _unit_days(match.group(3)))
+    for pattern in (HACE, AGO):
+        for match in pattern.finditer(plain):
+            ages.append(_match_days(match))
     return min(ages) if ages else None

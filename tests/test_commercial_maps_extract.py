@@ -90,11 +90,21 @@ class MapsHtmlTests(unittest.TestCase):
         self.assertEqual(extract.review_age_days("há 2 semanas"), 14)
         self.assertEqual(extract.review_age_days("há um mês"), 30)
         self.assertEqual(extract.review_age_days("há 1 ano"), 365)
+        self.assertEqual(extract.review_age_days("um mês atrás"), 30)
+        self.assertEqual(extract.review_age_days("2 meses atrás"), 60)
+        self.assertEqual(extract.review_age_days("5 meses atrás"), 150)
         self.assertEqual(extract.review_age_days("hoje"), 0)
         self.assertEqual(extract.review_age_days("ontem"), 1)
         self.assertIsNone(extract.review_age_days("sem data"))
         text = "há 3 meses · há 2 dias · há um ano"
         self.assertEqual(extract.newest_review_age(text), 2)
+        self.assertEqual(extract.newest_review_age("um mês atrás · 2 meses atrás · 3 dias atrás"), 3)
+
+    def test_photos_presence_is_a_conservative_bucket(self):
+        page = ('<div role="main"><h1>Clínica Teste</h1><div>Ver fotos</div></div>')
+        value = extract.parse_listing(page, "https://www.google.com/maps/place/X",
+                                      self.rules)
+        self.assertEqual((value["photos"], value["photos_bucket"]), (1, "1-9"))
 
 
 if __name__ == "__main__":
