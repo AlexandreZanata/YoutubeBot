@@ -257,6 +257,6 @@ def save(path, query: str, rows: list[dict]) -> None:
     write_private(path, {
         "schema": 1,
         "query": query,
-        "captured_at": datetime.now().isoformat(timespec="seconds"),
+        "captured_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "products": rows,
     })
