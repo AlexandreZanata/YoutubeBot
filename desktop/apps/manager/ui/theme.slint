@@ -1,0 +1,62 @@
+// Design tokens. Every color is `dark ? <dark> : <light>` on one line so
+// `tests/contrast.rs` can verify the WCAG AA pairs listed in docs/DESKTOP.md.
+
+export global Theme {
+    in-out property <bool> dark: true;
+
+    // Surfaces
+    out property <color> bg: dark ? #0e0e10 : #f4f4f5;
+    out property <color> sidebar: dark ? #121214 : #fafafa;
+    out property <color> surface: dark ? #18181b : #ffffff;
+    out property <color> surface-alt: dark ? #232327 : #ececee;
+    out property <color> hover: dark ? #202024 : #f0f0f2;
+    out property <color> selected: dark ? #2a2a30 : #e4e4e7;
+    out property <color> skeleton: dark ? #26262b : #e4e4e7;
+
+    // Lines: `border` is decorative, `border-strong` outlines controls (3:1).
+    out property <color> border: dark ? #2e2e33 : #d4d4d8;
+    out property <color> border-strong: dark ? #8b8b93 : #71717a;
+
+    // Text
+    out property <color> text: dark ? #fafafa : #09090b;
+    out property <color> text-muted: dark ? #d4d4d8 : #3f3f46;
+    out property <color> text-subtle: dark ? #a1a1aa : #52525b;
+
+    // Actions and the single discrete accent
+    out property <color> primary: dark ? #fafafa : #18181b;
+    out property <color> on-primary: dark ? #0e0e10 : #fafafa;
+    out property <color> accent: dark ? #93b4ff : #1d4ed8;
+    out property <color> focus: dark ? #8ab4ff : #1d4ed8;
+
+    // Status (text and small marks only)
+    out property <color> success: dark ? #4ade80 : #166534;
+    out property <color> warning: dark ? #facc15 : #854d0e;
+    out property <color> danger: dark ? #f87171 : #b91c1c;
+
+    // Spacing: multiples of 4
+    out property <length> space-1: 4px;
+    out property <length> space-2: 8px;
+    out property <length> space-3: 12px;
+    out property <length> space-4: 16px;
+    out property <length> space-5: 20px;
+    out property <length> space-6: 24px;
+    out property <length> space-8: 32px;
+
+    // Radii
+    out property <length> radius-sm: 4px;
+    out property <length> radius-md: 8px;
+    out property <length> radius-lg: 12px;
+
+    // Typography: one sans family, five sizes, line height 1.4
+    out property <string> font: "Noto Sans";
+    out property <length> text-xs: 12px;
+    out property <length> text-sm: 14px;
+    out property <length> text-md: 16px;
+    out property <length> text-lg: 20px;
+    out property <length> text-xl: 28px;
+    out property <float> line-height: 1.4;
+
+    // Elevation: cards use a hairline border; only popovers would use a shadow.
+    out property <length> shadow-blur: dark ? 0px : 8px;
+    out property <color> shadow: dark ? #00000000 : #0000000f;
+}

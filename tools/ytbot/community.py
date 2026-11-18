@@ -245,10 +245,20 @@ def _confirmed(page) -> bool:
     return False
 
 
+HISTORY_FILE = "community-history.jsonl"
+
+
 def _journal(entry: dict) -> None:
+    """Keep the latest entry for the 24-hour check and append every transition to the
+    append-only history that the desktop manager reads for monthly counts."""
     path = config.DATA_DIR / "community.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(entry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    record = dict(entry)
+    if config.CHANNEL is not None:
+        record.setdefault("channel", config.CHANNEL.slug)
+    with (config.DATA_DIR / HISTORY_FILE).open("a", encoding="utf-8") as history:
+        history.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 ART_STYLES = {
