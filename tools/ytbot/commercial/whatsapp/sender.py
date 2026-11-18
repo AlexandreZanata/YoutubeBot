@@ -194,6 +194,11 @@ def journal(path: Path, entry: dict) -> None:
     path.chmod(0o600)
 
 
+def text_key(value: str) -> str:
+    """Compare typed text with WhatsApp's composer after it applies bold/italic formatting."""
+    return re.sub(r"\s+", " ", re.sub(r"[*_~`]", "", value or "")).strip()
+
+
 def human_type(page, text: str, pacing: Pacing) -> None:
     """Type in small chunks with plausible pauses instead of pasting."""
     for chunk in re.findall(r"\S+\s*|\s+", text):
@@ -357,7 +362,8 @@ def deliver(page, text: str, pacing: Pacing, delay: float | None = None,
         attach_image(page, image)
     composer = focus_composer(page)
     human_type(page, text, pacing)
-    if text.strip()[:20] not in composer.inner_text().replace("\n", " "):
+    needle = text_key(text)[:30]
+    if not needle or needle not in text_key(composer.inner_text()):
         page.keyboard.press("Control+A")
         page.keyboard.press("Delete")
         raise RuntimeError("the text did not reach the composer; nothing was sent")

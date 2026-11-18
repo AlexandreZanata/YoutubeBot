@@ -57,9 +57,9 @@ def handoff_entry(lead: dict, history: list[dict], reason: str, priority: str, i
     }
 
 
-def message(entry: dict) -> tuple[str, str]:
+def message(entry: dict, app_name: str = "Zaflas vendas") -> tuple[str, str]:
     """Notification title and body."""
-    title = f"Zaflas vendas · {entry['priority_label']}"
+    title = f"{app_name} · {entry['priority_label']}"
     who = entry.get("contact_name") or entry["name"]
     lines = [f"{who} · {entry['phone']}", entry["reason"]]
     if entry.get("last_message"):
@@ -71,10 +71,10 @@ def message(entry: dict) -> tuple[str, str]:
     return title, "\n".join(lines)
 
 
-def desktop_notify(entry: dict) -> None:
-    title, body = message(entry)
+def desktop_notify(entry: dict, app_name: str = "Zaflas vendas") -> None:
+    title, body = message(entry, app_name)
     try:
         subprocess.run(["notify-send", "-u", URGENCY.get(entry.get("priority"), "normal"),
-                        "-a", "Zaflas vendas", title, body], timeout=5, check=False)
+                        "-a", app_name, title, body], timeout=5, check=False)
     except Exception:
         pass

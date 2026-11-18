@@ -14,6 +14,11 @@ class WhatsAppSenderTests(unittest.TestCase):
             self.assertGreaterEqual(pacing.between_messages(), 3)
             self.assertLessEqual(pacing.between_messages(), 9)
 
+    def test_whatsapp_bold_formatting_does_not_look_like_a_lost_text(self):
+        self.assertEqual(sender.text_key("*Burgers artesanais*"), "Burgers artesanais")
+        self.assertEqual(sender.text_key("  *X-Bacon*\n— R$ 24,00 "),
+                         "X-Bacon — R$ 24,00")
+
     def test_message_key_is_stable_and_distinct(self):
         first = sender.message_key("Ana", "Oferta do dia", None)
         self.assertEqual(first, sender.message_key("Ana", "Oferta do dia", None))

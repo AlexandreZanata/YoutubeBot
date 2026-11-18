@@ -55,6 +55,9 @@ python3 -m tools.ytbot commercial sales simulate --network whatsapp --text "Quan
 python3 -m tools.ytbot commercial sales run --network whatsapp --live --prospect --limit 3
 python3 -m tools.ytbot commercial sales queue list --network whatsapp
 python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --limit 1
+python3 -m tools.ytbot commercial lanchonete check --network whatsapp
+python3 -m tools.ytbot commercial lanchonete simulate --network whatsapp --at 19:00 --text "oi"
+python3 -m tools.ytbot commercial lanchonete run --network whatsapp --live --once
 python3 -m tools.ytbot social open --network x
 python3 -m tools.ytbot social open --network instagram
 python3 -m tools.ytbot social status --network x

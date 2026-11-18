@@ -163,9 +163,9 @@ def _read_lines(path: Path) -> list[dict]:
 class SalesStore:
     """File-backed state for one WhatsApp account (`.local/commercial/whatsapp`)."""
 
-    def __init__(self, base: Path):
+    def __init__(self, base: Path, root_name: str = "sales"):
         self.base = base
-        self.root = base / "sales"
+        self.root = base / root_name
         self.leads_path = self.root / "leads.json"
         self.dnc_path = self.root / "do-not-contact.json"
         self.conversations = self.root / "conversations"
