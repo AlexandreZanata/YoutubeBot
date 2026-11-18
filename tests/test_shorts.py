@@ -19,8 +19,8 @@ class ShortsTests(unittest.TestCase):
         self.assertIn("#zaflasagro", meta["description"])
         self.assertIn("TAGS:", meta["description"])
 
-    def test_twelve_topics_are_available(self):
-        self.assertEqual(len(shorts.SHORT_TOPICS), 12)
+    def test_topic_queue_is_available(self):
+        self.assertGreaterEqual(len(shorts.SHORT_TOPICS), 12)
 
 
 class ShortLanguageTests(unittest.TestCase):

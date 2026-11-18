@@ -25,6 +25,31 @@ The long-form Zaflas videos remain one per day at 12:00. Shorts are separate upl
 Zaflas is the only Portuguese channel. A short script that comes back in English is rejected
 and rewritten once; a second English result fails the asset before audio, render or upload.
 
+## Channels with Shorts
+
+Only these channels publish Shorts; the others have no Shorts queue and must never receive one:
+
+| Channel | Protocol | Cadence |
+| --- | --- | --- |
+| Zaflas | `shorts` | 2 per day at 09:00/18:00 |
+| the word of reflection | `faith-shorts` | 2 per day at 08:00/20:00 |
+| Whispers From Heaven | `faith-shorts` | 2 per day at 09:00/21:00 |
+| zanata | `faith-shorts` | 1 per day at 09:00 |
+
+Infinite Random Worlds, Vocal Pages and Fallem Prince do not use Shorts.
+
+## Intelligent Shorts distribution
+
+```bash
+python3 -m tools.ytbot distribute-shorts --count 10
+python3 -m tools.ytbot distribute-shorts --count 10 --dry-run
+```
+
+The same water-fill as the long-video distribution: count the scheduled Shorts of each
+Shorts-enabled channel and give the next Short to the channel with fewer scheduled ones. The
+new slots skip every slot already taken, so a batch never overwrites an existing Short. Each
+channel keeps its own protocol, language and style.
+
 ## Command
 
 ```bash

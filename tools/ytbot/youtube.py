@@ -287,8 +287,22 @@ def upload_and_schedule_with_context(context, run_dir: Path, meta: dict, slot, *
               "endScreen": False, "scheduled": False}
     write_result(run_dir, result)
     page = open_edit(context, video_id)
+    details_deferred = False
     try:
-        video_details.apply_details(page, run_dir, meta, custom_thumbnail=custom_thumbnail)
+        try:
+            video_details.apply_details(page, run_dir, meta, custom_thumbnail=custom_thumbnail)
+        except upload_guard.UploadBlocked as error:
+            if "did not persist" not in str(error):
+                raise
+            details_deferred = True
+            log("draft details are read-only; scheduling first and editing after")
+            page.close()
+            result["endScreen"] = end_screen
+            write_result(run_dir, result)
+            result = schedule_existing(context, run_dir, result, slot)
+            page = open_edit(context, video_id)
+            video_details.apply_details(page, run_dir, meta, custom_thumbnail=custom_thumbnail)
+            return result
         if end_screen:
             wait_for_checks(page)
             try:

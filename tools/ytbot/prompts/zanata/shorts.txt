@@ -1,0 +1,16 @@
+Write one complete English YouTube Short for the zanata channel, which summarizes books of philosophy, psychology and social thought.
+
+REQUIREMENTS:
+
+- Everything must be 100% in English.
+- Length: 90 to 140 words, about 40 to 60 seconds at the channel's measured pace.
+- One book, one idea, one concrete example. Do not try to cover the whole book.
+- Open with a line that makes the idea feel urgent and personal.
+- Stay faithful to the author. Do not invent quotations, studies, numbers or biographical facts.
+- A precise, intelligent voice. No hype, no self-help promises, no listicles.
+- End on a short line that reframes how the listener sees the idea.
+- No headings, lists, labels, notes, citations or links.
+- Do not use em dashes or en dashes. Use commas, periods, colons or ordinary hyphens.
+- Output only the narration text that will be read aloud.
+
+THEME:

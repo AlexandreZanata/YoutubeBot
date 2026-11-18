@@ -16,23 +16,55 @@ CHANNELS = {
     "reflection": {
         "upload": "reflection",
         "hours": (8, 20),
+        "hashtags": "#shorts #faith #bible #prayer #hope #god",
+        "tags": "faith, bible, prayer, hope, god, short, devotional, scripture",
         "topics": (
             "Hannah: When You Have No Words Left to Pray",
             "Elijah in the Cave: When the Storm Is Not God",
             "Peter's Nets: When Obedience Comes Before the Catch",
             "The Widow's Oil: When Little Is All You Have",
             "Joseph in Prison: When the Promise Feels Forgotten",
+            "The Prodigal Son: When You Come Home With Nothing",
+            "The Woman at the Well: When Someone Sees You Whole",
+            "Paul's Thorn: When the Answer Is No",
+            "The Friends Who Dug Through the Roof",
+            "Stephen at the Stones: When Forgiveness Costs Everything",
+        ),
+    },
+    "zanata": {
+        "upload": "zanata",
+        "hours": (9,),
+        "hashtags": "#books #philosophy #psychology #summary #shorts",
+        "tags": "book summary, philosophy, psychology, sociology, ideas, short",
+        "topics": (
+            "Why We Perform: Goffman and the Masks We Wear",
+            "The Tyranny of the Should: Karen Horney on the Ideal Self",
+            "Why a Scapegoat Unites a Crowd: René Girard",
+            "The Banality of Evil: Arendt on Ordinary People",
+            "The Denial of Death: Becker on Why We Build",
+            "Why Good People Obey: Milgram and Authority",
+            "The Elephant and the Rider: Haidt on Moral Intuition",
+            "Flow: Csikszentmihalyi on the State of Absorption",
+            "Man's Search for Meaning: Frankl in the Camp",
+            "The Social Animal: How Groups Shape the Self",
         ),
     },
     "whispers-from-heaven": {
         "upload": "youtube-2",
         "hours": (9, 21),
+        "hashtags": "#shorts #faith #bible #prayer #hope #god",
+        "tags": "faith, bible, prayer, hope, god, short, devotional, scripture",
         "topics": (
             "When the Night Feels Longer Than Your Faith",
             "The Shepherd Who Leaves the Ninety-Nine",
             "A Prayer You Whisper Is Still Heard",
             "The Peace That Does Not Depend on the Storm",
             "He Gathers the Weary, One by One",
+            "When You Feel Forgotten, He Has Not Left",
+            "The God Who Runs to Meet You",
+            "A Lamp for the Darkest Room",
+            "The Hands That Hold Tomorrow",
+            "Rest for the Ones Who Carry Everyone",
         ),
     },
 }
@@ -42,15 +74,30 @@ def log(message: str) -> None:
     print(f"[faith-shorts] {message}", flush=True)
 
 
-def short_slots(count: int, hours: tuple[int, int], start: date,
-                skip: int = 0) -> list[datetime]:
+def occupied_slots(root: Path) -> set[tuple[int, int, int, int]]:
+    slots = set()
+    for upload in root.glob("*/upload.json"):
+        try:
+            data = json.loads(upload.read_text(encoding="utf-8"))
+            slot = datetime.strptime(data.get("slot", ""), "%Y-%m-%d %H:%M")
+        except (OSError, ValueError):
+            continue
+        if data.get("scheduled"):
+            slots.add((slot.year, slot.month, slot.day, slot.hour))
+    return slots
+
+
+def short_slots(count: int, hours: tuple[int, ...], start: date,
+                skip: int = 0,
+                occupied: set[tuple[int, int, int, int]] | None = None) -> list[datetime]:
     slots = []
     day = start
     index = 0
     while len(slots) < count + skip:
         for hour in hours:
             slot = datetime.combine(day, dtime(hour=hour))
-            if slot > datetime.now() + timedelta(minutes=60):
+            if slot > datetime.now() + timedelta(minutes=60) and not (
+                    occupied and (slot.year, slot.month, slot.day, slot.hour) in occupied):
                 slots.append(slot)
                 if len(slots) == count + skip:
                     return slots[skip:]
@@ -79,14 +126,12 @@ def generate_script(page, topic: str, run_dir: Path) -> str:
     return text
 
 
-def metadata(topic: str, text: str) -> dict:
-    description = (
-        text.strip()
-        + "\n\n#shorts #faith #bible #prayer #hope #god\n\n"
-        "TAGS: faith, bible, prayer, hope, god, short, devotional, scripture"
-    )
-    return {"title": topic + " #Shorts", "description": description,
-            "tags": "faith, bible, prayer, hope, god, short, devotional, scripture"}
+def metadata(topic: str, text: str, spec: dict | None = None) -> dict:
+    spec = spec or {}
+    hashtags = spec.get("hashtags", "#shorts #faith #bible #prayer #hope #god")
+    tags = spec.get("tags", "faith, bible, prayer, hope, god, short, devotional, scripture")
+    description = text.strip() + "\n\n" + hashtags + "\n\nTAGS: " + tags
+    return {"title": topic + " #Shorts", "description": description, "tags": tags}
 
 
 def render_short(run_dir: Path) -> Path:
@@ -117,7 +162,7 @@ def render_short(run_dir: Path) -> Path:
 
 
 def run(channel_slug: str, count: int = 5, start: date | None = None,
-        skip_slots: int = 0) -> list:
+        skip_slots: int = 0, start_index: int = 0) -> list:
     spec = CHANNELS[channel_slug]
     channels.apply(channel_slug)
     store = AccountStore()
@@ -126,9 +171,10 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
     upload_cdp = store.account(spec["upload"])["cdp_port"]
     store.activate("legacy")
     runtime.start_hidden_chrome()
-    topics = list(spec["topics"])[:count]
+    topics = list(spec["topics"])[start_index:start_index + count]
     slots = short_slots(len(topics), spec["hours"],
-                        start or (date.today() + timedelta(days=1)), skip_slots)
+                        start or (date.today() + timedelta(days=1)), skip_slots,
+                        occupied_slots(config.DATA_DIR / "shorts"))
     failures = []
     with sync_playwright() as playwright:
         gen_browser, gen = runtime.connect_hidden(playwright)
@@ -162,7 +208,7 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
             try:
                 codex_media.generate_thumbnail(run_dir, "short-background")
                 render_short(run_dir)
-                meta = metadata(topic, text)
+                meta = metadata(topic, text, spec)
                 (run_dir / "metadata.json").write_text(
                     json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
                 youtube.upload_and_schedule_with_context(
