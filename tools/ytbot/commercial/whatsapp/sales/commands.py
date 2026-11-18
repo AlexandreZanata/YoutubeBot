@@ -18,7 +18,7 @@ from .agent import (SalesAgent, WhatsAppChannel, owner_block, owner_reset, owner
 from .decide import decide
 from .pacing import SalesPacing
 from .rules import RULES_PATH, RulesError, load
-from .store import AUTOMATED_STATES, SalesStore, mask, stamp
+from .store import AUTOMATED_STATES, SOURCES, SalesStore, mask, stamp
 
 OWNER_STATES = ("needs-owner", "quote-requested", "owner", "unconfirmed")
 
@@ -64,7 +64,7 @@ def command_import(args, store_factory) -> None:
     if not path.is_file():
         raise SystemExit(f"[sales] CSV not found: {path}")
     try:
-        report = store.import_csv(path, now)
+        report = store.import_csv(path, now, source=args.source)
     except ValueError as error:
         raise SystemExit(f"[sales] {error}")
     report["daily_openings"] = rules.limits["daily_openings"]
@@ -406,6 +406,8 @@ def add_parser(actions, store_factory, page_factory) -> None:
     importer = action("import", "import the owner-reviewed Google Maps CSV",
                       partial(command_import, store_factory=store_factory))
     importer.add_argument("--csv", required=True)
+    importer.add_argument("--source", choices=SOURCES, default="google-maps-reviewed",
+                          help="where the reviewed rows came from (default: google-maps-reviewed)")
     leads = action("leads", "list leads (phones masked)",
                    partial(command_leads, store_factory=store_factory))
     leads.add_argument("--state", default=None)

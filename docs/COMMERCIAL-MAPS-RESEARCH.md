@@ -1,8 +1,9 @@
 # Google Maps lead research
 
-Status: contract only (owner, 2026-11-18). No code exists yet; this file is what the owner and
-the bot use to pick the businesses most likely to buy a site, a system, an app or the
-"Ajuste do Google Maps" service, and the specification for the module that will automate it.
+Status: implemented (2026-11-18). The contract below is the
+source of truth; the module is `tools/ytbot/commercial/maps/`. Tests use saved HTML fixtures
+only. A real, owner-requested run is still pending and uses `--limit 10` in
+`Lucas do Rio Verde - MT` first.
 
 The research produces an owner-reviewed CSV for the WhatsApp sales agent
 ([WHATSAPP-SALES](COMMERCIAL-WHATSAPP-SALES.md)). It never sends a message, never writes on
@@ -192,25 +193,66 @@ Sources: Google Business Profile Help on
 [requesting ownership](https://support.google.com/business/answer/4566671) and
 [suggesting edits](https://support.google.com/websearch/answer/9879130).
 
-## Implementation contract (for the bot)
+## Implementation
 
-A new module `tools/ytbot/commercial/maps/` with a typed CLI, following the commercial runtime
-model:
+`tools/ytbot/commercial/maps/` follows the commercial runtime model: visible Chrome only for
+the owner's login, then hidden Chrome/Xvfb on display `:94` and CDP port `9326`, one tab.
+
+| File | Role |
+| --- | --- |
+| `maps_rules.toml` | Versioned data: selectors, category catalog and offers, exclusions, confirmation domains/markers, scoring, tiers, pacing, daily limit. |
+| `rules.py` | Loads and validates the TOML; no selector or weight in code. |
+| `html.py`, `extract.py` | Tolerant DOM, listing/feed/Google-result parsing, challenge/login/layout detection, relative review age. |
+| `score.py` | Website class, phone form, hard filters, score, tier and the owner note. |
+| `record.py` | Run directories, resumable JSONL, identities, daily count, `needs-attention.json`. |
+| `verify.py` | Bounded confirmation requests and the `no-site` / `site-not-on-maps` / `weak-site` / `has-site` outcome. |
+| `render.py` | `candidatos.csv`, `ajuste-maps.csv`, `report.md`. |
+| `driver.py` | Live one-tab Playwright flow: typed search, feed scroll, one listing, back. |
+| `commands.py` | The typed `commercial maps` CLI. |
 
 ```bash
-python3 -m tools.ytbot commercial maps login                       # visible, owner signs in
+python3 -m tools.ytbot commercial maps login
 python3 -m tools.ytbot commercial maps status
 python3 -m tools.ytbot commercial maps research --city "Lucas do Rio Verde" --state MT \
   [--group saude] [--limit 120]
-python3 -m tools.ytbot commercial maps verify --run <id>            # confirmation searches
-python3 -m tools.ytbot commercial maps export --run <id>            # candidatos.csv, report.md
+python3 -m tools.ytbot commercial maps verify --run lucas-do-rio-verde/2026-11-18
+python3 -m tools.ytbot commercial maps export --run lucas-do-rio-verde/2026-11-18
 python3 -m tools.ytbot commercial sales import --network whatsapp --csv <file> \
   --source google-maps-manual
 ```
 
-- Selectors, classification, ignore lists and scoring are data (a versioned TOML next to the
-  module), not code, so the owner tunes them like the sales rules.
-- Every step writes its record before acting; a crash resumes without opening a business
-  twice.
-- Tests use saved HTML fixtures of listings and search pages; no live Google access in CI.
-- The research never imports, never messages and never writes on Google.
+`--run` also accepts only the city slug and then uses its latest day. `--group` is repeatable
+and uses the keys in `[[groups]]` (`saude`, `agro`, `casa`, `automotivo`, `servicos`,
+`alimentacao`, `educacao`, `varejo`, `hotelaria`).
+
+Operational details:
+
+- `research` writes an `opening` row before opening a business, then the `read` row. A done
+  query stores its feed links, so a crash resumes at the next unread business instead of
+  repeating the search or reopening a listing.
+- The daily cap counts unique read businesses on that date across every city run. A new day
+  gets a new `<city-slug>/<date>` directory.
+- A challenge, sign-in requirement or unknown layout stops the run with exit code 2, writes
+  `.local/commercial/maps/needs-attention.json` and sends a desktop notification. The owner
+  checks the screen; the module never solves a CAPTCHA, rotates identity or retries blindly.
+  `commercial maps status` clears the marker after a successful signed-in check.
+- `verify` performs the one-page Google search, the two obvious domains and the Maps own-site
+  probe with 5 s timeouts, and records every URL and signal in `checks.jsonl`. Ignored
+  directories, social networks and marketplaces never count as the business's own site.
+- `export` merges the checks, drops closed listings, invalid/absent phones, excluded
+  categories/chains, existing sales leads and the do-not-contact list. Only tier A/B goes to
+  the CSVs; tier C and every exclusion stay in `report.md`.
+- `ajuste-maps.csv` carries the found site in `website`, so it is not importable until the
+  sales rules have the "Ajuste do Google Maps" opening and price.
+
+## Verification and limits
+
+Tests use saved HTML fixtures for listings, the results feed and Google result pages; CI never
+touches Google. The live selectors and the reviews sub-panel still need the owner-requested
+physical run (`--limit 10` in `Lucas do Rio Verde - MT` first). The confirmation search proves
+the sites it finds; it cannot prove that a site does not exist, so the owner reviews the list
+before importing. Google's terms restrict automated access; keep the module owner-operated,
+slow and low-volume, and stop at the first challenge. If the volume must grow, use the paid
+Google Places API with the owner's key instead of scaling the browser.
+
+The research never imports, never messages and never writes on Google.

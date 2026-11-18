@@ -49,9 +49,11 @@ gain `kind` (`sales-opening`, `sales-reply`, `sales-followup`), `lead` and `inte
 
 ## Leads from Google Maps
 
-Scraping Google Maps breaks Google's terms, so leads come only from the owner's review. Open
-Maps, search a category and city, open each business without a website, and copy name and
-phone into a CSV:
+Leads come only from the owner's review. The slow, read-only research module described in
+[Maps research](COMMERCIAL-MAPS-RESEARCH.md) can collect public listings into a candidate CSV
+with the owner's own Google account; the owner still edits the file and imports it, so no row
+enters the funnel without approval. Manual search also works: open Maps, search a category and
+city, open each business without a website, and copy name and phone into a CSV:
 
 ```csv
 name,phone,city,category,maps_url,website,note
@@ -83,9 +85,10 @@ rewrites `todos.vcf` on demand.
 
 Acquisition contract: every source (the reviewed Maps CSV, a manual Maps search, Receita
 Federal data) adds leads through `SalesStore.import_rows(rows, now, source)` with `source` in
-`google-maps-reviewed`, `google-maps-manual`, `receita-federal`, `manual`. Rows carry `name`,
-`phone` and optionally `category`, `city`, `maps_url`, `website`, `note`; the same validation,
-do-not-contact check, numbering and vCard apply to all of them.
+`google-maps-reviewed`, `google-maps-manual`, `receita-federal`, `manual`. The research CSV uses
+`--source google-maps-manual`. Rows carry `name`, `phone` and optionally `category`, `city`,
+`maps_url`, `website`, `note`; the same validation, do-not-contact check, numbering and vCard
+apply to all of them.
 
 ## Central snapshot
 
