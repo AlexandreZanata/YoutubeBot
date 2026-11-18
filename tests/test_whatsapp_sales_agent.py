@@ -214,7 +214,8 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(agent.reply_pending(), [])
         self.assertEqual(channel.sent, [])
         self.assertTrue(self.notes)
-        self.assertEqual(self.store.lead(lead["id"])["state"], "new")
+        self.assertEqual(self.store.lead(lead["id"])["state"], "needs-owner")
+        self.assertIn("pausadas", self.notes[-1]["reason"])
 
     def test_messages_from_other_chats_are_ignored(self):
         _, agent, channel = self.opened_lead()

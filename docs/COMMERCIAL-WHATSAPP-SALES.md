@@ -156,7 +156,7 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
 - Every imported number starts with `reply_active: true`. If it writes before an opening, the
   agent stores the message and answers it (the lead moves to `engaged`); it never sends an
   opening to someone already in conversation. `activate --all` re-enables older leads,
-  `pause --lead <id>` stops automatic replies and notifies the owner. `sales leads` and the
+  `pause --lead <id>` stops automatic replies and sends the message to "Precisa de você". `sales leads` and the
   Central show `reply: ativo` or `pausado`.
 - Openings stay one number at a time, in import order, up to 10/day and only in the opening
   window. Use `--limit 1` to start exactly one number per invocation or `--limit 10` for the

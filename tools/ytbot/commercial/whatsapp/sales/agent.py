@@ -294,6 +294,7 @@ class SalesAgent:
             changes = {"last_in_at": now, "chat": event.get("chat") or lead.get("chat")}
             if not reply_is_active(lead) and lead["state"] not in ("do-not-contact",
                                                                        "invalid-number"):
+                changes["state"] = "needs-owner"
                 self.store.update_lead(lead["id"], **changes)
                 if self._remind(lead):
                     self._handoff(lead, "Mensagem de um contato com respostas automáticas "
