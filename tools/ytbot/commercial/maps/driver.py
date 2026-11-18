@@ -12,7 +12,7 @@ from datetime import datetime
 from urllib.parse import quote_plus
 from zoneinfo import ZoneInfo
 
-from . import extract, verify
+from . import extract, score, verify
 from .record import Run, identity as listing_identity, url_key
 from .rules import MapsRules, normalize
 
@@ -251,7 +251,8 @@ def verify_key(url: str) -> str:
 def verify_run(page, run: Run, rules: MapsRules, log=print,
                sleep=time.sleep, rng=random, fetcher=verify.fetch) -> dict:
     """Confirmation Google searches in the same tab, then the bounded own-site checks."""
-    pending = run.pending_checks()
+    pending = [listing for listing in run.pending_checks()
+               if score.city_matches(listing, run.city)]
     page.set_default_timeout(float(rules.pacing["page_timeout_seconds"]) * 1000)
     first = True
     done = 0

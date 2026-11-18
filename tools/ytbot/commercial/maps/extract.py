@@ -9,6 +9,7 @@ from . import html
 from .rules import MapsRules, host_of, normalize
 
 NUMBER = re.compile(r"\d[\d.\s]*")
+ADDRESS_CITY = re.compile(r",\s*([^,]+?)\s*-\s*[A-Z]{2}\b")
 
 
 def _number(text: str) -> float | None:
@@ -41,6 +42,12 @@ def _label_value(text: str) -> str:
         if len(head) <= 24:
             value = rest.strip()
     return value
+
+
+def city_from_address(address: str) -> str:
+    """`..., Sinop - MT, 78550-000` -> `Sinop`; empty when the address has no city/UF."""
+    matches = ADDRESS_CITY.findall(address or "")
+    return matches[-1].strip() if matches else ""
 
 
 def _first(nodes: list[html.Node]) -> html.Node | None:
@@ -159,10 +166,12 @@ def parse_listing(page_html: str, url: str, rules: MapsRules) -> dict:
     if not hours:
         hours = "horario de funcionamento" in normalize(root.text)
 
+    address = _labeled_text(address_node)
     return {
         "name": html.text_of(name_node),
         "category": html.text_of(category_node),
-        "address": _labeled_text(address_node),
+        "address": address,
+        "city": city_from_address(address),
         "phone": phone,
         "website_field": website,
         "social": _social_links(root, rules),

@@ -23,6 +23,7 @@ class MapsHtmlTests(unittest.TestCase):
         self.assertEqual(value["category"], "Clínica odontológica")
         self.assertEqual(value["address"],
                          "Av. Brasil, 123 - Centro, Lucas do Rio Verde - MT, 78455-000")
+        self.assertEqual(value["city"], "Lucas do Rio Verde")
         self.assertEqual(value["phone"], "(65) 90000-0001")
         self.assertEqual(value["website_field"], "")
         self.assertEqual(value["rating"], 4.8)

@@ -125,7 +125,13 @@ def export_run(run: Run, rules: MapsRules, now: datetime, lead_keys: set[str],
     exported = set()
     pending = 0
     for listing in listings:
-        listing["city"] = run.city
+        listing["city"] = listing.get("city") or run.city
+        listing["target_city"] = run.city
+        if not score.city_matches(listing, run.city):
+            excluded.append({"name": listing.get("name", ""),
+                             "reason": f"fora da cidade: {listing['city']}",
+                             "identity": listing["identity"]})
+            continue
         check = checks.get(listing["identity"])
         if check is None:
             pending += 1

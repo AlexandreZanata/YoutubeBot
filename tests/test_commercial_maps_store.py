@@ -93,6 +93,16 @@ class MapsRecordTests(unittest.TestCase):
         self.assertIn("já tem site funcionando", text)
         self.assertEqual((self.run.path / "report.md").stat().st_mode & 0o777, 0o600)
 
+    def test_other_city_is_excluded_before_confirmation(self):
+        self.run.append_listing({**listing(name="Odonto Sorriso", phone="(66) 90000-0002",
+                                           city="Sorriso",
+                                           address="R. Central, 10 - Centro, Sorriso - MT"),
+                                 "state": "read"})
+        report = render.export_run(self.run, self.rules, NOW, set(), set())
+        self.assertEqual((report["excluded"], report["pending"]), (1, 0))
+        text = (self.run.path / "report.md").read_text(encoding="utf-8")
+        self.assertIn("fora da cidade: Sorriso", text)
+
     def test_pending_confirmation_is_not_exported(self):
         self.run.append_listing({**listing(), "state": "read"})
         report = render.export_run(self.run, self.rules, NOW, set(), set())

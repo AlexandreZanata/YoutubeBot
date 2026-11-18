@@ -80,6 +80,14 @@ class MapsScoreTests(unittest.TestCase):
         self.assertEqual(score.exclusion_reason(listing(outcome="has-site"), self.rules, set(),
                                                 set()), "já tem site funcionando")
 
+    def test_listing_from_another_city_is_excluded(self):
+        value = listing(city="Sorriso", target_city="Sinop",
+                        address="R. Central, 10 - Centro, Sorriso - MT")
+        self.assertEqual(score.exclusion_reason(value, self.rules, set(), set()),
+                         "fora da cidade: Sorriso")
+        self.assertFalse(score.city_matches(value, "Sinop"))
+        self.assertTrue(score.city_matches(value, "Sorriso"))
+
     def test_already_a_lead_and_do_not_contact(self):
         value = listing()
         key = phone_key(value["phone"])
