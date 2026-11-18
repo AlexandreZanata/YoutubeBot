@@ -583,8 +583,8 @@ def add_parser(actions, store_factory, page_factory) -> None:
                      help="also send openings to new leads (daily limit applies)")
     run.add_argument("--limit", type=int, default=None, help="max openings in this run")
     run.add_argument("--once", action="store_true")
-    run.add_argument("--interval", type=int, default=10,
-                     help="seconds between two scans of the chat list (default 10)")
+    run.add_argument("--interval", type=int, default=2,
+                     help="seconds between two scans of the chat list (default 2)")
     run.add_argument("--max-cycles", type=int, default=0)
     run.add_argument("--max-chats", type=int, default=30)
     run.add_argument("--no-llm", action="store_true")

@@ -48,10 +48,15 @@ OWNER_ACTIONS = ("handoff", "quote", "won", "buy", "lose")
 # describing it, the requirements interview starts instead of offering again.
 SYSTEM_OFFERS = ("system_request", "system_price", "app_at_site_price")
 # A correction or an addition after the summary, not a plain "yes".
-CORRECTION = re.compile(r"\b(mas|porem|faltou|falta|so que|corrig\w*|acrescent\w*|tambem|"
-                        r"alem disso|errad\w*|nao)\b")
-CONFIRMED = re.compile(r"\b(certo|correto|exato|isso mesmo|perfeito|esta certo|ta certo|"
-                       r"tudo certo|pode seguir|isso ai)\b")
+CORRECTION = re.compile(r"\b(mas|porem|faltou|falta|so que|corrig\w*|acrescent\w*|adicion\w*|"
+                        r"esquec\w*|inclu\w*|tambem|alem disso|errad\w*|nao|mudar|alterar|trocar)\b")
+CONFIRMED = re.compile(
+    r"\b(certo|correto|exat\w*|isso mesmo|isso msm|perfeit\w*|esta certo|ta certo|"
+    r"tudo certo|tudo ok|ta ok|pode seguir|pode mandar|pode tocar|manda ver|manda brasa|"
+    r"bota pra frente|isso a[ie]|iss[ao]e|e isso a[ie]|positivo|afirmativo|confirmad[oa]|"
+    r"confirmo|concordo|de acordo|fechou|combinado|beleza|blz|show|top|joia|maravilha|"
+    r"tranquilo)\b"
+)
 SYSTEM_WORDS = re.compile(
     r"sistema|aplicativo|\bapps?\b|loja (virtual|online)|e-?commerce|"
     r"agendamento|cadastro|\blogin\b|painel|delivery|"
@@ -497,7 +502,9 @@ class SalesAgent:
             confirmations = int(lead.get("confirmations", 0)) + 1
             plain = normalize(text)
             agreed = (not CORRECTION.search(plain)
-                      and (bool(CONFIRMED.search(plain)) or dossier.client_said_done(self.rules, text)
+                      and (bool(CONFIRMED.search(plain)) or bool(decision.updates.get("buy_intent"))
+                           or bool(brief.get("cliente_terminou"))
+                           or dossier.client_said_done(self.rules, text)
                            or any(re.search(pattern, plain)
                                   for pattern in self.rules.context["affirmative"])))
             summary = self._summary(brief) if model_ready else ""
