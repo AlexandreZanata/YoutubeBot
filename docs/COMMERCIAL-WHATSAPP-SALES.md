@@ -237,7 +237,11 @@ The chat receives a number ("o número do Carlos é (65) 9…")
       names never take an article ("da Felipe" was wrong in the 2026-11-17 test): the article
       goes with "empresa", people's names stand alone; the context model says the same
       a contact card without a visible number → owner: "salve o número e chame"
-      a number already in the contacts → no new lead, no second opening; owner (needed):
+      a number already in the contacts (owner, 2026-11-18: a referred contact is always
+        messaged) → that lead gets a new cycle and the same referral opening; its earlier
+        history stays. Only a lead the owner is closing (owner, quote-requested, won,
+        buying), an uncertain send (unconfirmed, opening), a number without WhatsApp or one
+        on the do-not-contact list goes to the owner instead:
         "O número indicado já está nos contatos (barbearia-2, estado …)"
 
 "Quero fechar" / "como pago a entrada" (checked before the quote "sim")

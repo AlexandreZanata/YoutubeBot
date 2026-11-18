@@ -68,20 +68,38 @@ class SalesFlowTests(unittest.TestCase):
         batch = sorted(self.store.contacts_dir.glob("novos-*.vcf"))[-1].read_text("utf-8")
         self.assertIn("FN:barbearia-2 Carlos · Barbearia Navalha", batch)
 
-    def test_referral_to_a_number_already_in_the_contacts_goes_to_the_owner(self):
-        # Seen live 2026-11-18: the bot thanked the staff and nothing else happened.
+    def test_referral_to_a_number_already_in_the_contacts_still_gets_the_opening(self):
+        # Owner, 2026-11-18: a referred contact is always messaged, even one already known.
         self.store.import_rows([{"name": "Carlos", "phone": PHONES[8], "category": "Barbearia"}],
                                MONDAY)
+        known = self.store.find_lead(PHONES[8])
+        self.store.update_lead(known["id"], state="needs-owner", opened_at="2026-11-15T09:00:00",
+                               last_in_at="2026-11-15T09:05:00", cycle=1)
         before = set(self.store.leads())
-        sent = len(self.sent())
         self.say("Sou funcionária, o dono não está")
         self.say("O número do Carlos é (65) 90000-0009")
         self.assertEqual(set(self.store.leads()), before)
+        self.assertEqual(self.store.lead(self.lead["id"])["referred_to"], known["id"])
+        lead = self.store.lead(known["id"])
+        self.assertEqual((lead["state"], lead["cycle"]), ("opened", 2))
+        self.assertEqual(lead["referral"]["from"], self.lead["id"])
+        self.assertIn("A equipe da empresa Barbearia Navalha me passou o seu contato. Sou o "
+                      "Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. "
+                      "Vi que no Google Maps a empresa Barbearia Navalha ainda não tem site.",
+                      self.sent())
+
+    def test_referral_to_a_contact_the_owner_is_closing_goes_to_the_owner(self):
+        self.store.import_rows([{"name": "Carlos", "phone": PHONES[8], "category": "Barbearia"}],
+                               MONDAY)
+        known = self.store.find_lead(PHONES[8])
+        self.store.update_lead(known["id"], state="won")
+        sent = len(self.sent())
+        self.say("Sou funcionária, o dono não está")
+        self.say("O número do Carlos é (65) 90000-0009")
+        self.assertEqual(self.store.lead(known["id"])["state"], "won")
         self.assertEqual(self.state(), "needs-owner")
-        self.assertEqual(self.notes[-1]["priority"], "needed")
-        self.assertIn("já está nos contatos (barbearia-2, estado new)", self.notes[-1]["reason"])
-        self.assertEqual(len([text for text in self.sent()[sent:]
-                              if text.startswith("Bom dia")]), 0)
+        self.assertIn("já está nos contatos (barbearia-2, estado won)", self.notes[-1]["reason"])
+        self.assertFalse([text for text in self.sent()[sent:] if "me passou o seu contato" in text])
 
     def test_staff_who_will_not_pass_the_contact_gets_a_kind_close(self):
         self.say("Sou funcionária, o dono não está")

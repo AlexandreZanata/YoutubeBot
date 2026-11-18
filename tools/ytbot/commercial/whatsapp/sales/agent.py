@@ -35,6 +35,10 @@ REOPENS = ("new", "opened", "followed-up", "closed", "no-response", "engaged", "
 OWNER_STATES = ("needs-owner", "quote-requested", "owner", "unconfirmed", "won", "buying", "lost")
 # Owner states where material the client still sends (receipt, logo) is saved silently.
 SILENT_STATES = ("quote-requested", "won")
+# A referral never re-opens a lead the owner is closing a sale with, one whose last send is
+# uncertain, a number without WhatsApp or one on the do-not-contact list.
+REFERRAL_KEEPS = ("owner", "quote-requested", "won", "buying", "unconfirmed", "opening",
+                  "invalid-number", "do-not-contact")
 NEXT_STATE = {"qualify": "qualifying", "collect": "qualifying", "quote": "quote-requested",
               "close": "closed", "block": "do-not-contact", "handoff": "needs-owner",
               "won": "won", "buy": "buying", "lose": "lost", "refer": "referred"}
@@ -610,20 +614,39 @@ class SalesAgent:
         if report["do_not_contact"]:
             decision.action, decision.priority = "handoff", "needed"
             decision.owner_reason = "O número indicado está na lista de não contatar"
-        elif report["duplicates"] and not report["ids"]:
-            # Already a lead: never a second opening; the owner decides how to follow up.
-            known = self.store.find_lead(numbers[0])
-            where = (f" ({known.get('label') or known['name']}, estado {known['state']})"
-                     if known else "")
-            decision.action, decision.priority = "handoff", "needed"
-            decision.owner_reason = (f"O número indicado já está nos contatos{where}; "
-                                     "decida como seguir com ele")
         decision.referred = report["ids"][0] if report["ids"] else ""
+        if report["duplicates"] and not report["ids"]:
+            # Already a lead: the referral still gets its own opening (owner, 2026-11-18),
+            # unless the owner is closing a sale there or a send to it is uncertain.
+            known = self.store.find_lead(numbers[0])
+            if known and known["id"] != lead["id"] and known["state"] not in REFERRAL_KEEPS:
+                self._retarget(known, lead, staff, decider)
+                decision.referred = known["id"]
+            else:
+                where = (f" ({known.get('label') or known['name']}, estado {known['state']})"
+                         if known else "")
+                decision.action, decision.priority = "handoff", "needed"
+                decision.owner_reason = (f"O número indicado já está nos contatos{where}; "
+                                         "decida como seguir com ele")
         who = decider or texts["who_unnamed"]
         thanks = texts["thanks"] if staff else texts["thanks_unnamed"]
         decision.messages = [thanks.replace("{staff}", staff).replace("{who}", who)]
         self.store.update_lead(lead["id"], staff_name=staff or lead.get("staff_name"))
         return decision
+
+    def _retarget(self, known: dict, source: dict, staff: str, decider: str) -> None:
+        """A referral to a number already in the contacts: a new cycle opened as a referral.
+
+        The earlier conversation stays in its history; the new cycle keeps the journal keys
+        of the first opening apart, so the referral opening is not mistaken for a repeat.
+        """
+        note = f"Indicado por {staff or 'funcionário'} ({source.get('label', '')})"
+        self.store.update_lead(
+            known["id"], state="new", opened_at=None, followups=0, last_out_at=None,
+            last_in_at=None, awaiting=None, replies={}, handoff_reason=None, intents=[],
+            bot_replies=0, collect_turns=0, cycle=int(known.get("cycle", 0)) + 1,
+            note=note, referral={"from": source["id"], "staff": staff,
+                                 "company": source["name"], "decider": decider})
 
     def _check_progress(self, lead: dict, decision: Decision) -> Decision:
         """Hand off when the bot is not moving the conversation toward a quote."""
