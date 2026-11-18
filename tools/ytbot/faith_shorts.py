@@ -31,6 +31,19 @@ CHANNELS = {
             "Stephen at the Stones: When Forgiveness Costs Everything",
         ),
     },
+    "zaflas": {
+        "upload": "zaflas",
+        "hours": (9, 18),
+        "hashtags": "#zaflasagro #agricultura #agro #shorts #gestaorural",
+        "tags": "Zaflas Agro, agricultura, agronegócio, gestão rural, solo, lavoura, pecuária",
+        "topics": (
+            "Por que a palhada protege o solo do sol?",
+            "Como saber se o calcário reagiu no solo?",
+            "O que a umidade do grão faz com o preço?",
+            "Por que o bezerro desmama mais leve?",
+            "Quando a pulverização perde eficiência?",
+        ),
+    },
     "zanata": {
         "upload": "zanata",
         "hours": (9,),
@@ -111,9 +124,14 @@ def generate_script(page, topic: str, run_dir: Path) -> str:
     page.wait_for_timeout(7000)
     chat.dismiss_notice(page)
     header = config.prompt("shorts.txt")
-    header += ("\n\nMANDATORY NARRATION LANGUAGE: English. Write the entire spoken short in "
-               "English, regardless of the operator message or the browser language. Return "
-               "only the narration text.")
+    language = config.CHANNEL.language if config.CHANNEL else "en"
+    if language == "pt-BR":
+        header += ("\n\nIDIOMA OBRIGATÓRIO: português do Brasil. Escreva todo o texto falado "
+                   "nesse idioma, sem nenhuma palavra em inglês. Responda apenas com a narração.")
+    else:
+        header += ("\n\nMANDATORY NARRATION LANGUAGE: English. Write the entire spoken short in "
+                   "English, regardless of the operator message or the browser language. Return "
+                   "only the narration text.")
     chat.send_text(page, header + "\n\nTheme: " + topic)
     log(f"script prompt sent: {topic}")
     chat.wait_for_assistant(page)

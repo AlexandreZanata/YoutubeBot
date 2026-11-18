@@ -175,7 +175,8 @@ def build_parser() -> argparse.ArgumentParser:
     distribute_shorts.set_defaults(func=command_distribute_shorts)
     faith = sub.add_parser("faith-shorts",
                            help="religious Shorts with one generated background per short")
-    faith.add_argument("--channel", choices=("reflection", "whispers-from-heaven", "zanata"),
+    faith.add_argument("--channel",
+                       choices=("reflection", "whispers-from-heaven", "zanata", "zaflas"),
                        required=True)
     faith.add_argument("--count", type=int, default=5)
     faith.add_argument("--start-date", default=None, help="first schedule date (YYYY-MM-DD)")
