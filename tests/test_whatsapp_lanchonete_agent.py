@@ -435,6 +435,17 @@ class LanchoneteAgentTests(unittest.TestCase):
         self.assertIn("atendente humano", texts)
         self.assertEqual(self.customer()["state"], "needs-owner")
 
+    def test_wanting_to_order_shows_the_menu(self):
+        self.say("quero fazer um pedido")
+        texts = "\n".join(self.sent())
+        self.assertIn("cardápio", texts)
+        self.assertIn("X-Bacon", texts)
+        self.assertEqual(self.customer()["state"], "ordering")
+        # ...while a real item in the same sentence still orders.
+        self.say("quero pedir um x-bacon")
+        cart = {line["item_id"]: line["qty"] for line in self.customer()["cart"]}
+        self.assertEqual(cart, {"x-bacon": 1})
+
 
 if __name__ == "__main__":
     unittest.main()

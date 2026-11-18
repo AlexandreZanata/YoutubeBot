@@ -711,6 +711,7 @@ priority = "needed"
 patterns = [
   'cardapio', 'menu', 'o que (voces )?(tem|vende|oferece)', 'quais (sao )?(os )?(lanches|itens|opcoes)',
   'me manda (o )?(cardapio|menu)', 'quero ver (o )?(cardapio|menu)', 'opcoes',
+  'quero fazer (um |o )?pedido', 'fazer (um |o )?pedido', 'quero pedir',
 ]
 messages = []
 
