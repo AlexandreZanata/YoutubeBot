@@ -11,7 +11,7 @@ from pathlib import Path
 from ...accounts_store import private_directory
 from ..whatsapp.sales.store import CSV_FIELDS
 from .extract import city_from_address
-from . import score
+from . import score, verify
 from .record import Run
 from .rules import MapsRules
 
@@ -119,7 +119,8 @@ def _report(run: Run, listings: list[dict], excluded: list[dict],
 def export_run(run: Run, rules: MapsRules, now: datetime, lead_keys: set[str],
                dnc_keys: set[str]) -> dict:
     """Merge checks, apply filters and score; the only step that produces owner files."""
-    checks = {entry["identity"]: entry for entry in run.checks()}
+    checks = {entry["identity"]: verify.reclassify(entry, rules)
+              for entry in run.checks()}
     listings = run.read_listings()
     excluded, candidates, adjustments = [], [], []
     scores = {}
@@ -132,6 +133,11 @@ def export_run(run: Run, rules: MapsRules, now: datetime, lead_keys: set[str],
         if not score.city_matches(listing, run.city):
             excluded.append({"name": listing.get("name", ""),
                              "reason": f"fora da cidade: {listing['city']}",
+                             "identity": listing["identity"]})
+            continue
+        reason = score.exclusion_reason(listing, rules, lead_keys, dnc_keys)
+        if reason:
+            excluded.append({"name": listing.get("name", ""), "reason": reason,
                              "identity": listing["identity"]})
             continue
         check = checks.get(listing["identity"])
