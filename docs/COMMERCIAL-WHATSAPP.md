@@ -174,6 +174,7 @@ The key hashes `to + text + image name`. `send` refuses a key already marked `se
 | Message unconfirmed | last outgoing bubble lacks the text | Journal `unconfirmed`; do not retry blindly |
 | Session expired | `status` returns `login-required` | Owner rescans the QR |
 | Browser stuck | CDP port refuses connections | `commercial stop --network whatsapp`, then `status` |
+| Page or connection closed after a suspend | `TargetClosedError` in `sales run` | The run reconnects on its own (3 times in a row at most); a send in progress is fenced, never retried |
 | Port 9325 busy | another profile owns it | Stop the other browser; never reuse a foreign profile |
 | Disk or profile error | browser fails to start | Check free space and profile permissions (0700) |
 

@@ -294,9 +294,9 @@ class SalesAgent:
         ours = [normalize(entry.get("text", "")) for entry in history if entry.get("dir") == "out"]
         last_out = max((index for index, bubble in enumerate(bubbles) if bubble["dir"] == "out"),
                        default=-1)
-        if (bubbles and bubbles[-1]["dir"] == "out" and not bubbles[-1].get("media")
-                and not _ours(bubbles[-1]["text"], ours)):
-            return bubbles[-1]["text"]
+        typed = self._owner_typed(bubbles, ours)
+        if typed is not None:
+            return typed
         _, unanswered = split_pending(history)
         seen = {entry.get("message_id") for entry in history if entry.get("message_id")}
         previews = [entry["event"] for entry in unanswered
@@ -313,6 +313,34 @@ class SalesAgent:
         for entry in entries:
             self.store.remember(lead["id"], entry)
         return None
+
+    @staticmethod
+    def _owner_typed(bubbles: list[dict], ours: list[str]) -> str | None:
+        """Text the owner typed in the chat after the bot's first message, if any.
+
+        Older personal messages (before the bot ever wrote in this chat) do not count. Without
+        a bot message in view, only a last outgoing bubble the bot did not send counts.
+        """
+        anchor = next((index for index, bubble in enumerate(bubbles)
+                       if bubble["dir"] == "out" and bubble.get("text")
+                       and _ours(bubble["text"], ours)), None)
+        if anchor is None:
+            last = bubbles[-1] if bubbles else None
+            if last and last["dir"] == "out" and not last.get("media") and \
+                    not _ours(last["text"], ours):
+                return last["text"]
+            return None
+        typed = [bubble["text"] for bubble in bubbles[anchor + 1:]
+                 if bubble["dir"] == "out" and bubble.get("text")
+                 and not _ours(bubble["text"], ours)]
+        return typed[-1] if typed else None
+
+    def _owner_took_over(self, lead: dict, text: str, result: dict) -> dict:
+        self.store.remember(lead["id"], {"at": stamp(self.now()), "dir": "out", "text": text,
+                                         "kind": "owner", "state": "sent"})
+        self.store.update_lead(lead["id"], state="owner", awaiting=None)
+        self.log(f"{lead['name']}: the owner wrote in the chat; automation paused")
+        return {**result, "state": "owner"}
 
     def _from_bubble(self, lead: dict, bubble: dict) -> dict | None:
         now = self.now()
@@ -431,12 +459,7 @@ class SalesAgent:
                 return {**result, "state": "invalid-number"}
             owner_text = self._merge_chat(lead, self.channel.read_recent())
             if owner_text is not None:
-                self.store.remember(lead["id"], {"at": stamp(self.now()), "dir": "out",
-                                                 "text": owner_text, "kind": "owner",
-                                                 "state": "sent"})
-                self.store.update_lead(lead["id"], state="owner", awaiting=None)
-                self.log(f"{lead['name']}: the owner already answered; automation paused")
-                return {**result, "state": "owner"}
+                return self._owner_took_over(lead, owner_text, result)
         if lead["state"] in SILENT_STATES:
             if not self.live:
                 return {**result, "state": "planned", "action": "refresh-ficha"}
@@ -712,6 +735,9 @@ class SalesAgent:
         if status != "ready":
             self.store.update_lead(lead["id"], state="invalid-number")
             return {**result, "state": "invalid-number"}
+        owner_text = self._merge_chat(lead, self.channel.read_recent())
+        if owner_text is not None:
+            return self._owner_took_over(lead, owner_text, result)
         results = self.channel.send(lead, items, {"kind": "sales-followup", "lead": lead["id"]})
         self.store.update_lead(lead["id"], followups=number)
         done, worst = self._remember_sent(lead, items, results, "followup")

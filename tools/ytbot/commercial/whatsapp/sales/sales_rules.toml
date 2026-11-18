@@ -168,6 +168,8 @@ fallback_question = "Anotei! Se tiver mais alguma informação, como nome do sit
 
 [referral]
 # A staff member who does not decide is asked, politely, for the decision maker's contact.
+# Names never take an article ("a Felipe", "da Barbearia" may be the wrong gender): write
+# "da empresa {company}" and people's names alone ("Vou falar com {who}").
 # A number sent in the chat becomes a new lead (same category, next number, vCard) and gets
 # its own opening, mentioning who passed the number. Staff chats then stop (state referred).
 ask_name = "E com quem eu falo, por gentileza?"
@@ -180,10 +182,10 @@ daily_limit = 10                    # referral openings, apart from the 10 cold 
 opening = [
   "{greeting}",
   "Tudo bem?",
-  "{staff}, da {company}, me passou o seu contato. Sou o Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. Vi que no Google Maps a {company} ainda não tem site.",
+  "{staff}, da empresa {company}, me passou o seu contato. Sou o Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. Vi que no Google Maps a empresa {company} ainda não tem site.",
   "Nós temos alguns exemplos de sistemas e sites que nós criamos:",
 ]
-opening_unnamed = "A equipe da {company} me passou o seu contato. Sou o Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. Vi que no Google Maps a {company} ainda não tem site."
+opening_unnamed = "A equipe da empresa {company} me passou o seu contato. Sou o Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. Vi que no Google Maps a empresa {company} ainda não tem site."
 contact_card = "Mandou o contato do responsável em cartão: salve o número e chame"
 
 [context]

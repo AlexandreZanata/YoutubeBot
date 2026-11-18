@@ -260,6 +260,94 @@ def reload_if_changed(agent, path: Path, seen: float) -> float:
     return changed
 
 
+MAX_RECONNECTS = 3
+
+
+def is_closed(error: BaseException) -> bool:
+    """The browser page or the CDP connection went away (suspend/resume, Chrome restart)."""
+    text = str(error)
+    return (type(error).__name__ == "TargetClosedError" or "has been closed" in text
+            or "Connection closed" in text or "Browser closed" in text)
+
+
+class Session:
+    """The page the bot works on; reopened when the computer wakes up or Chrome restarts."""
+
+    def __init__(self, args, page_factory, rules, store, log=print):
+        self.args = args
+        self.page_factory = page_factory
+        self.rules = rules
+        self.store = store
+        self.log = log
+        self.playwright = self.client = self.page = None
+        self.channel = None
+        self.open()
+
+    def open(self) -> None:
+        _, _, self.playwright, self.client, self.page = self.page_factory(self.args)
+        self.channel = WhatsAppChannel(self.page, SalesPacing.from_rules(self.rules),
+                                       self.store.journal_path)
+
+    def close(self) -> None:
+        for step in (lambda: self.page.close(), lambda: self.client.close(),
+                     lambda: self.playwright.stop()):
+            try:
+                step()
+            except Exception:
+                pass
+
+    def reopen(self, agent, error: BaseException) -> None:
+        self.log(f"[sales] browser page closed ({type(error).__name__}); reconnecting")
+        self.close()
+        self.open()
+        if agent.live:
+            agent.channel = self.channel
+
+
+def run_cycles(agent, session, args, listen=None, out=None) -> None:
+    """Listen, answer, follow up and open leads until told to stop.
+
+    A closed page outside a send (the computer slept, Chrome restarted) reconnects up to
+    MAX_RECONNECTS times in a row. A send that failed is never retried: the journal fences it
+    and the run stops.
+    """
+    listen = listen or whatsapp_listener.listen
+    out = out or (lambda line: print(line, flush=True))
+    rules_path = Path(args.rules) if args.rules else RULES_PATH
+    rules_seen = rules_path.stat().st_mtime
+    cycles = failures = 0
+
+    def recover(error: BaseException) -> None:
+        nonlocal failures
+        if not is_closed(error) or failures >= MAX_RECONNECTS:
+            raise error
+        failures += 1
+        session.reopen(agent, error)
+
+    while True:
+        rules_seen = reload_if_changed(agent, rules_path, rules_seen)
+        try:
+            events = listen(session.page, agent.store.base, once=True, limit=args.max_chats)
+            summary = agent.cycle(events, prospect=args.prospect, limit=args.limit)
+        except Exception as error:
+            recover(error)
+            continue
+        failures = 0
+        out(json.dumps(summary, ensure_ascii=False))
+        cycles += 1
+        outcomes = [item.get("state") for group in ("replies", "followups", "openings")
+                    for item in summary[group]]
+        if any(state in ("unconfirmed", "error") for state in outcomes):
+            raise SystemExit("[sales] a send was not confirmed; stopping. Check the chat, "
+                             "then `commercial sales resolve`.")
+        if args.once or (args.max_cycles and cycles >= args.max_cycles):
+            return
+        try:
+            session.page.wait_for_timeout(args.interval * 1000)
+        except Exception as error:
+            recover(error)
+
+
 def command_run(args, store_factory, page_factory) -> None:
     rules, store, _ = _context(args, store_factory)
     model = _model(rules, store, not args.no_llm)
@@ -269,34 +357,16 @@ def command_run(args, store_factory, page_factory) -> None:
     if not store.acquire():
         raise SystemExit("[sales] another sales run is active; one conversation at a time")
     try:
-        _, _, playwright, client, page = page_factory(args)
+        session = Session(args, page_factory, rules, store)
     except RuntimeError as error:
         store.release()
         raise SystemExit(f"[sales] {error}")
     try:
-        channel = WhatsAppChannel(page, SalesPacing.from_rules(rules), store.journal_path)
-        agent = SalesAgent(rules, store, channel if args.live else None, model, live=args.live)
-        rules_path = Path(args.rules) if args.rules else RULES_PATH
-        rules_seen = rules_path.stat().st_mtime
-        cycles = 0
-        while True:
-            rules_seen = reload_if_changed(agent, rules_path, rules_seen)
-            events = whatsapp_listener.listen(page, store.base, once=True, limit=args.max_chats)
-            summary = agent.cycle(events, prospect=args.prospect, limit=args.limit)
-            print(json.dumps(summary, ensure_ascii=False), flush=True)
-            cycles += 1
-            outcomes = [item.get("state") for group in ("replies", "followups", "openings")
-                        for item in summary[group]]
-            if any(state in ("unconfirmed", "error") for state in outcomes):
-                raise SystemExit("[sales] a send was not confirmed; stopping. Check the chat, "
-                                 "then `commercial sales resolve`.")
-            if args.once or (args.max_cycles and cycles >= args.max_cycles):
-                break
-            page.wait_for_timeout(args.interval * 1000)
+        agent = SalesAgent(rules, store, session.channel if args.live else None, model,
+                           live=args.live)
+        run_cycles(agent, session, args)
     finally:
-        page.close()
-        client.close()
-        playwright.stop()
+        session.close()
         store.release()
 
 

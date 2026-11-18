@@ -133,7 +133,10 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   them, sends due follow-ups and, with `--prospect`, opens new leads up to the daily limit.
   Without `--live` it prints the decisions and changes no lead state. It stops on the first
   send that is not confirmed. An edited `sales_rules.toml` is reloaded before the next cycle;
-  an invalid edit is reported and the previous rules stay in use.
+  an invalid edit is reported and the previous rules stay in use. When the browser page or the
+  CDP connection closes outside a send (the computer slept, Chrome restarted; seen on
+  2026-11-18 as `TargetClosedError` after a night), the run reconnects to the hidden browser
+  and continues, up to 3 times in a row; a failed send still stops the run.
 - `resolve` hands a conversation back to the agent after the owner handled it; `block` adds the
   number to the do-not-contact list.
 
@@ -202,7 +205,7 @@ the model using only the facts.
 | "Obrigado", "ok" | `thanks` | ignore | Nothing |
 | Anything not in the facts: city, invoice, contract, domain, technology, e-mail, ambiguous text | `unknown` | handoff | Fixed: "Certo! Vou verificar direitinho e já te respondo."; owner notified |
 | Message outside 07:00–21:00 | — | — | Stored; answered at the start of the next reply window |
-| The owner typed in the chat | — | — | Detected when the chat opens; state `owner`, automation pauses |
+| The owner typed in the chat | — | — | Any message the bot did not send, after the bot's first message in that chat (older personal messages do not count), found when the chat opens to answer or to follow up; state `owner`, automation pauses |
 | A refused contact writes again | — | — | No automated answer; owner notified |
 
 ## Staff, referral, closing and end states (owner, 2026-11-17)
@@ -223,9 +226,11 @@ The chat receives a number ("o número do Carlos é (65) 9…")
       new lead: next number of the same category (barbearia-2 "Carlos · Barbearia X"),
       source referral, vCard batch, linked to the staff chat
       opening to the new number, in the opening window, own daily limit (10), first in line:
-        greeting → "Tudo bem?" → "Paula, da Barbearia X, me passou o seu contato. Sou o
-        Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. Vi que no
-        Google Maps a Barbearia X ainda não tem site." → examples → links
+        greeting → "Tudo bem?" → "Paula, da empresa Barbearia X, me passou o seu contato. Sou
+        o Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. Vi que no
+        Google Maps a empresa Barbearia X ainda não tem site." → examples → links
+      names never take an article ("da Felipe" was wrong in the 2026-11-17 test): the article
+      goes with "empresa", people's names stand alone; the context model says the same
       a contact card without a visible number → owner: "salve o número e chame"
 
 "Quero fechar" / "como pago a entrada" (checked before the quote "sim")

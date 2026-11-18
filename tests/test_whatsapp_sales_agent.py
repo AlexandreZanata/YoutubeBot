@@ -235,6 +235,33 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(agent.reply_pending()[0]["state"], "owner")
         self.assertEqual(len(channel.sent), 8)
 
+    def opening_bubbles(self):
+        return [{"dir": "out", "text": text} for text in self.rules.opening_messages(MONDAY)]
+
+    def test_owner_message_anywhere_after_the_bot_pauses_it(self):
+        lead, agent, channel = self.opened_lead()
+        channel.bubbles = self.opening_bubbles() + [
+            {"dir": "out", "text": "É o bot"}, {"dir": "out", "text": "Só ignora"},
+            {"dir": "in", "text": "ok"}]
+        agent.ingest([self.event("ok")])
+        self.assertEqual(agent.reply_pending()[0]["state"], "owner")
+        self.assertEqual(len(channel.sent), 8)
+
+    def test_old_personal_messages_before_the_bot_do_not_count(self):
+        lead, agent, channel = self.opened_lead()
+        channel.bubbles = [{"dir": "out", "text": "bora x1 amanhã"}] + self.opening_bubbles() + [
+            {"dir": "in", "text": "Quanto custa?"}]
+        agent.ingest([self.event("Quanto custa?")])
+        self.assertEqual(agent.reply_pending()[0]["state"], "engaged")
+        self.assertGreater(len(channel.sent), 8)
+
+    def test_no_follow_up_after_the_owner_wrote(self):
+        lead, agent, channel = self.opened_lead()
+        channel.bubbles = self.opening_bubbles() + [{"dir": "out", "text": "Só ignora"}]
+        self.clock.now = MONDAY + timedelta(hours=73)
+        self.assertEqual(agent.followups()[0]["state"], "owner")
+        self.assertEqual(len(channel.sent), 8)
+
     def test_full_chat_text_replaces_the_truncated_preview(self):
         lead, agent, channel = self.opened_lead()
         model = FakeModel({"intent": "system_request", "messages": []})

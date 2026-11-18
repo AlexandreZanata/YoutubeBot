@@ -60,9 +60,10 @@ class SalesFlowTests(unittest.TestCase):
         self.assertEqual((new["label"], new["name"]), ("barbearia-2", "Carlos · Barbearia Navalha"))
         self.assertEqual(new["referral"]["staff"], "Paula")
         self.assertIn("Muito obrigado, Paula! Vou falar com Carlos agora.", self.sent())
-        self.assertIn("Paula, da Barbearia Navalha, me passou o seu contato. Sou o Alexandre, "
-                      "da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. Vi que no "
-                      "Google Maps a Barbearia Navalha ainda não tem site.", self.sent())
+        self.assertIn("Paula, da empresa Barbearia Navalha, me passou o seu contato. Sou o "
+                      "Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. "
+                      "Vi que no Google Maps a empresa Barbearia Navalha ainda não tem site.",
+                      self.sent())
         self.assertEqual(new["state"], "opened")
         batch = sorted(self.store.contacts_dir.glob("novos-*.vcf"))[-1].read_text("utf-8")
         self.assertIn("FN:barbearia-2 Carlos · Barbearia Navalha", batch)

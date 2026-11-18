@@ -34,6 +34,18 @@ class SalesRulesTests(unittest.TestCase):
         with self.assertRaises(sales_rules.RulesError):
             sales_rules.build(raw)
 
+    def test_names_never_take_an_article_of_unknown_gender(self):
+        import re
+        texts = [text for value in self.raw["referral"].values()
+                 for text in (value if isinstance(value, list) else [value])
+                 if isinstance(text, str)]
+        for text in texts:
+            self.assertIsNone(re.search(r"\b(a|o|as|os|da|do|na|no|pela|pelo)\s+\{(company|staff|who)\}",
+                                        text, re.IGNORECASE), text)
+        opening = self.rules.referral_opening(MONDAY, "Tinalda", "Felipe")
+        self.assertIn("Tinalda, da empresa Felipe, me passou o seu contato.", opening[2])
+        self.assertIn("a empresa Felipe ainda não tem site", opening[2])
+
     def test_greeting_follows_the_local_hour(self):
         self.assertEqual(self.rules.greeting(MONDAY.replace(hour=14)), "Boa tarde")
         self.assertEqual(self.rules.greeting(MONDAY.replace(hour=19)), "Boa noite")
