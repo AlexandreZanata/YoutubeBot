@@ -17,7 +17,7 @@ from ..sales import dossier
 from ..sales.store import SalesStore, _private_dir, _read_json, _write_json, canonical_phone, \
     phone_key, stamp
 from .order import Order, order_number
-from .rules import RestaurantRules
+from .rules import RestaurantRules, normalize
 
 
 class LanchoneteStore(SalesStore):

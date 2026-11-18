@@ -14,6 +14,7 @@ from .. import sender
 from ..sales import llm as sales_llm
 from ..sales.commands import is_closed
 from ..sales.pacing import SalesPacing
+from ..sales.store import canonical_phone as whatsapp_phone, phone_key
 from .agent import LanchoneteAgent, LanchoneteChannel, owner_block, owner_resolve
 from .rules import RULES_PATH, RulesError, load
 from .store import LanchoneteStore
@@ -168,6 +169,25 @@ def command_simulate(args, store_factory) -> None:
                 "orders": store.orders()})
 
 
+def command_allow(args, store_factory) -> None:
+    """Owner: register a number and its WhatsApp title so the bot may answer it."""
+    _, store, now = _context(args, store_factory)
+    phone = whatsapp_phone(args.phone)
+    if phone is None:
+        raise SystemExit("[lanchonete] --phone is not a valid Brazilian number")
+    chat = (args.chat or args.name).strip()
+    found = next((customer for customer in store.leads().values()
+                  if customer.get("phone") and phone_key(customer["phone"]) == phone_key(phone)),
+                 None)
+    if found is None:
+        found = store.ensure_customer(chat, now)
+    if store.is_blocked(found):
+        raise SystemExit("[lanchonete] this number is on the do-not-contact list")
+    updated = store.update_lead(found["id"], phone=phone, name=args.name.strip(),
+                                chat=chat, contact_name=chat, source="owner-allow")
+    _print(_public(updated))
+
+
 def command_customers(args, store_factory) -> None:
     _, store, _ = _context(args, store_factory)
     customers = [customer for customer in store.leads().values()
@@ -283,7 +303,7 @@ def command_run(args, store_factory, page_factory) -> None:
     failures = cycles = 0
     try:
         agent = LanchoneteAgent(rules, store, session.channel if args.live else None, model,
-                                live=args.live)
+                                live=args.live, only=tuple(args.only or ()))
         while True:
             if requested:
                 break
@@ -347,6 +367,11 @@ def add_parser(actions, store_factory, page_factory) -> None:
                           help="customer message; repeat it for a sequence")
     simulate.add_argument("--chat", default="(65) 90000-0001")
     simulate.add_argument("--at", default="19:00", help="local time for the simulation")
+    allow = action("allow", "owner: register a number the bot may answer",
+                   lambda args: command_allow(args, store_factory))
+    allow.add_argument("--phone", required=True)
+    allow.add_argument("--name", required=True)
+    allow.add_argument("--chat", default=None, help="WhatsApp chat title, when different")
     customers = action("customers", "list customers and their state",
                        lambda args: command_customers(args, store_factory))
     customers.add_argument("--state", default=None)
@@ -376,3 +401,5 @@ def add_parser(actions, store_factory, page_factory) -> None:
     run.add_argument("--max-chats", type=int, default=30)
     run.add_argument("--no-llm", action="store_true",
                      help="local parser and fixed replies only")
+    run.add_argument("--only", action="append", default=[],
+                     help="answer only this phone (repeat for more than one)")

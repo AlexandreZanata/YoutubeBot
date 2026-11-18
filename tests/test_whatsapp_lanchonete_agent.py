@@ -189,6 +189,20 @@ class LanchoneteAgentTests(unittest.TestCase):
         agent.reply_pending()
         self.assertEqual(store.find_lead("(65) 90000-0003")["cart"], [])
 
+    def test_allowlist_answers_only_the_selected_numbers_or_titles(self):
+        agent = LanchoneteAgent(self.rules, self.store, self.channel, None, live=True,
+                                clock=self.clock, sleep=lambda seconds: None,
+                                notify=self.notes.append, log=lambda message: None,
+                                only=("556696384527", "556696623492"))
+        felipe = self.store.ensure_customer("Felipe", self.clock.now)
+        self.store.update_lead(felipe["id"], phone="556696384527", chat="Felipe")
+        agent.ingest([{"id": "a1", "chat": "Felipe", "text": "oi"}])
+        self.assertIsNotNone(self.store.find_lead("Felipe")["awaiting"])
+        agent.ingest([{"id": "a2", "chat": "Outro contato", "text": "oi"}])
+        self.assertIsNone(self.store.find_lead("Outro contato"))
+        agent.ingest([{"id": "a3", "chat": "(66) 9662-3492", "text": "oi"}])
+        self.assertIsNotNone(self.store.find_lead("(66) 9662-3492"))
+
     def test_group_like_chats_are_never_touched(self):
         self.agent.ingest([{"id": "g1", "chat": "Família ❤️", "text": "João: quero 2 x-bacon"}])
         self.assertEqual(self.agent.reply_pending(), [])

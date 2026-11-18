@@ -29,7 +29,7 @@ from ..sales.rules import normalize
 from . import guard, interpreter, parser
 from .order import Order, OrderError
 from .rules import RestaurantRules, brl
-from .store import LanchoneteStore, canonical_phone
+from .store import LanchoneteStore, canonical_phone, phone_key
 from ..sales.transcribe import local_transcriber
 
 REPLYABLE = ("new", "ordering", "confirming", "closed", "cancelled")
@@ -73,7 +73,7 @@ class Turn:
 class LanchoneteAgent:
     def __init__(self, rules: RestaurantRules, store: LanchoneteStore, channel=None, llm=None,
                  live: bool = False, clock=None, sleep=time.sleep, rng=random,
-                 notify=None, log=None, transcriber=None):
+                 notify=None, log=None, transcriber=None, only=()):
         self.rules = rules
         self.store = store
         self.channel = channel
@@ -87,6 +87,7 @@ class LanchoneteAgent:
         self.log = log or (lambda message: print(f"[lanchonete] {message}", flush=True))
         self.pacing = SalesPacing.from_rules(rules)
         self.transcriber = transcriber or local_transcriber
+        self.only_keys = {phone_key(phone) for phone in only if phone_key(phone)}
         self._chats = 0
         self._last_chat = None
         self._planned: set[tuple[str, str]] = set()
@@ -183,6 +184,17 @@ class LanchoneteAgent:
         return (not canonical_phone(event.get("chat", ""))
                 and bool(GROUP_PREFIX.match(event.get("text", ""))))
 
+    def allowed_chat(self, chat: str) -> bool:
+        """An allowlisted phone, or an existing customer whose phone is allowlisted."""
+        if not self.only_keys:
+            return True
+        phone = canonical_phone(chat)
+        if phone and phone_key(phone) in self.only_keys:
+            return True
+        customer = self.store.find_lead(chat)
+        return bool(customer and customer.get("phone")
+                    and phone_key(customer["phone"]) in self.only_keys)
+
     def ingest(self, events: list[dict]) -> list[str]:
         touched = []
         contacts = listener.load_rules(self.store.contact_rules_path)
@@ -190,6 +202,9 @@ class LanchoneteAgent:
             chat = (event.get("chat") or "").strip()
             text = event.get("text") or ""
             if not chat or not text:
+                continue
+            if not self.allowed_chat(chat):
+                self.log("chat outside the allowlist skipped")
                 continue
             customer = self.store.find_lead(chat)
             if customer is None:

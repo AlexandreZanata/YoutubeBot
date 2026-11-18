@@ -183,6 +183,8 @@ python3 -m tools.ytbot commercial lanchonete menu     --network whatsapp [--json
 python3 -m tools.ytbot commercial lanchonete simulate --network whatsapp --at 19:00 \
   --text "oi" --text "quero 2 x-bacon com bacon extra e uma coca" --text "fechar" \
   --text "retirada" --text "Ana" --text "pix" --text "sim"
+python3 -m tools.ytbot commercial lanchonete allow     --network whatsapp \
+  --phone "+55 66 90000-0001" --name "Cliente Teste" [--chat "Título no WhatsApp"]
 python3 -m tools.ytbot commercial lanchonete customers --network whatsapp [--state ordering]
 python3 -m tools.ytbot commercial lanchonete pedidos   --network whatsapp [--today]
 python3 -m tools.ytbot commercial lanchonete ficha     --network whatsapp --order BP-20261118-001
@@ -198,6 +200,10 @@ python3 -m tools.ytbot commercial lanchonete run       --network whatsapp --live
 - `menu` prints the exact chat menu, extras with their prices and the payment rules.
 - `simulate` plays a full conversation offline with a fresh temporary state and prints every
   reply, state and the order. It never sends and never touches the real database.
+- `allow` registers a number and the exact WhatsApp chat title, so a saved contact can be
+  recognized before the first message. `run --only <phone>` restricts the run to those numbers;
+  repeat `--only` for more than one. Without `--only` the bot answers any chat that writes
+  first, which is the normal dedicated-number mode.
 - `run` scans the chat list, answers ordering customers and confirms orders. It stops on the
   first send that is not confirmed. A browser page that closed outside a send reconnects up to
   three times; a failed send still stops the run. `SIGTERM` ends between two steps.
