@@ -54,7 +54,8 @@ def names(text: str, llm=None, session_id: str = "") -> dict:
         return result
     try:
         reply = llm.complete([{"role": "system", "content": PROMPT},
-                              {"role": "user", "content": text}], session_id=session_id)
+                              {"role": "user", "content": text}], session_id=session_id,
+                             quick=True)
         data = json.loads(reply.content[reply.content.find("{"):reply.content.rfind("}") + 1])
     except Exception:
         return result

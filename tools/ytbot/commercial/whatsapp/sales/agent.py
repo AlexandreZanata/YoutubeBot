@@ -610,6 +610,14 @@ class SalesAgent:
         if report["do_not_contact"]:
             decision.action, decision.priority = "handoff", "needed"
             decision.owner_reason = "O número indicado está na lista de não contatar"
+        elif report["duplicates"] and not report["ids"]:
+            # Already a lead: never a second opening; the owner decides how to follow up.
+            known = self.store.find_lead(numbers[0])
+            where = (f" ({known.get('label') or known['name']}, estado {known['state']})"
+                     if known else "")
+            decision.action, decision.priority = "handoff", "needed"
+            decision.owner_reason = (f"O número indicado já está nos contatos{where}; "
+                                     "decida como seguir com ele")
         decision.referred = report["ids"][0] if report["ids"] else ""
         who = decider or texts["who_unnamed"]
         thanks = texts["thanks"] if staff else texts["thanks_unnamed"]

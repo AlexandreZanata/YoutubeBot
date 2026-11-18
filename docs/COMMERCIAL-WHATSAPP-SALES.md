@@ -237,6 +237,8 @@ The chat receives a number ("o número do Carlos é (65) 9…")
       names never take an article ("da Felipe" was wrong in the 2026-11-17 test): the article
       goes with "empresa", people's names stand alone; the context model says the same
       a contact card without a visible number → owner: "salve o número e chame"
+      a number already in the contacts → no new lead, no second opening; owner (needed):
+        "O número indicado já está nos contatos (barbearia-2, estado …)"
 
 "Quero fechar" / "como pago a entrada" (checked before the quote "sim")
   ├─ the conversation is about the institutional site → close_site, state won:
@@ -458,6 +460,10 @@ live in `[opening]` and `[pacing]` of the rules file.
    `free_timeout_seconds` (20) to answer; a timeout or an error pauses it `cooldown_seconds`
    (120), "no credits" or a rate limit (402, 429, quota) pauses it
    `no_credit_cooldown_seconds` (1800), and a reply that is not a JSON object moves on.
+   A small optional lookup (the staff or decider name in a gatekeeper message) is `quick`:
+   `quick_timeout_seconds` (8) per model and `quick_attempts` (2) models, then the local
+   pattern result is used. Measured 2026-11-18: a hung `longcat-2.5-free` held that lookup,
+   and the reply, for 20 s.
 4. **Fallback.** With no free model answering: `deepseek-v4.1-flash`, then
    `muse-spark-1.3-contributor` (the only paid models the code accepts).
 5. Models without JSON mode (`iceman-contributor-free` rejects `response_format`) are called

@@ -68,6 +68,21 @@ class SalesFlowTests(unittest.TestCase):
         batch = sorted(self.store.contacts_dir.glob("novos-*.vcf"))[-1].read_text("utf-8")
         self.assertIn("FN:barbearia-2 Carlos · Barbearia Navalha", batch)
 
+    def test_referral_to_a_number_already_in_the_contacts_goes_to_the_owner(self):
+        # Seen live 2026-11-18: the bot thanked the staff and nothing else happened.
+        self.store.import_rows([{"name": "Carlos", "phone": PHONES[8], "category": "Barbearia"}],
+                               MONDAY)
+        before = set(self.store.leads())
+        sent = len(self.sent())
+        self.say("Sou funcionária, o dono não está")
+        self.say("O número do Carlos é (65) 90000-0009")
+        self.assertEqual(set(self.store.leads()), before)
+        self.assertEqual(self.state(), "needs-owner")
+        self.assertEqual(self.notes[-1]["priority"], "needed")
+        self.assertIn("já está nos contatos (barbearia-2, estado new)", self.notes[-1]["reason"])
+        self.assertEqual(len([text for text in self.sent()[sent:]
+                              if text.startswith("Bom dia")]), 0)
+
     def test_staff_who_will_not_pass_the_contact_gets_a_kind_close(self):
         self.say("Sou funcionária, o dono não está")
         self.say("Vou passar pro dono, ele te chama")

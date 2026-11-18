@@ -350,12 +350,23 @@ class ModelRouter:
         # A paused fallback is still tried last: better a late answer than none.
         return [(model, True) for model in free] + [(model, False) for model in ready + paused]
 
-    def complete(self, messages: list[dict], session_id: str) -> LlmReply:
+    def complete(self, messages: list[dict], session_id: str, quick: bool = False) -> LlmReply:
+        """First model that answers with a JSON object.
+
+        `quick` is for small optional lookups (a name in a message) whose caller has a local
+        fallback: each model gets `quick_timeout_seconds` and only `quick_attempts` are tried,
+        so one hung free model cannot hold a reply for the full `free_timeout_seconds`.
+        """
         self.refresh()
         failures = []
+        attempts = int(self.settings.get("quick_attempts", 2)) if quick else None
         for model_id, free in self.candidates():
+            if attempts is not None and len(failures) >= attempts:
+                break
             timeout = float(self.settings["free_timeout_seconds"] if free
                             else self.settings["timeout_seconds"])
+            if quick:
+                timeout = min(timeout, float(self.settings.get("quick_timeout_seconds", 8)))
             try:
                 reply = self._call(model_id, messages, session_id, timeout)
             except LlmError as error:

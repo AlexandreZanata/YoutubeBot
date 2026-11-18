@@ -45,6 +45,7 @@ class FakeProvider:
         self.behavior = behavior or {}
         self.catalog = catalog
         self.calls = []
+        self.timeouts = []
 
     def __call__(self, request, timeout):
         if request.full_url.endswith("/models"):
@@ -52,6 +53,7 @@ class FakeProvider:
         body = json.loads(request.data)
         name = body["model"]
         self.calls.append((name, "response_format" in body))
+        self.timeouts.append(timeout)
         how = self.behavior.get(name, "ok")
         if how == "timeout":
             raise socket.timeout("timed out")
@@ -116,6 +118,19 @@ class ModelRouterTests(unittest.TestCase):
         self.assertNotIn("longcat-2.5-free", [name for name, _ in provider.calls])
         clock.now += self.settings["cooldown_seconds"] + 1
         self.assertFalse(router.cooling("longcat-2.5-free"))
+
+    def test_a_quick_lookup_waits_little_and_gives_up_after_two_models(self):
+        # Measured 2026-11-18: a hung free model held a name lookup (and the reply) for 20 s.
+        provider = FakeProvider()
+        router = self.router(provider)
+        router.refresh(force=True)  # every model healthy at the probe, then they hang
+        provider.behavior = {name: "timeout" for name in router.free_models()}
+        provider.calls.clear()
+        with self.assertRaises(llm.LlmError):
+            router.complete([{"role": "user", "content": "oi"}], "s", quick=True)
+        self.assertEqual([name for name, _ in provider.calls],
+                         ["longcat-2.5-free", "beam-free"])
+        self.assertEqual(provider.timeouts[-2:], [8.0, 8.0])
 
     def test_without_free_credits_the_paid_fallback_answers_in_order(self):
         provider = FakeProvider({"longcat-2.5-free": "credits", "beam-free": "credits",

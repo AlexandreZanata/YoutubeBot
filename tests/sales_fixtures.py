@@ -48,8 +48,8 @@ class FakeModel:
         self.error = error
         self.calls = []
 
-    def complete(self, messages, session_id):
-        self.calls.append({"messages": messages, "session_id": session_id})
+    def complete(self, messages, session_id, quick=False):
+        self.calls.append({"messages": messages, "session_id": session_id, "quick": quick})
         if self.error:
             raise LlmError(self.error)
         answer = self.answers.pop(0) if self.answers else {"intent": "unknown", "messages": []}
