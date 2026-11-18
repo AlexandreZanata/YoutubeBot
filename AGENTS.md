@@ -144,7 +144,9 @@ its fixed text or goes to the owner. A refusal is a permanent do-not-contact ent
 question gets an honest answer, the OpenCode key stays in `.local/`, and `--live` stays
 required. Imported numbers start with replies active: the agent answers a lead that writes even before
 an opening, `sales activate|pause` toggles that per lead, and `run --live --prospect --limit`
-opens one number at a time up to 10/day. The rules' values are of the static institutional
+opens one number at a time up to 10/day. `sales queue list|send` is a view of `leads.json`
+(Maps leads in CSV order, no second store) whose `send --live --limit 1` opens exactly one
+number through the same path and run lock; the opening names the business as on Google Maps. The rules' values are of the static institutional
 site only; apps and systems are always quoted by the owner and the bot must never tie the site
 price to them. Closing the
 institutional site sends only the Pix keys written in the rules file; closing an app or system,

@@ -26,6 +26,7 @@ from .context import effective
 from .decide import Decision, _fixed, decide, stuck
 from .pacing import SalesPacing
 from .rules import SalesRules, normalize
+from .queue import in_queue, order_key
 from .store import SalesStore, reply_is_active, stamp
 from .transcribe import local_transcriber
 
@@ -836,22 +837,53 @@ class SalesAgent:
         return {**result, "state": state}
 
     # Openings and follow-ups ---------------------------------------------------------
-    def prospect(self, limit: int | None = None) -> list[dict]:
-        now = self.now()
-        if not self.rules.in_window(now, "opening"):
-            self.log("outside opening hours; no first contact now")
+    def opening_blocker(self, queue_only: bool = False) -> str:
+        """Why no first contact may start now ("" when one may), in the owner's words."""
+        hours = self.rules.raw["hours"]
+        if not self.rules.in_window(self.now(), "opening"):
+            days = ("segunda a sexta" if list(hours["opening_days"]) == [0, 1, 2, 3, 4]
+                    else "nos dias de abertura")
+            return (f"fora do horário de abertura ({hours['opening_start']} às "
+                    f"{hours['opening_end']}, {days})")
+        limit = int(self.rules.limits["daily_openings"])
+        cold = limit - self.openings_today("cold")
+        referral = int(self.rules.raw["referral"]["daily_limit"]) - self.openings_today("referral")
+        if cold <= 0 and (queue_only or referral <= 0):
+            return f"limite diário de {limit} aberturas atingido"
+        return ""
+
+    def reconcile_openings(self) -> list[dict]:
+        """An opening that started and never finished (a crash) becomes unconfirmed.
+
+        It is never sent again and the owner checks the chat. Only safe while this process
+        holds the run lock, so no other process is in the middle of that send.
+        """
+        found = []
+        for lead in list(self.store.leads().values()):
+            if lead.get("state") != "opening":
+                continue
+            self.store.update_lead(lead["id"], state="unconfirmed",
+                                   handoff_reason="abertura interrompida")
+            self._handoff(lead, "Abertura interrompida antes de confirmar: confira a conversa "
+                          "no WhatsApp; nada foi reenviado")
+            found.append({"lead": lead["id"], "name": lead["name"], "state": "unconfirmed"})
+        return found
+
+    def prospect(self, limit: int | None = None, queue_only: bool = False) -> list[dict]:
+        """Open new leads one at a time; `queue_only` keeps to the Maps queue (`sales queue`)."""
+        blocked = self.opening_blocker(queue_only)
+        if blocked:
+            self.log(f"no first contact now: {blocked}")
             return []
         left = {"cold": int(self.rules.limits["daily_openings"]) - self.openings_today("cold"),
                 "referral": int(self.rules.raw["referral"]["daily_limit"])
                 - self.openings_today("referral")}
-        if left["cold"] <= 0 and left["referral"] <= 0:
-            self.log("daily opening limit reached")
-            return []
-        # Referred numbers first: someone at the business asked us to talk to them.
+        # Referred numbers first: someone at the business asked us to talk to them. Maps
+        # leads keep the owner's CSV order (`queue_position`).
         candidates = sorted((lead for lead in self.store.leads().values()
-                             if lead["state"] == "new" and not lead.get("opened_at")),
-                            key=lambda lead: (not lead.get("referral"),
-                                              lead.get("imported_at") or ""))
+                             if lead["state"] == "new" and not lead.get("opened_at")
+                             and (in_queue(lead) or not queue_only)),
+                            key=lambda lead: (not lead.get("referral"), *order_key(lead)))
         results = []
         for lead in candidates:
             kind = "referral" if lead.get("referral") else "cold"
@@ -880,7 +912,7 @@ class SalesAgent:
         source = lead.get("referral") or {}
         messages = (self.rules.referral_opening(now, source.get("staff", ""),
                                                 source.get("company", lead["name"]))
-                    if source else self.rules.opening_messages(now))
+                    if source else self.rules.opening_messages(now, lead.get("name", "")))
         if not self.live:
             return {**result, "state": "planned", "messages": messages}
         items = self._items(lead, "opening", messages, None, self.rules.opening_delays())
@@ -893,12 +925,15 @@ class SalesAgent:
         try:
             status = self._open_chat(lead)
         except Exception as error:
-            self.store.update_lead(lead["id"], state="new", opened_at=None)
+            # Nothing was typed yet: the lead stays new and the error is shown in the queue.
+            self.store.update_lead(lead["id"], state="new", opened_at=None,
+                                   open_error=str(error)[:200])
             return {**result, "state": "error", "error": str(error)[:300]}
         if status != "ready":
             self.store.update_lead(lead["id"], state="invalid-number", opened_at=None)
             return {**result, "state": "invalid-number"}
         listener.allow_contact(self.store.contact_rules_path, self._contact_entry(lead))
+        self.store.update_lead(lead["id"], open_error=None)
         results = self.channel.send(lead, items, {"kind": "sales-opening", "lead": lead["id"]})
         done, worst = self._remember_sent(lead, items, results, "opening")
         if not done:

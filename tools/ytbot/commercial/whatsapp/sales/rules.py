@@ -83,6 +83,20 @@ class Intent:
         return any(pattern.search(plain) for pattern in self.patterns)
 
 
+def company_name(name: str, limit: int = 120) -> str:
+    """The Google Maps business name for the opening: spaces normalized, at most `limit`
+    characters, cut at a word when possible, and without trailing punctuation that would end
+    the sentence early ("Vem Sorrir em Sinop." -> "Vem Sorrir em Sinop"). Never escaped or
+    rewritten otherwise."""
+    text = " ".join(str(name or "").split())
+    if len(text) > limit:
+        cut = text[:limit]
+        if text[limit] != " " and " " in cut:
+            cut = cut.rsplit(" ", 1)[0]
+        text = cut
+    return text.rstrip(" .,;:-|")
+
+
 @dataclass(frozen=True)
 class SalesRules:
     raw: dict
@@ -136,11 +150,22 @@ class SalesRules:
             return greetings["afternoon"]
         return greetings["evening"]
 
-    def opening_messages(self, now: datetime) -> list[str]:
-        """The fixed opening, one text per bubble, each link in its own bubble."""
+    def opening_messages(self, now: datetime, company: str = "") -> list[str]:
+        """The fixed opening, one text per bubble, each link in its own bubble.
+
+        `company` is the business name as on Google Maps (the lead `name`); without it the
+        `unnamed` text ("vocês") replaces the message that names the company.
+        """
+        opening = self.raw["opening"]
         greeting = self.greeting(now)
-        texts = [text.replace("{greeting}", greeting) for text in self.raw["opening"]["messages"]]
-        return texts + list(self.raw["opening"]["links"])
+        name = company_name(company, int(opening.get("company_max_chars", 120)))
+        texts = []
+        for text in opening["messages"]:
+            text = text.replace("{greeting}", greeting)
+            if "{company}" in text:
+                text = text.replace("{company}", name) if name else opening["unnamed"]
+            texts.append(text)
+        return texts + list(opening["links"])
 
     def opening_delays(self) -> list[float]:
         """Seconds before each opening message, aligned with `opening_messages`."""
@@ -230,6 +255,10 @@ def build(raw: dict) -> SalesRules:
                           "no_credit_cooldown_seconds", "catalog_refresh_seconds"))
     _require(raw, "greetings", ("morning", "afternoon", "evening"))
     _require(raw, "opening", ("messages", "links", "delays", "link_delay"))
+    if any("{company}" in text for text in raw["opening"]["messages"]):
+        unnamed = raw["opening"].get("unnamed")
+        if not isinstance(unnamed, str) or not unnamed.strip() or "{company}" in unnamed:
+            raise RulesError("opening.unnamed (the text without the company name) is required")
     _require(raw, "followup", ("messages",))
     _require(raw, "handoff", ("messages",))
     _require(raw, "context", ("offer_question", "affirmative", "negative"))

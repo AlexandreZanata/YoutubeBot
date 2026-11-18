@@ -90,9 +90,14 @@ link_delay = 4
 messages = [
   "{greeting}",
   "Tudo bem?",
-  "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e aplicativos. Eu vi que no Google Maps vocês não têm site.",
+  "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e aplicativos. Eu vi que no Google Maps a empresa {company} ainda não tem site.",
   "Nós temos alguns exemplos de sistemas e sites que nós criamos:",
 ]
+# {company} is the business name exactly as on Google Maps (the lead `name`, spaces
+# normalized, at most `company_max_chars`, cut at a word). Without a name, `unnamed` replaces
+# that message (owner, 2026-11-18). The opening is fixed text: the model never writes it.
+unnamed = "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e aplicativos. Eu vi que no Google Maps vocês não têm site."
+company_max_chars = 120
 # Each link goes in its own message so WhatsApp loads the preview card.
 links = [
   "https://sorrifit.com",

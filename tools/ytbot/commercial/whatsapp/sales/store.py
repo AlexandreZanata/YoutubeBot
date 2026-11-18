@@ -33,6 +33,8 @@ TERMINAL_STATES = ("do-not-contact", "no-response", "invalid-number")
 # Where leads come from; the acquisition module (Receita Federal, manual Maps search) adds rows
 # through `import_rows` with its own source so numbering and contact export stay the same.
 SOURCES = ("google-maps-reviewed", "google-maps-manual", "receita-federal", "manual", "referral")
+# Sources that enter the opening queue (`sales queue`), in CSV row order.
+QUEUE_SOURCES = ("google-maps-reviewed", "google-maps-manual")
 
 
 def stamp(now: datetime) -> str:
@@ -339,6 +341,9 @@ class SalesStore:
                   "labels": [], "contacts_file": None, "ids": []}
         leads = self.ensure_labels(self.leads())
         added = []
+        queued = source in QUEUE_SOURCES and not (extra or {}).get("referral")
+        position = max((int(lead.get("queue_position") or 0) for lead in leads.values()),
+                       default=0)
         for line, row in enumerate(rows, start=first_line):
             reason = self._reject_reason(row)
             if reason:
@@ -361,6 +366,10 @@ class SalesStore:
                 "last_out_at": None, "last_in_at": None, "awaiting": None,
                 "replies": {}, "handoff_reason": None, "chat": None, **(extra or {}),
             }
+            if queued:
+                # The owner's CSV order is the opening order; never re-sorted at send time.
+                position += 1
+                leads[identifier]["queue_position"] = position
             self.ensure_labels(leads)
             added.append(leads[identifier])
             report["imported"] += 1
