@@ -118,6 +118,15 @@ adjust = "Ajuste do Google Maps"
 redesign = "redesign do site"
 
 [scoring]
+[scoring.thresholds]
+rating_excellent = 4.5
+rating_good = 4.0
+reviews_many = 100
+reviews_some = 30
+reviews_few = 10
+recent_ninety_days = 90
+recent_year = 365
+photos_many = 10
 [scoring.rating]
 excellent = 20                  # 4.5 or more
 good = 12                       # 4.0 to 4.4

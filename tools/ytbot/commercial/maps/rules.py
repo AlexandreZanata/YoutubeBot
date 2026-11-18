@@ -209,6 +209,19 @@ def load(path: Path | None = None) -> MapsRules:
         raise RulesError("[offers] needs adjust and redesign")
 
     scoring = raw["scoring"]
+    thresholds = scoring.get("thresholds")
+    if not isinstance(thresholds, dict):
+        raise RulesError("missing [scoring.thresholds]")
+    for key in ("rating_excellent", "rating_good", "reviews_many", "reviews_some",
+                "reviews_few", "recent_ninety_days", "recent_year", "photos_many"):
+        if key not in thresholds:
+            raise RulesError(f"missing scoring.thresholds.{key}")
+        try:
+            thresholds[key] = float(thresholds[key])
+        except (TypeError, ValueError) as error:
+            raise RulesError(f"scoring.thresholds.{key} must be a number") from error
+    if thresholds["rating_excellent"] < thresholds["rating_good"]:
+        raise RulesError("scoring.thresholds.rating_excellent must be >= rating_good")
     for section, keys in {
         "rating": ("excellent", "good"),
         "reviews": ("many", "some", "few"),

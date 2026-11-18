@@ -91,7 +91,7 @@ def _social_links(root: html.Node, rules: MapsRules) -> list[str]:
 
 def _photos(node: html.Node | None) -> tuple[int | None, str]:
     if node is None:
-        return None, "0"
+        return 0, "0"
     label = f"{node.get('aria-label')} {node.text}"
     count = _count(label)
     if count is None:

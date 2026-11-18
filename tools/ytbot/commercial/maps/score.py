@@ -87,30 +87,31 @@ def exclusion_reason(listing: dict, rules: MapsRules, lead_keys: set[str],
 def score_listing(listing: dict, rules: MapsRules) -> dict:
     """Points from the contract table; the group weight comes from `[[groups]]`."""
     scoring = rules.scoring
+    thresholds = scoring["thresholds"]
     points = {}
 
     rating = listing.get("rating")
-    if rating is not None and rating >= 4.5:
+    if rating is not None and rating >= float(thresholds["rating_excellent"]):
         points["rating"] = int(scoring["rating"]["excellent"])
-    elif rating is not None and rating >= 4.0:
+    elif rating is not None and rating >= float(thresholds["rating_good"]):
         points["rating"] = int(scoring["rating"]["good"])
     else:
         points["rating"] = 0
 
     reviews = int(listing.get("reviews") or 0)
-    if reviews >= 100:
+    if reviews >= int(thresholds["reviews_many"]):
         points["reviews"] = int(scoring["reviews"]["many"])
-    elif reviews >= 30:
+    elif reviews >= int(thresholds["reviews_some"]):
         points["reviews"] = int(scoring["reviews"]["some"])
-    elif reviews >= 10:
+    elif reviews >= int(thresholds["reviews_few"]):
         points["reviews"] = int(scoring["reviews"]["few"])
     else:
         points["reviews"] = 0
 
     age = listing.get("last_review_days")
-    if age is not None and age <= 90:
+    if age is not None and age <= int(thresholds["recent_ninety_days"]):
         points["recent_review"] = int(scoring["recent_review"]["ninety_days"])
-    elif age is not None and age <= 365:
+    elif age is not None and age <= int(thresholds["recent_year"]):
         points["recent_review"] = int(scoring["recent_review"]["year"])
     else:
         points["recent_review"] = 0
@@ -132,13 +133,13 @@ def score_listing(listing: dict, rules: MapsRules) -> dict:
 
     points["unclaimed"] = int(scoring["gaps"]["unclaimed"]) if listing.get("unclaimed") else 0
     points["no_hours"] = int(scoring["gaps"]["no_hours"]) if not listing.get("hours") else 0
-    bucket = listing.get("photos_bucket")
-    if bucket == "10+":
-        points["photos"] = int(scoring["photos"]["ten_or_more"])
-    elif bucket in ("0", "1-9"):
-        points["photos"] = int(scoring["gaps"]["few_photos"])
-    else:
+    photos = listing.get("photos")
+    if photos is None:
         points["photos"] = 0
+    elif photos >= int(thresholds["photos_many"]):
+        points["photos"] = int(scoring["photos"]["ten_or_more"])
+    else:
+        points["photos"] = int(scoring["gaps"]["few_photos"])
 
     total = sum(points.values())
     if total >= int(rules.tiers["a"]):
