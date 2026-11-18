@@ -59,6 +59,7 @@ The 2026 web client is a React app without `#main` or `footer`. The stable ancho
 | Row preview | `[data-testid="last-msg-status"]` | Groups prefix `You:` / sender name |
 | Our last message | `svg title` `wds-ic-delivered` / `wds-ic-read` in the row | 1:1 chats show no `You:` prefix |
 | Unread badge | `[data-testid="icon-unread-count"]` | aria-label `2 unread messages` |
+| Open chat title | `#main [data-testid="conversation-info-header-chat-title"]` | Saved contact name or formatted number of the open conversation |
 | Composer | `div[data-testid="conversation-compose-box-input"]` | `contenteditable`, `aria-label="Type a message to ..."` |
 | Send button | `button[aria-label="Send"]` | Appears after the composer has text |
 | Attach button | `button[aria-label="Attach"]` | Opens the attach menu |

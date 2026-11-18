@@ -91,6 +91,9 @@ class WhatsAppChannel:
             return "invalid-number"
         return "ready"
 
+    def chat_title(self) -> str:
+        return sender.chat_title(self.page)
+
     def read_recent(self) -> list[dict]:
         return sender.read_bubbles(self.page, 30)
 
@@ -145,6 +148,25 @@ class SalesAgent:
         if self._chats:
             self.sleep(self.pacing.between_chats(self.rng))
         self._chats += 1
+
+    def _open_chat(self, lead: dict) -> str:
+        """Open the lead's chat by number and remember the name WhatsApp shows for it.
+
+        A number the owner saved ("Maria Padaria") is listed under that name, not the
+        number, so the listener events only reach the lead through this binding. A name
+        already bound to another lead is never taken over.
+        """
+        status = self.channel.open(lead)
+        title_of = getattr(self.channel, "chat_title", None)
+        if status != "ready" or not callable(title_of):
+            return status
+        title = (title_of() or "").strip()
+        if title and title != lead.get("chat"):
+            owner = self.store.find_lead(title)
+            if owner is None or owner["id"] == lead["id"]:
+                self.store.update_lead(lead["id"], chat=title)
+                lead["chat"] = title
+        return status
 
     def _contact_entry(self, lead: dict) -> str:
         return "+" + lead["phone"]
@@ -471,7 +493,7 @@ class SalesAgent:
         if self.live:
             self._next_chat()
             try:
-                status = self.channel.open(lead)
+                status = self._open_chat(lead)
             except Exception as error:
                 return {**result, "state": "error", "error": str(error)[:300]}
             if status != "ready":
@@ -699,7 +721,7 @@ class SalesAgent:
         # Recorded before the browser acts, so a crash never sends the opening twice.
         self.store.update_lead(lead["id"], state="opening", opened_at=stamp(now))
         try:
-            status = self.channel.open(lead)
+            status = self._open_chat(lead)
         except Exception as error:
             self.store.update_lead(lead["id"], state="new", opened_at=None)
             return {**result, "state": "error", "error": str(error)[:300]}
@@ -749,7 +771,7 @@ class SalesAgent:
         items = self._items(lead, f"followup#{number}", messages, None)
         self._next_chat()
         try:
-            status = self.channel.open(lead)
+            status = self._open_chat(lead)
         except Exception as error:
             return {**result, "state": "error", "error": str(error)[:300]}
         if status != "ready":

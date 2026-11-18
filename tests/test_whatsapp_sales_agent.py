@@ -89,6 +89,24 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(len(channel.sent), 8)
         self.assertEqual(agent.open_lead(self.store.lead(lead["id"]))["state"], "already-opened")
 
+    def test_saved_contact_name_binds_the_chat_so_replies_reach_the_lead(self):
+        # The owner saved the number, so the chat list shows the name, not the number.
+        lead = self.leads(1)[0]
+        agent, _ = self.agent(FakeChannel(self.store.journal_path, title="Maria Padaria"))
+        agent.prospect()
+        self.assertEqual(self.store.lead(lead["id"])["chat"], "Maria Padaria")
+        event = {**self.event("Me deixa em paz"), "chat": "Maria Padaria"}
+        self.assertEqual(agent.ingest([event]), [lead["id"]])
+        self.assertEqual(self.store.lead(lead["id"])["state"], "engaged")
+
+    def test_chat_name_of_another_lead_is_never_taken_over(self):
+        first, second = self.leads(2)
+        self.store.update_lead(first["id"], chat="Maria Padaria")
+        agent, _ = self.agent(FakeChannel(self.store.journal_path, title="Maria Padaria"))
+        agent.open_lead(self.store.lead(second["id"]))
+        self.assertIsNone(self.store.lead(second["id"]).get("chat"))
+        self.assertEqual(self.store.find_lead("Maria Padaria")["id"], first["id"])
+
     def test_daily_limit_of_ten_first_contacts(self):
         self.leads(12)
         agent, channel = self.agent()

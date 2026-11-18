@@ -136,7 +136,9 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   an invalid edit is reported and the previous rules stay in use. When the browser page or the
   CDP connection closes outside a send (the computer slept, Chrome restarted; seen on
   2026-11-18 as `TargetClosedError` after a night), the run reconnects to the hidden browser
-  and continues, up to 3 times in a row; a failed send still stops the run.
+  and continues, up to 3 times in a row; a failed send still stops the run. A `SIGTERM`
+  (stopping the background run) ends it like Ctrl+C: its WhatsApp tab is closed and the run
+  lock released, so restarts no longer leave extra tabs in the hidden browser.
 - `resolve` hands a conversation back to the agent after the owner handled it; `block` adds the
   number to the do-not-contact list.
 
@@ -510,5 +512,8 @@ Automated tests use fixtures only; these steps need the owner's WhatsApp and a s
   without its card.
 - Bubble direction comes from tails or row classes (in the 2026 client `data-id` is the bare
   message id); re-check them after a WhatsApp Web update.
-- A contact saved in the owner's phone shows its saved name as the chat title; the lead must
-  carry that name (the CSV `name`) for its replies to be matched.
+- A contact saved in the owner's phone shows its saved name as the chat title, not the
+  number. Each time the agent opens a lead's chat by number it reads the header title and
+  stores it as the lead's `chat`, so replies under that name reach the lead. A title already
+  bound to another lead is never taken over. Before this (2026-11-18), a test number saved
+  under a longer name had its reply dropped by the listener.

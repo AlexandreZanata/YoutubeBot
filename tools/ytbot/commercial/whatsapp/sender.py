@@ -237,6 +237,18 @@ def _open_by_phone(page, phone: str, pacing: Pacing, timeout: float = 60.0) -> N
     raise RuntimeError("WhatsApp chat did not open for the number")
 
 
+CHAT_TITLE = '#main [data-testid="conversation-info-header-chat-title"]'
+
+
+def chat_title(page) -> str:
+    """Name in the open chat's header: the owner's saved contact name, or the number."""
+    try:
+        node = page.locator(CHAT_TITLE).first
+        return (node.inner_text(timeout=3000) or "").strip() if node.count() else ""
+    except Exception:
+        return ""
+
+
 def read_bubbles(page, limit: int = 30) -> list[dict]:
     """Recent bubbles of the open chat, oldest first: {dir: in|out|unknown, text, id}."""
     try:

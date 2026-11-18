@@ -61,8 +61,9 @@ class FakeChannel:
     """The browser stand-in: real journal and fence through `sender.send_sequence`."""
 
     def __init__(self, journal_path: Path, states=None, open_status="ready", bubbles=None,
-                 media=None):
+                 media=None, title=""):
         self.journal_path = journal_path
+        self.title = title
         self.media = media or {}
         self.states = list(states or [])
         self.open_status = open_status
@@ -73,6 +74,9 @@ class FakeChannel:
     def open(self, lead):
         self.opened.append(lead["id"])
         return self.open_status
+
+    def chat_title(self):
+        return self.title
 
     def read_recent(self):
         return list(self.bubbles)

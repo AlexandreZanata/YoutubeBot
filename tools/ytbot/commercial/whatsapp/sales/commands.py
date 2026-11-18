@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import signal
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -361,11 +362,17 @@ def command_run(args, store_factory, page_factory) -> None:
     except RuntimeError as error:
         store.release()
         raise SystemExit(f"[sales] {error}")
+    def stop(signum, frame):
+        # A plain SIGTERM skips `finally`: the tab would stay open in the hidden browser.
+        raise SystemExit(f"[sales] stopped by signal {signum}")
+
+    previous = signal.signal(signal.SIGTERM, stop)
     try:
         agent = SalesAgent(rules, store, session.channel if args.live else None, model,
                            live=args.live)
         run_cycles(agent, session, args)
     finally:
+        signal.signal(signal.SIGTERM, previous)
         session.close()
         store.release()
 

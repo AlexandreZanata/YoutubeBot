@@ -2,6 +2,7 @@ import unittest
 from types import SimpleNamespace
 
 from tools.ytbot.commercial.whatsapp.sales import commands
+from tools.ytbot.commercial.whatsapp.sales.store import SalesStore
 
 
 class TargetClosedError(Exception):
@@ -105,3 +106,46 @@ class ReconnectTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StopSignalTests(unittest.TestCase):
+    def test_sigterm_closes_the_tab_and_releases_the_run_lock(self):
+        import os
+        import signal
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        closed = []
+
+        class Closable:
+            def __init__(self, name):
+                self.name = name
+
+            def close(self):
+                closed.append(self.name)
+
+            def stop(self):
+                closed.append(self.name)
+
+        def page_factory(_args):
+            return None, None, Closable("playwright"), Closable("client"), Closable("page")
+
+        locks = []
+
+        def stopped(agent, *_args, **_kwargs):
+            locks.append(agent.store.lock_path.exists())
+            os.kill(os.getpid(), signal.SIGTERM)
+
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory) / "whatsapp"
+            factory = lambda: SimpleNamespace(network=lambda name: base)  # noqa: E731
+            run_args = SimpleNamespace(**{**vars(args()), "live": False, "no_llm": True})
+            previous = signal.getsignal(signal.SIGTERM)
+            with mock.patch.object(commands, "run_cycles", stopped), \
+                    self.assertRaises(SystemExit):
+                commands.command_run(run_args, factory, page_factory)
+            self.assertEqual(signal.getsignal(signal.SIGTERM), previous)
+            self.assertIn("page", closed)
+            self.assertEqual(locks, [True])
+            self.assertFalse(SalesStore(base).lock_path.exists())
