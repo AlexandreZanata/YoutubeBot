@@ -234,6 +234,11 @@ def no_search_results(page_html: str, rules: MapsRules) -> bool:
     return _has_label(html.parse(page_html), rules.labels["search_no_results"])
 
 
+def search_page(page_html: str, rules: MapsRules) -> bool:
+    """The Google results shell, even when it has no organic result links."""
+    return _has_label(html.parse(page_html), rules.labels["google_search"])
+
+
 def login_state(page_html: str, rules: MapsRules) -> str:
     root = html.parse(page_html)
     if any(root.select(selector) for selector in rules.selectors["account_button"]):

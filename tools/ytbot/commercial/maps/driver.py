@@ -267,12 +267,19 @@ def verify_run(page, run: Run, rules: MapsRules, log=print,
         url = rules.confirmation["search_url"].format(query=quote_plus(query))
         page.goto(url, wait_until="domcontentloaded",
                   timeout=float(rules.pacing["page_timeout_seconds"]) * 1000)
-        content = _check_page(page, rules, "confirmation")
+        timeout = float(rules.pacing["page_timeout_seconds"])
+        deadline = time.monotonic() + timeout
+        while True:
+            content = _check_page(page, rules, "confirmation")
+            if (extract.parse_search_results(content, rules)
+                    or extract.no_search_results(content, rules)
+                    or extract.search_page(content, rules)):
+                break
+            if time.monotonic() >= deadline:
+                raise LayoutError("layout desconhecido na busca de confirmação",
+                                  {"url": page.url, "stage": "confirmation"})
+            page.wait_for_timeout(700)
         results = extract.parse_search_results(content, rules)
-        if not results and not extract.no_search_results(content, rules) and extract.layout(
-                content, rules, page.url) != "google-search":
-            raise LayoutError("layout desconhecido na busca de confirmação",
-                              {"url": page.url, "stage": "confirmation"})
         check = verify.confirm(listing, results, rules, fetcher=fetcher)
         check.update({
             "identity": listing["identity"], "name": listing.get("name", ""),

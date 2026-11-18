@@ -92,6 +92,11 @@ class MapsHtmlTests(unittest.TestCase):
         self.assertEqual(extract.login_state(logged_out, self.rules), "login-required")
         self.assertEqual(extract.login_state("<p>nada</p>", self.rules), "unknown")
 
+    def test_google_results_shell_without_links_is_recognized(self):
+        page = '<html><body>Resultados da pesquisa <h1>Visão geral</h1></body></html>'
+        self.assertTrue(extract.search_page(page, self.rules))
+        self.assertEqual(extract.parse_search_results(page, self.rules), [])
+
     def test_review_age_reads_the_freshest_relative_date(self):
         self.assertEqual(extract.review_age_days("há 2 semanas"), 14)
         self.assertEqual(extract.review_age_days("há um mês"), 30)

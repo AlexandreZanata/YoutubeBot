@@ -75,6 +75,7 @@ reviews_sort = ["ordenar"]
 photos = ["ver fotos"]
 search_no_results = ["nao encontrou nenhum documento", "did not match any documents",
                      "sua pesquisa nao encontrou"]
+google_search = ["resultados da pesquisa"]
 
 [website]
 social = [
