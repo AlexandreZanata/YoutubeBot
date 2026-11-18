@@ -7,7 +7,7 @@ build = "build.rs"
 
 [dependencies]
 anyhow.workspace = true
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 manager-core.workspace = true
 reports.workspace = true
 slint.workspace = true

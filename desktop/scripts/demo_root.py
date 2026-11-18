@@ -249,12 +249,122 @@ def sales_central(root: Path) -> None:
     messages = [{"at": (NOW - timedelta(minutes=minutes)).isoformat(), "label": label, "name": name,
                  "dir": direction, "text": text, "media": "", "needs_owner": direction == "in"}
                 for label, name, direction, text, minutes in sorted(talk, key=lambda item: item[4])]
+    fichas = client_fichas(root)
+    by_lead = {ficha["lead"]: ficha["ficha_md"] for ficha in fichas}
+    for item in interventions:
+        item["ficha"] = by_lead.get(item["lead"], "")
     write(root / ".local/commercial/whatsapp/sales/central.json", {
         "generated_at": NOW.isoformat(), "interventions": interventions, "messages": messages,
         "states": [{"state": state, "label": label, "group": group, "owner": owner, "count": count}
                    for state, label, group, owner, count in states],
         "leads": [{"label": f"demo-{index}"} for index in range(30)],
+        "fichas": fichas,
     })
+
+
+def picture(path: Path, size: tuple[int, int], colors: tuple[tuple[int, int, int], ...]) -> None:
+    """A small generated picture (no photo of anyone): stripes and a disc."""
+    image = Image.new("RGB", size, colors[0])
+    draw = ImageDraw.Draw(image)
+    width, height = size
+    for index in range(6):
+        draw.rectangle((0, index * height // 6, width, index * height // 6 + height // 24), fill=colors[1])
+    draw.ellipse((width // 4, height // 4, width * 3 // 4, height * 3 // 4), fill=colors[2])
+    image.save(path)
+
+
+def client_fichas(root: Path) -> list[dict]:
+    """Two synthetic client fichas, newest first: a "sistema" waiting for answers and a "site"
+    ready for a quote with two generated pictures, an audio and a document."""
+    clients = root / ".local/commercial/whatsapp/sales/clientes"
+    site = clients / "barbearia-2-Ldemo1"
+    sistema = clients / "oficina-3-Ldemo3"
+    for folder, title in ((site, "Barbearia Demo Centro"), (sistema, "Oficina Demo Motor")):
+        (folder / "midia").mkdir(parents=True, exist_ok=True)
+        write(folder / "ficha.md", f"# Ficha · {title}\n\nDados sintéticos de demonstração.\n")
+        write(folder / "conversa.md", f"# Conversa · {title}\n\nDemonstração.\n")
+    logo = site / "midia" / "20261118-090000-image.jpg"
+    front = site / "midia" / "20261118-090500-image.png"
+    picture(logo, (480, 360), ((28, 28, 32), (196, 160, 72), (236, 236, 228)))
+    picture(front, (360, 480), ((40, 72, 96), (210, 222, 230), (180, 64, 52)))
+    audio = site / "midia" / "20261118-091000-audio.ogg"
+    audio.write_bytes(b"OggS demo")
+    document = site / "midia" / "20261118-091500-tabela-de-servicos.pdf"
+    document.write_bytes(b"%PDF-1.4 demo")
+
+    def media(kind: str, path: Path, caption: str, minutes: int) -> dict:
+        return {"kind": kind, "path": str(path), "name": path.name, "caption": caption,
+                "at": (NOW - timedelta(minutes=minutes)).isoformat()}
+
+    return [
+        {
+            "lead": "Ldemo3", "label": "oficina-3", "name": "Oficina Demo Motor",
+            "state": "needs-owner", "state_label": "Precisa de você", "kind": "sistema",
+            "status": "aguardando confirmação",
+            "updated_at": (NOW - timedelta(minutes=8)).isoformat(),
+            "resumo": ("Oficina mecânica com quatro mecânicos quer trocar o caderno de ordens de serviço "
+                       "por um sistema simples, com estoque de peças e aviso ao cliente quando o carro "
+                       "ficar pronto. Pediu desconto e ainda não confirmou quantos usuários vão usar."),
+            "sections": [
+                {"title": "Empresa", "items": [
+                    {"label": "Nome", "value": "Oficina Demo Motor"},
+                    {"label": "Ramo", "value": "Oficina mecânica de carros leves"},
+                    {"label": "Cidade", "value": "Cidade Demo (MT)"},
+                ]},
+                {"title": "Sistema", "items": [
+                    {"label": "Módulos", "value": "Ordens de serviço, estoque de peças, agenda dos mecânicos e relatório mensal"},
+                    {"label": "Hoje usa", "value": "Caderno e uma planilha compartilhada"},
+                    {"label": "Aviso ao cliente", "value": "Mensagem no WhatsApp quando o serviço terminar"},
+                ]},
+            ],
+            "pendencias": ["Quantos usuários vão usar ao mesmo tempo",
+                           "Se precisa de aplicativo no celular dos mecânicos",
+                           "Confirmar o orçamento máximo"],
+            "duvidas": ["Integra com nota fiscal?", "Funciona sem internet?",
+                        "Tem mensalidade ou é pagamento único?"],
+            "media": [],
+            "ficha_md": str(sistema / "ficha.md"), "folder": str(sistema),
+            "phone": "(65) 90000-0003", "wa_link": "https://wa.me/5565900000003",
+        },
+        {
+            "lead": "Ldemo1", "label": "barbearia-2", "name": "Barbearia Demo Centro",
+            "state": "quote-requested", "state_label": "Orçamento a fazer", "kind": "site",
+            "status": "pronta para orçamento",
+            "updated_at": (NOW - timedelta(minutes=12)).isoformat(),
+            "resumo": ("Barbearia com três cadeiras quer um site com agendamento online, a tabela de "
+                       "serviços e as fotos do espaço. Já tem logotipo e mandou duas fotos, um áudio "
+                       "explicando os horários e a tabela atual em PDF."),
+            "sections": [
+                {"title": "Empresa", "items": [
+                    {"label": "Nome", "value": "Barbearia Demo Centro"},
+                    {"label": "Ramo", "value": "Barbearia e cuidados masculinos"},
+                    {"label": "Instagram", "value": "https://instagram.example/barbearia.demo.centro.agendamento.oficial"},
+                ]},
+                {"title": "Projeto", "items": [
+                    {"label": "Tipo", "value": "Site institucional com agendamento online"},
+                    {"label": "Páginas", "value": "Início, Serviços, Equipe, Agendamento e Contato"},
+                    {"label": "Domínio", "value": "Ainda não tem; quer sugestões"},
+                    {"label": "Observações", "value": ("Quer que o cliente escolha o barbeiro e o horário, receba "
+                                                         "a confirmação no WhatsApp e possa remarcar sem ligar. "
+                                                         "Prefere tons escuros com detalhes dourados, como no logotipo.")},
+                ]},
+                {"title": "Prazo e orçamento", "items": [
+                    {"label": "Prazo", "value": "Antes do fim do mês"},
+                    {"label": "Faixa de preço", "value": "Até R$ 1.500"},
+                ]},
+            ],
+            "pendencias": ["Cores da marca em código (hex)"],
+            "duvidas": ["Dá para mudar os horários sozinho depois?"],
+            "media": [
+                media("image", logo, "logotipo", 40),
+                media("image", front, "fachada", 35),
+                media("audio", audio, "explica os horários de funcionamento", 30),
+                media("document", document, "tabela de serviços atual", 25),
+            ],
+            "ficha_md": str(site / "ficha.md"), "folder": str(site),
+            "phone": "(65) 90000-0001", "wa_link": "https://wa.me/5565900000001",
+        },
+    ]
 
 
 def main() -> int:

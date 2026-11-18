@@ -14,11 +14,14 @@ use reports::time::{self, format_datetime, format_relative, format_slot};
 use reports::{NaiveDateTime, Period, SourceState, SourceStatus, VideoKind, VideoState};
 use slint::{Image, ModelRc, SharedString, VecModel};
 
-use reports::sales::safe_wa_link;
+use reports::sales::{Ficha, MediaKind, safe_wa_link};
+use reports::search::normalize;
 
+use crate::thumbs::{self, Request};
 use crate::{
-    ChannelCard, ContactRow, Fact, InterventionRow, Kpi, MessageRow, Notice, ProductRow,
-    SessionRow, ShortRow, SourceRow, StateTile, UpcomingRow, VideoRow, XPostRow,
+    ChannelCard, ContactRow, Fact, FichaDetail, FichaFile, FichaPhoto, FichaRow, InterventionRow,
+    Kpi, MessageRow, Notice, ProductRow, SessionRow, ShortRow, SourceRow, StateTile, UpcomingRow,
+    VideoRow, XPostRow,
 };
 
 pub struct Context<'a> {
@@ -461,7 +464,17 @@ pub struct ShortsView {
     pub rows: Vec<ShortRow>,
     pub notice: Notice,
     pub summary: String,
-    pub missing_thumbs: Vec<PathBuf>,
+    pub missing_thumbs: Vec<Request>,
+}
+
+/// A decoded thumbnail, or `None` while it is not cached; a failed decode is cached as an
+/// empty image, which keeps the placeholder.
+fn cached_thumb(thumbs: &HashMap<PathBuf, Image>, path: &Path) -> Option<Image> {
+    thumbs.get(path).cloned()
+}
+
+fn has_pixels(image: &Image) -> bool {
+    image.size().width > 0
 }
 
 pub fn shorts(context: &Context, thumbs: &HashMap<PathBuf, Image>) -> ShortsView {
@@ -472,9 +485,9 @@ pub fn shorts(context: &Context, thumbs: &HashMap<PathBuf, Image>) -> ShortsView
         .filter(|(video, _)| matches(context.search, &[&video.title]))
         .map(|(video, state)| {
             let thumb = video.thumbnail.as_ref().and_then(|path| {
-                let image = thumbs.get(path).cloned();
+                let image = cached_thumb(thumbs, path);
                 if image.is_none() {
-                    missing_thumbs.push(path.clone());
+                    missing_thumbs.push(Request::same(path.clone(), thumbs::SHORT));
                 }
                 image
             });
@@ -489,7 +502,7 @@ pub fn shorts(context: &Context, thumbs: &HashMap<PathBuf, Image>) -> ShortsView
                 state: text(state.label()),
                 state_kind: state_kind(*state),
                 link: text(short_link(&video.link())),
-                has_thumb: thumb.is_some(),
+                has_thumb: thumb.as_ref().is_some_and(has_pixels),
                 thumb: thumb.unwrap_or_default(),
             }
         })
@@ -669,12 +682,20 @@ const GROUPS: [(&str, &str); 4] = [
     ("Encerrados", "recusas, sem resposta ou sem WhatsApp"),
 ];
 
+/// What the buttons of one visible intervention row act on.
+#[derive(Debug, Clone)]
+pub struct InterventionTarget {
+    pub wa_link: String,
+    pub ficha: String,
+    pub lead: String,
+}
+
 pub struct CentralView {
     pub groups: Vec<Kpi>,
     pub states: Vec<StateTile>,
     pub interventions: Vec<InterventionRow>,
-    /// Visible intervention → (wa.me link, ficha path), for the row buttons.
-    pub targets: Vec<(String, String)>,
+    /// Visible intervention → its link, ficha.md and lead, for the row buttons.
+    pub targets: Vec<InterventionTarget>,
     pub interventions_notice: Notice,
     pub summary: String,
     pub messages: Vec<MessageRow>,
@@ -743,7 +764,11 @@ pub fn central(context: &Context) -> CentralView {
             )
         })
         .map(|item| {
-            targets.push((item.wa_link.clone(), item.ficha.clone()));
+            targets.push(InterventionTarget {
+                wa_link: item.wa_link.clone(),
+                ficha: item.ficha.clone(),
+                lead: item.lead.clone(),
+            });
             let (priority, tone) = priority_text(&item.priority);
             InterventionRow {
                 who: text(who(&item.label, &item.name)),
@@ -756,6 +781,7 @@ pub fn central(context: &Context) -> CentralView {
                 tone,
                 has_link: safe_wa_link(&item.wa_link),
                 has_ficha: !item.ficha.is_empty(),
+                has_sheet: report.ficha(&item.lead).is_some(),
             }
         })
         .collect();
@@ -831,6 +857,244 @@ pub fn central(context: &Context) -> CentralView {
             .map(|moment| format!("às {}", moment.format("%H:%M")))
             .unwrap_or_default(),
     }
+}
+
+/// `Site`, `Sistema`, or the agent's word with a capital letter.
+fn kind_title(kind: &str) -> String {
+    match kind {
+        "site" => "Site".to_owned(),
+        "sistema" => "Sistema".to_owned(),
+        other => {
+            let mut chars = other.chars();
+            chars
+                .next()
+                .map(|first| first.to_uppercase().chain(chars).collect())
+                .unwrap_or_default()
+        }
+    }
+}
+
+/// Badge tone of the agent's free-text status: buying is red, a quote to write is amber,
+/// waiting for the client is the accent, collecting data is neutral.
+fn status_tone(status: &str) -> i32 {
+    let status = normalize(status);
+    if status.contains("comprar") || status.contains("fechar") {
+        3
+    } else if status.contains("orcamento") {
+        2
+    } else if status.contains("confirma") {
+        4
+    } else {
+        0
+    }
+}
+
+fn short_moment(moment: Option<NaiveDateTime>) -> String {
+    moment
+        .map(|moment| moment.format("%d/%m %H:%M").to_string())
+        .unwrap_or_default()
+}
+
+/// "3 fotos · 1 áudio · 2 pendências"
+pub fn ficha_counts(ficha: &Ficha) -> String {
+    let parts: Vec<String> = [
+        (ficha.count(MediaKind::Image), "foto", "fotos"),
+        (ficha.count(MediaKind::Audio), "áudio", "áudios"),
+        (ficha.count(MediaKind::Video), "vídeo", "vídeos"),
+        (ficha.count(MediaKind::Document), "documento", "documentos"),
+        (ficha.pendencias.len(), "pendência", "pendências"),
+        (ficha.duvidas.len(), "dúvida", "dúvidas"),
+    ]
+    .into_iter()
+    .filter(|(count, _, _)| *count > 0)
+    .map(|(count, one, many)| plural(count, one, many))
+    .collect();
+    if parts.is_empty() {
+        "sem anexos nem pendências".to_owned()
+    } else {
+        parts.join(" · ")
+    }
+}
+
+/// The state label only when it says more than the status.
+fn state_beyond_status(ficha: &Ficha) -> String {
+    if normalize(&ficha.state_label) == normalize(&ficha.status) {
+        String::new()
+    } else {
+        ficha.state_label.clone()
+    }
+}
+
+pub struct FichasView {
+    pub rows: Vec<FichaRow>,
+    /// Visible row → lead.
+    pub leads: Vec<String>,
+    pub notice: Notice,
+    pub summary: String,
+}
+
+pub fn fichas(context: &Context) -> FichasView {
+    let report = &context.snapshot.sales;
+    let mut leads = Vec::new();
+    let rows: Vec<FichaRow> = report
+        .fichas
+        .iter()
+        .filter(|ficha| {
+            matches(
+                context.search,
+                &[
+                    &ficha.label,
+                    &ficha.name,
+                    &ficha.status,
+                    &ficha.state_label,
+                    &ficha.kind,
+                    &ficha.phone,
+                    &ficha.resumo,
+                ],
+            )
+        })
+        .map(|ficha| {
+            leads.push(ficha.lead.clone());
+            FichaRow {
+                label: text(if ficha.label.is_empty() {
+                    &ficha.lead
+                } else {
+                    &ficha.label
+                }),
+                name: text(&ficha.name),
+                kind: text(kind_title(&ficha.kind)),
+                status: text(&ficha.status),
+                status_tone: status_tone(&ficha.status),
+                state: text(state_beyond_status(ficha)),
+                when: text(short_moment(ficha.updated_at)),
+                counts: text(ficha_counts(ficha)),
+            }
+        })
+        .collect();
+    let notice = match source_notice(&report.source, "vendas do WhatsApp") {
+        Some(problem) => problem,
+        None if !rows.is_empty() => no_notice(),
+        None if !report.fichas.is_empty() => search_notice(context.search),
+        None => notice(
+            1,
+            "Nenhuma ficha ainda",
+            "Quando um cliente aceitar o orçamento, o bot monta a ficha com o que ele quer e ela aparece aqui.",
+        ),
+    };
+    let summary = match report.fichas.len() {
+        0 => String::new(),
+        total => format!("{} · clique para ver", plural(total, "ficha", "fichas")),
+    };
+    FichasView {
+        rows,
+        leads,
+        notice,
+        summary,
+    }
+}
+
+fn media_kind_label(kind: MediaKind) -> &'static str {
+    match kind {
+        MediaKind::Image => "Foto",
+        MediaKind::Audio => "Áudio",
+        MediaKind::Video => "Vídeo",
+        MediaKind::Document => "Documento",
+    }
+}
+
+/// The open ficha, or `None` when it is no longer in the record. Photos without a cached
+/// thumbnail come back as decode requests (checked on disk first, so a file outside the
+/// ficha's folder is never read).
+pub fn ficha_detail(
+    snapshot: &Snapshot,
+    lead: &str,
+    thumbs: &HashMap<PathBuf, Image>,
+) -> Option<(FichaDetail, Vec<Request>)> {
+    let ficha = snapshot.sales.ficha(lead)?;
+    let root = &snapshot.root;
+    let mut requests = Vec::new();
+    let mut photos = Vec::new();
+    let mut files = Vec::new();
+    for (index, media) in ficha.media.iter().enumerate() {
+        let when = short_moment(media.at);
+        if media.kind == MediaKind::Image {
+            let thumb = cached_thumb(thumbs, &media.path);
+            if thumb.is_none() {
+                requests.push(Request {
+                    key: media.path.clone(),
+                    file: ficha.open_media(root, index),
+                    size: thumbs::PHOTO,
+                });
+            }
+            photos.push(FichaPhoto {
+                media: index as i32,
+                name: text(&media.name),
+                caption: text(&media.caption),
+                when: text(when),
+                has_thumb: thumb.as_ref().is_some_and(has_pixels),
+                thumb: thumb.unwrap_or_default(),
+            });
+        } else {
+            files.push(FichaFile {
+                media: index as i32,
+                kind: text(media_kind_label(media.kind)),
+                name: text(&media.name),
+                caption: text(&media.caption),
+                when: text(when),
+            });
+        }
+    }
+    let sections: Vec<crate::FichaSection> = ficha
+        .sections
+        .iter()
+        .map(|section| crate::FichaSection {
+            title: text(if section.title.is_empty() {
+                "Dados"
+            } else {
+                &section.title
+            }),
+            items: model(
+                section
+                    .items
+                    .iter()
+                    .map(|item| crate::FichaField {
+                        label: text(&item.label),
+                        value: text(&item.value),
+                    })
+                    .collect(),
+            ),
+        })
+        .collect();
+    let strings = |items: &[String]| model(items.iter().map(text).collect::<Vec<SharedString>>());
+    let detail = FichaDetail {
+        label: text(if ficha.label.is_empty() {
+            &ficha.lead
+        } else {
+            &ficha.label
+        }),
+        name: text(&ficha.name),
+        phone: text(&ficha.phone),
+        state: text(&ficha.state_label),
+        kind: text(kind_title(&ficha.kind)),
+        status: text(&ficha.status),
+        status_tone: status_tone(&ficha.status),
+        when: text(
+            ficha
+                .updated_at
+                .map(|moment| format!("atualizada em {}", short_moment(Some(moment))))
+                .unwrap_or_default(),
+        ),
+        resumo: text(&ficha.resumo),
+        sections: model(sections),
+        pendencias: strings(&ficha.pendencias),
+        duvidas: strings(&ficha.duvidas),
+        photos: model(photos),
+        files: model(files),
+        has_link: safe_wa_link(&ficha.wa_link),
+        has_markdown: ficha.ficha_md.as_ref().is_some_and(|path| path.is_file()),
+        has_folder: ficha.folder.is_dir(),
+    };
+    Some((detail, requests))
 }
 
 pub struct WhatsAppView {
@@ -1072,6 +1336,59 @@ pub fn now() -> NaiveDateTime {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ficha(media: &[MediaKind], pendencias: usize) -> Ficha {
+        Ficha {
+            lead: "L1".into(),
+            label: "barbearia-2".into(),
+            name: String::new(),
+            state: String::new(),
+            state_label: "Coletando dados".into(),
+            kind: "site".into(),
+            status: "coletando dados".into(),
+            updated_at: None,
+            resumo: String::new(),
+            sections: Vec::new(),
+            pendencias: vec!["cores".into(); pendencias],
+            duvidas: Vec::new(),
+            media: media
+                .iter()
+                .map(|kind| reports::sales::FichaMedia {
+                    kind: *kind,
+                    path: PathBuf::from("/x/midia/a.jpg"),
+                    name: "a.jpg".into(),
+                    caption: String::new(),
+                    at: None,
+                })
+                .collect(),
+            ficha_md: None,
+            folder: PathBuf::from("/x"),
+            phone: String::new(),
+            wa_link: String::new(),
+        }
+    }
+
+    #[test]
+    fn ficha_rows_count_media_and_hide_a_repeated_state() {
+        let full = ficha(
+            &[
+                MediaKind::Image,
+                MediaKind::Image,
+                MediaKind::Image,
+                MediaKind::Audio,
+            ],
+            2,
+        );
+        assert_eq!(ficha_counts(&full), "3 fotos · 1 áudio · 2 pendências");
+        assert_eq!(ficha_counts(&ficha(&[], 0)), "sem anexos nem pendências");
+        assert_eq!(state_beyond_status(&full), "");
+        assert_eq!(kind_title("sistema"), "Sistema");
+        assert_eq!(kind_title("app"), "App");
+        assert_eq!(status_tone("quer comprar"), 3);
+        assert_eq!(status_tone("pronta para orçamento"), 2);
+        assert_eq!(status_tone("aguardando confirmação"), 4);
+        assert_eq!(status_tone("coletando dados"), 0);
+    }
 
     #[test]
     fn excerpts_are_single_line_and_bounded() {

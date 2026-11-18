@@ -102,6 +102,69 @@ export struct InterventionRow {
     tone: int,
     has-link: bool,
     has-ficha: bool,
+    // The lead has a ficha in central.json: "Ver ficha" opens it inside the app.
+    has-sheet: bool,
+}
+
+// One client ficha in the Central list.
+export struct FichaRow {
+    label: string,
+    name: string,
+    kind: string,
+    status: string,
+    // 0 neutral, 1 success, 2 warning, 3 danger, 4 accent
+    status-tone: int,
+    state: string,
+    when: string,
+    counts: string,
+}
+
+export struct FichaField {
+    label: string,
+    value: string,
+}
+
+export struct FichaSection {
+    title: string,
+    items: [FichaField],
+}
+
+export struct FichaPhoto {
+    // Index in the ficha's media, for Bridge.open-ficha-media.
+    media: int,
+    name: string,
+    caption: string,
+    when: string,
+    thumb: image,
+    has-thumb: bool,
+}
+
+export struct FichaFile {
+    media: int,
+    kind: string,
+    name: string,
+    caption: string,
+    when: string,
+}
+
+export struct FichaDetail {
+    label: string,
+    name: string,
+    phone: string,
+    state: string,
+    kind: string,
+    status: string,
+    status-tone: int,
+    when: string,
+    resumo: string,
+    sections: [FichaSection],
+    pendencias: [string],
+    duvidas: [string],
+    photos: [FichaPhoto],
+    files: [FichaFile],
+    has-link: bool,
+    has-markdown: bool,
+    has-folder: bool,
 }
 
 export struct StateTile {
@@ -155,6 +218,8 @@ export global Store {
     in property <string> login-banner: "";
     in property <Notice> root-notice;
     in-out property <string> search-text: "";
+    // Width of the page area, assigned by the window on resize (responsive arrangements).
+    in-out property <length> page-width: 984px;
 
     // Central (sales agent: who needs the owner, every state, recent messages)
     in property <[Kpi]> central-groups;
@@ -166,6 +231,15 @@ export global Store {
     in property <[MessageRow]> central-messages;
     in property <Notice> central-messages-notice;
     in property <string> central-updated: "";
+    in property <[FichaRow]> fichas;
+    in property <Notice> fichas-notice;
+    in property <string> fichas-summary: "";
+    in-out property <int> ficha-current: -1;
+    in-out property <bool> ficha-open: false;
+    in property <FichaDetail> ficha-detail;
+    // Scroll position of the open ficha (≤ 0) and how far it can go, for the arrow keys.
+    in-out property <length> ficha-scroll: 0px;
+    in-out property <length> ficha-scroll-max: 0px;
 
     // Overview
     in-out property <int> period-index: 0;
@@ -248,4 +322,11 @@ export global Bridge {
     callback reset-root();
     callback open-conversation(int);
     callback open-ficha(int);
+    // Client fichas: open one in the app (list row or intervention row), then its targets.
+    callback show-ficha(int);
+    callback show-lead-ficha(int);
+    callback open-ficha-media(int);
+    callback open-ficha-folder();
+    callback open-ficha-markdown();
+    callback open-ficha-conversation();
 }

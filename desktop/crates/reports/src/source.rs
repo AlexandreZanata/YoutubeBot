@@ -136,4 +136,34 @@ pub mod lenient {
             _ => None,
         })
     }
+
+    /// A list whose items are parsed one by one: a broken item is dropped, a value that is not
+    /// an array is an empty list.
+    pub fn list<'de, D: Deserializer<'de>, T: serde::de::DeserializeOwned>(
+        deserializer: D,
+    ) -> Result<Vec<T>, D::Error> {
+        Ok(match Value::deserialize(deserializer)? {
+            Value::Array(items) => items
+                .into_iter()
+                .filter_map(|item| serde_json::from_value(item).ok())
+                .collect(),
+            _ => Vec::new(),
+        })
+    }
+
+    /// A list of non-empty, trimmed strings (numbers are kept as text, other items dropped).
+    pub fn strings<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<String>, D::Error> {
+        Ok(match Value::deserialize(deserializer)? {
+            Value::Array(items) => items
+                .into_iter()
+                .filter_map(|item| match item {
+                    Value::String(text) => Some(text.trim().to_owned()),
+                    Value::Number(number) => Some(number.to_string()),
+                    _ => None,
+                })
+                .filter(|text| !text.is_empty())
+                .collect(),
+            _ => Vec::new(),
+        })
+    }
 }

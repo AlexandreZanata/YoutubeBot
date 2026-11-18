@@ -1,11 +1,12 @@
-// The eight pages. They only lay out what `Store` holds and call `Bridge`.
+// The eight pages (and the Central's ficha detail). They only lay out what `Store` holds
+// and call `Bridge`.
 
 import { LineEdit, ComboBox } from "std-widgets.slint";
 import { Theme } from "theme.slint";
-import { Store, Bridge, Notice, ChannelCard } from "store.slint";
+import { Store, Bridge, Notice, ChannelCard, FichaPhoto } from "store.slint";
 import {
     Btn, Segmented, Badge, Card, SectionTitle, Caption, Body, Skeleton, KpiCard, NoticeView,
-    FactLine, RowList, RowFrame,
+    FactLine, RowList, RowFrame, FocusRing,
 } from "controls.slint";
 
 component ColumnHead inherits Text {
@@ -96,12 +97,811 @@ component Panel inherits Card {
     }
 }
 
-// Home: what needs the owner first, then every state of the sales funnel and the latest
-// WhatsApp messages. Data comes from the agent's central.json.
-export component CentralPage inherits VerticalLayout {
-    spacing: Theme.space-4;
+// "Precisa de você" with rows: who, priority, reason, last message and the row actions.
+component InterventionsPanel inherits Panel {
+    title: "Precisa de você";
+    subtitle: Store.interventions-summary;
+    notice: Store.interventions-notice;
+    loading: Store.loading && !Store.has-data;
+    action-text: "Tentar novamente";
+    action => {
+        Bridge.refresh();
+    }
+
+    RowList {
+        vertical-stretch: 1;
+        label: "Conversas que precisam de você";
+        count: Store.interventions.length;
+        current: Store.intervention-current;
+        row-height: 96px;
+        for row[index] in Store.interventions: RowFrame {
+            height: 96px;
+            selected: index == Store.intervention-current;
+            label: row.priority + ", " + row.who + ", " + row.reason + ", " + row.last;
+            clicked => {
+                Store.intervention-current = index;
+                Store.ficha-current = -1;
+            }
+            HorizontalLayout {
+                padding-left: Theme.space-4;
+                padding-right: Theme.space-4;
+                spacing: Theme.space-3;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    spacing: Theme.space-1;
+                    HorizontalLayout {
+                        spacing: Theme.space-3;
+                        Cell {
+                            horizontal-stretch: 1;
+                            text: row.who;
+                            font-weight: 600;
+                        }
+                        Caption {
+                            horizontal-stretch: 0;
+                            text: row.when;
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: Theme.space-2;
+                        Badge {
+                            text: row.priority;
+                            tone: row.tone;
+                        }
+                        Body {
+                            horizontal-stretch: 1;
+                            text: row.reason;
+                            overflow: elide;
+                        }
+                    }
+                    Caption {
+                        text: row.phone + (row.last != "" ? "  ·  “" + row.last + "”" : "");
+                        overflow: elide;
+                    }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 0;
+                    alignment: center;
+                    spacing: Theme.space-2;
+                    Btn {
+                        text: "Abrir conversa";
+                        kind: "primary";
+                        enabled: row.has-link;
+                        description: "Abre o WhatsApp do contato no navegador";
+                        clicked => {
+                            Store.intervention-current = index;
+                            Bridge.open-conversation(index);
+                        }
+                    }
+                    // A lead with a ficha opens it here; otherwise its ficha.md opens outside.
+                    Btn {
+                        text: row.has-sheet ? "Ver ficha" : "Ficha do cliente";
+                        enabled: row.has-sheet || row.has-ficha;
+                        description: row.has-sheet ? "Mostra a ficha do cliente aqui no app" : "Abre a ficha com o que o cliente pediu";
+                        clicked => {
+                            Store.intervention-current = index;
+                            if (row.has-sheet) {
+                                Bridge.show-lead-ficha(index);
+                            } else {
+                                Bridge.open-ficha(index);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The usual case, nothing waiting: one line instead of a large empty panel.
+component InterventionsCalm inherits Card {
+    height: 56px;
+    accessible-role: AccessibleRole.text;
+    accessible-label: "Precisa de você: " + Store.interventions-notice.title + ". " + Store.interventions-notice.message;
 
     HorizontalLayout {
+        padding-left: Theme.space-4;
+        padding-right: Theme.space-4;
+        spacing: Theme.space-3;
+        SectionTitle {
+            horizontal-stretch: 0;
+            text: "Precisa de você";
+        }
+        Badge {
+            text: Store.interventions-notice.title;
+            // Green only when there is really nothing; a search without matches stays neutral.
+            tone: Store.interventions-summary == "" ? 1 : 0;
+        }
+        Caption {
+            text: Store.interventions-notice.message;
+            overflow: elide;
+        }
+    }
+}
+
+component FichasPanel inherits Panel {
+    title: "Fichas de clientes";
+    subtitle: Store.fichas-summary;
+    notice: Store.fichas-notice;
+    loading: Store.loading && !Store.has-data;
+    action-text: "Tentar novamente";
+    action => {
+        Bridge.refresh();
+    }
+
+    RowList {
+        vertical-stretch: 1;
+        label: "Fichas de clientes";
+        count: Store.fichas.length;
+        current: Store.ficha-current;
+        row-height: 80px;
+        for row[index] in Store.fichas: RowFrame {
+            height: 80px;
+            selected: index == Store.ficha-current;
+            label: row.label + " " + row.name + ", " + row.kind + ", " + row.status + ", " + row.counts;
+            clicked => {
+                Store.ficha-current = index;
+                Store.intervention-current = -1;
+                Bridge.show-ficha(index);
+            }
+            HorizontalLayout {
+                padding-left: Theme.space-4;
+                padding-right: Theme.space-4;
+                spacing: Theme.space-3;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    spacing: Theme.space-1;
+                    HorizontalLayout {
+                        spacing: Theme.space-3;
+                        Cell {
+                            horizontal-stretch: 1;
+                            text: row.label + (row.name != "" ? " " + row.name : "");
+                            font-weight: 600;
+                        }
+                        Caption {
+                            horizontal-stretch: 0;
+                            text: row.when;
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: Theme.space-3;
+                        if row.kind != "": Badge {
+                            text: row.kind;
+                            tone: 4;
+                        }
+                        if row.status != "": Badge {
+                            text: row.status;
+                            tone: row.status-tone;
+                        }
+                        Caption {
+                            horizontal-stretch: 1;
+                            text: row.state;
+                            overflow: elide;
+                        }
+                    }
+                    Caption {
+                        text: row.counts;
+                        overflow: elide;
+                    }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 0;
+                    alignment: center;
+                    Btn {
+                        text: "Ver ficha";
+                        description: "Mostra a ficha completa: dados, pendências, dúvidas e fotos";
+                        clicked => {
+                            Store.ficha-current = index;
+                            Store.intervention-current = -1;
+                            Bridge.show-ficha(index);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component MessagesPanel inherits Panel {
+    title: "Mensagens recentes";
+    subtitle: Store.central-updated;
+    notice: Store.central-messages-notice;
+    loading: Store.loading && !Store.has-data;
+    action-text: "Tentar novamente";
+    action => {
+        Bridge.refresh();
+    }
+
+    RowList {
+        vertical-stretch: 1;
+        label: "Mensagens recentes de todos os contatos";
+        count: Store.central-messages.length;
+        current: -1;
+        row-height: 60px;
+        for row in Store.central-messages: RowFrame {
+            height: 60px;
+            label: (row.direction == "in" ? "Recebida de " : "Enviada para ") + row.who + ", " + row.text;
+            VerticalLayout {
+                padding-left: Theme.space-4;
+                padding-right: Theme.space-4;
+                alignment: center;
+                spacing: Theme.space-1;
+                HorizontalLayout {
+                    spacing: Theme.space-2;
+                    Cell {
+                        horizontal-stretch: 1;
+                        text: (row.direction == "in" ? "← " : "→ ") + row.who;
+                        font-weight: row.direction == "in" ? 600 : 400;
+                        color: row.needs-owner ? Theme.warning : Theme.text;
+                    }
+                    Caption {
+                        horizontal-stretch: 0;
+                        text: row.when;
+                    }
+                }
+                Body {
+                    text: row.text;
+                    color: Theme.text-muted;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}
+
+component StatesCard inherits Card {
+    VerticalLayout {
+        padding: Theme.space-4;
+        spacing: Theme.space-1;
+        alignment: start;
+        SectionTitle {
+            text: "Estados";
+        }
+        Caption {
+            text: "Todos os estados possíveis de um contato";
+            wrap: word-wrap;
+        }
+        RowList {
+            vertical-stretch: 1;
+            label: "Contatos por estado";
+            count: Store.central-states.length;
+            current: -1;
+            row-height: 30px;
+            for tile in Store.central-states: HorizontalLayout {
+                height: 30px;
+                // Clear of the scroll hint when the list scrolls.
+                padding-right: Theme.space-3;
+                spacing: Theme.space-2;
+                accessible-role: AccessibleRole.list-item;
+                accessible-label: tile.group + ", " + tile.label + ": " + tile.count;
+                Badge {
+                    text: tile.label;
+                    tone: tile.owner && tile.count != "0" ? 2 : 0;
+                }
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+                Cell {
+                    horizontal-stretch: 0;
+                    text: tile.count;
+                    font-weight: tile.count != "0" ? 600 : 400;
+                    color: tile.count != "0" ? Theme.text : Theme.text-subtle;
+                    horizontal-alignment: right;
+                }
+            }
+        }
+    }
+}
+
+// Wrapping paragraph: never wider than its column, long words break.
+component Para inherits Text {
+    min-width: 0px;
+    font-family: Theme.font;
+    font-size: Theme.text-sm;
+    color: Theme.text;
+    wrap: word-wrap;
+}
+
+// A titled card of the ficha detail; it keeps its content height.
+component DetailCard inherits Card {
+    in property <string> title;
+    in property <string> subtitle;
+    // Height the content really takes. Slint 1.18 measures wrapped text inside nested rows
+    // at the wrong width when a parent asks for this card's height, while the rows are placed
+    // right inside it; `end` reports the real bottom (assigned, so no binding loop).
+    property <length> used;
+
+    min-height: self.used;
+
+    VerticalLayout {
+        padding: Theme.space-4;
+        // `end` adds one `spacing` after the last row; together they make the 16 px padding.
+        padding-bottom: Theme.space-4 - Theme.space-3;
+        spacing: Theme.space-3;
+        HorizontalLayout {
+            spacing: Theme.space-3;
+            SectionTitle {
+                text: root.title;
+            }
+            Caption {
+                text: root.subtitle;
+                horizontal-alignment: right;
+                overflow: elide;
+            }
+        }
+        @children
+        end := Rectangle {
+            height: 0px;
+            init => {
+                root.used = self.y + Theme.space-4 - Theme.space-3;
+            }
+            changed y => {
+                root.used = self.y + Theme.space-4 - Theme.space-3;
+            }
+        }
+    }
+}
+
+component Bullet inherits HorizontalLayout {
+    in property <string> text;
+    in property <color> mark: Theme.text-subtle;
+
+    spacing: Theme.space-2;
+    accessible-role: AccessibleRole.list-item;
+    accessible-label: self.text;
+
+    VerticalLayout {
+        alignment: start;
+        padding-top: 7px;
+        Rectangle {
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: root.mark;
+        }
+    }
+    Para {
+        text: root.text;
+    }
+}
+
+component BulletCard inherits DetailCard {
+    in property <[string]> items;
+    in property <string> empty;
+    in property <color> mark;
+
+    subtitle: self.items.length > 0 ? self.items.length + "" : "";
+
+    if root.items.length == 0: Para {
+        text: root.empty;
+        color: Theme.text-subtle;
+    }
+    for item in root.items: Bullet {
+        text: item;
+        mark: root.mark;
+    }
+}
+
+component PhotoTile inherits Rectangle {
+    in property <FichaPhoto> photo;
+    callback clicked();
+
+    accessible-role: AccessibleRole.button;
+    accessible-label: "Foto " + self.photo.name + (self.photo.caption != "" ? ", " + self.photo.caption : "");
+    accessible-description: "Abre a foto no visualizador do sistema";
+    accessible-action-default => {
+        self.clicked();
+    }
+
+    VerticalLayout {
+        spacing: Theme.space-1;
+        Rectangle {
+            height: root.width;
+            border-radius: Theme.radius-md;
+            border-width: 1px;
+            border-color: touch.has-hover ? Theme.border-strong : Theme.border;
+            background: Theme.surface-alt;
+            clip: true;
+            if root.photo.has-thumb: Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.photo.thumb;
+                image-fit: cover;
+            }
+            if !root.photo.has-thumb: Text {
+                text: "sem prévia";
+                font-family: Theme.font;
+                font-size: Theme.text-xs;
+                color: Theme.text-subtle;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+        Caption {
+            text: root.photo.caption != "" ? root.photo.caption : root.photo.name;
+            color: Theme.text-muted;
+            overflow: elide;
+        }
+        Caption {
+            text: root.photo.when;
+            overflow: elide;
+        }
+    }
+
+    focus := FocusScope {
+        focus-on-click: false;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+        touch := TouchArea {
+            mouse-cursor: MouseCursor.pointer;
+            clicked => {
+                root.clicked();
+            }
+        }
+    }
+
+    FocusRing {
+        x: -3px;
+        y: -3px;
+        width: root.width + 6px;
+        height: root.height + 6px;
+        visible-ring: focus.has-focus;
+        radius: Theme.radius-md;
+    }
+}
+
+// Photo grid. `available` is the width the parent gives it, so the height never depends on
+// the grid's own width.
+component Gallery inherits Rectangle {
+    in property <[FichaPhoto]> photos;
+    in property <length> available;
+
+    property <length> tile: 160px;
+    property <length> caption-height: 2 * Theme.text-xs * Theme.line-height + Theme.space-1 * 2;
+    property <length> gap: Theme.space-3;
+    property <int> columns: Math.max(1, Math.floor((self.available + self.gap) / (self.tile + self.gap)));
+    property <int> rows: Math.ceil(self.photos.length / self.columns);
+
+    height: self.rows * (self.tile + self.caption-height + self.gap) - self.gap;
+    accessible-role: AccessibleRole.list;
+    accessible-label: "Fotos enviadas pelo cliente";
+
+    for photo[index] in root.photos: PhotoTile {
+        x: Math.mod(index, root.columns) * (root.tile + root.gap);
+        y: Math.floor(index / root.columns) * (root.tile + root.caption-height + root.gap);
+        width: root.tile;
+        height: root.tile + root.caption-height;
+        photo: photo;
+        clicked => {
+            Bridge.open-ficha-media(photo.media);
+        }
+    }
+}
+
+component FichaSummaryCards inherits VerticalLayout {
+    // Height actually taken by the cards (see `end`).
+    out property <length> used;
+
+    spacing: Theme.space-4;
+    alignment: start;
+
+    DetailCard {
+        title: "Resumo";
+        Para {
+            text: Store.ficha-detail.resumo != "" ? Store.ficha-detail.resumo : "O bot ainda não escreveu um resumo desta ficha.";
+            color: Store.ficha-detail.resumo != "" ? Theme.text : Theme.text-subtle;
+        }
+    }
+
+    for section in Store.ficha-detail.sections: DetailCard {
+        title: section.title;
+        for item in section.items: HorizontalLayout {
+            spacing: Theme.space-3;
+            accessible-role: AccessibleRole.text;
+            accessible-label: item.label + ": " + item.value;
+            Para {
+                width: 160px;
+                text: item.label;
+                color: Theme.text-subtle;
+            }
+            Para {
+                min-width: 96px;
+                horizontal-stretch: 1;
+                text: item.value;
+            }
+        }
+    }
+
+    if Store.ficha-detail.sections.length == 0: DetailCard {
+        title: "Dados do projeto";
+        Para {
+            text: "Nenhum campo preenchido ainda.";
+            color: Theme.text-subtle;
+        }
+    }
+
+    // Where the content really ends. Read from outside, `preferred-height` counts wrapped
+    // text at its unwrapped width; this zero-height mark sits after the last card instead.
+    // Assigned in a change handler, so the scroll area can follow it without a binding loop.
+    end := Rectangle {
+        height: 0px;
+        init => {
+            root.used = self.y;
+        }
+        changed y => {
+            root.used = self.y;
+        }
+    }
+}
+
+component FichaSideCards inherits VerticalLayout {
+    // Width available inside a card of this column, for the photo grid.
+    in property <length> inner-width;
+    // Height actually taken by the cards (see FichaSummaryCards).
+    out property <length> used;
+
+    spacing: Theme.space-4;
+    alignment: start;
+
+    BulletCard {
+        title: "Pendências";
+        items: Store.ficha-detail.pendencias;
+        empty: "Nada pendente.";
+        mark: Theme.warning;
+    }
+
+    BulletCard {
+        title: "Dúvidas do cliente";
+        items: Store.ficha-detail.duvidas;
+        empty: "O cliente não deixou dúvidas.";
+        mark: Theme.accent;
+    }
+
+    DetailCard {
+        title: "Fotos";
+        subtitle: Store.ficha-detail.photos.length > 0 ? Store.ficha-detail.photos.length + " · clique para abrir" : "";
+        if Store.ficha-detail.photos.length == 0: Para {
+            text: "Nenhuma foto enviada.";
+            color: Theme.text-subtle;
+        }
+        if Store.ficha-detail.photos.length > 0: Gallery {
+            photos: Store.ficha-detail.photos;
+            available: root.inner-width;
+        }
+    }
+
+    DetailCard {
+        title: "Áudios, vídeos e documentos";
+        subtitle: Store.ficha-detail.files.length > 0 ? Store.ficha-detail.files.length + "" : "";
+        if Store.ficha-detail.files.length == 0: Para {
+            text: "Nenhum arquivo enviado.";
+            color: Theme.text-subtle;
+        }
+        for file in Store.ficha-detail.files: HorizontalLayout {
+            spacing: Theme.space-3;
+            accessible-role: AccessibleRole.list-item;
+            accessible-label: file.kind + ", " + file.name + (file.caption != "" ? ", " + file.caption : "");
+            Rectangle {
+                width: 88px;
+                // On the file name's line.
+                Badge {
+                    x: 0;
+                    y: 0;
+                    height: Theme.text-sm * Theme.line-height;
+                    text: file.kind;
+                    tone: 0;
+                }
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: start;
+                Body {
+                    min-width: 0px;
+                    text: file.name;
+                    overflow: elide;
+                }
+                Para {
+                    text: file.caption + (file.caption != "" && file.when != "" ? " · " : "") + file.when;
+                    font-size: Theme.text-xs;
+                    color: Theme.text-subtle;
+                }
+            }
+            VerticalLayout {
+                horizontal-stretch: 0;
+                alignment: start;
+                Btn {
+                    text: "Abrir";
+                    description: "Abre " + file.name + " no aplicativo padrão";
+                    clicked => {
+                        Bridge.open-ficha-media(file.media);
+                    }
+                }
+            }
+        }
+    }
+
+    // Where the content really ends. Read from outside, `preferred-height` counts wrapped
+    // text at its unwrapped width; this zero-height mark sits after the last card instead.
+    // Assigned in a change handler, so the scroll area can follow it without a binding loop.
+    end := Rectangle {
+        height: 0px;
+        init => {
+            root.used = self.y;
+        }
+        changed y => {
+            root.used = self.y;
+        }
+    }
+}
+
+// Everything the client asked for, read from central.json. Esc or "Voltar" returns.
+component FichaView inherits VerticalLayout {
+    property <length> gap: Theme.space-4;
+
+    spacing: Theme.space-3;
+
+    HorizontalLayout {
+        spacing: Theme.space-3;
+        VerticalLayout {
+            alignment: center;
+            Btn {
+                text: "← Voltar";
+                kind: "ghost";
+                description: "Esc";
+                clicked => {
+                    Store.ficha-open = false;
+                }
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            Text {
+                text: Store.ficha-detail.label + (Store.ficha-detail.name != "" ? " · " + Store.ficha-detail.name : "");
+                font-family: Theme.font;
+                font-size: Theme.text-lg;
+                font-weight: 600;
+                color: Theme.text;
+                overflow: elide;
+            }
+            Caption {
+                text: Store.ficha-detail.phone + (Store.ficha-detail.phone != "" && Store.ficha-detail.state != "" ? " · " : "") + Store.ficha-detail.state + (Store.ficha-detail.when != "" ? " · " + Store.ficha-detail.when : "");
+                overflow: elide;
+            }
+        }
+        if Store.ficha-detail.kind != "": VerticalLayout {
+            alignment: center;
+            Badge {
+                text: Store.ficha-detail.kind;
+                tone: 4;
+            }
+        }
+        if Store.ficha-detail.status != "": VerticalLayout {
+            alignment: center;
+            Badge {
+                text: Store.ficha-detail.status;
+                tone: Store.ficha-detail.status-tone;
+            }
+        }
+    }
+
+    HorizontalLayout {
+        spacing: Theme.space-2;
+        alignment: start;
+        Btn {
+            text: "Abrir conversa";
+            kind: "primary";
+            enabled: Store.ficha-detail.has-link;
+            description: "Abre o WhatsApp do cliente no navegador";
+            clicked => {
+                Bridge.open-ficha-conversation();
+            }
+        }
+        Btn {
+            text: "Abrir ficha.md";
+            enabled: Store.ficha-detail.has-markdown;
+            description: "Abre o arquivo da ficha no editor padrão";
+            clicked => {
+                Bridge.open-ficha-markdown();
+            }
+        }
+        Btn {
+            text: "Abrir pasta";
+            enabled: Store.ficha-detail.has-folder;
+            description: "Abre a pasta do cliente com a conversa e as mídias";
+            clicked => {
+                Bridge.open-ficha-folder();
+            }
+        }
+    }
+
+    // The two columns are placed by hand: a layout around them would size the scroll area
+    // from its minimum height (every text wrapped at the narrowest width), about twice the
+    // real content. Each column reports the height its cards really take (`used`).
+    Rectangle {
+        vertical-stretch: 1;
+
+        body := Flickable {
+            property <bool> wide: self.width >= 900px;
+            // Room on the right for the scroll hint.
+            property <length> usable: self.width - Theme.space-3;
+            property <length> main-width: self.wide ? (self.usable - root.gap) * 3 / 5 : self.usable;
+            property <length> side-width: self.wide ? self.usable - root.gap - self.main-width : self.usable;
+
+            width: parent.width;
+            height: parent.height;
+            content-height: Math.max(self.height, self.wide ? Math.max(main.height, side.height) : main.height + root.gap + side.height);
+            // The window's arrow keys scroll through Store; the wheel writes back.
+            content-y <=> Store.ficha-scroll;
+
+            init => {
+                self.measure();
+            }
+            changed content-height => {
+                self.measure();
+            }
+            changed height => {
+                self.measure();
+            }
+
+            function measure() {
+                Store.ficha-scroll-max = Math.max(0px, self.content-height - self.height);
+                Store.ficha-scroll = Math.max(-Store.ficha-scroll-max, Store.ficha-scroll);
+            }
+
+            main := FichaSummaryCards {
+                x: 0;
+                y: 0;
+                width: body.main-width;
+                height: Math.max(self.preferred-height, self.used);
+            }
+
+            side := FichaSideCards {
+                x: body.wide ? body.main-width + root.gap : 0;
+                y: body.wide ? 0 : main.height + root.gap;
+                width: body.side-width;
+                height: Math.max(self.preferred-height, self.used);
+                // Minus the card padding.
+                inner-width: body.side-width - 2 * Theme.space-4;
+            }
+        }
+
+        // Scroll bar hint, purely visual.
+        if body.content-height > body.height: Rectangle {
+            x: parent.width - 4px;
+            y: (-body.content-y / body.content-height) * parent.height;
+            width: 4px;
+            height: Math.max(24px, (body.height / body.content-height) * parent.height);
+            border-radius: 2px;
+            background: Theme.border-strong;
+            opacity: 0.5;
+        }
+    }
+}
+
+// Home: what needs the owner first, every client ficha, the latest WhatsApp messages and
+// every state of the sales funnel. Data comes from the agent's central.json.
+export component CentralPage inherits VerticalLayout {
+    // Below 900 px of page width the states move under the recent messages. The width is
+    // `Store.page-width`, assigned by the window: a binding on this page's own width would
+    // loop, because the two arrangements change its minimum width.
+    property <bool> wide: Store.page-width >= 900px;
+    // Nothing waiting for the owner: the panel shrinks to one line and the fichas grow.
+    property <bool> calm: !(Store.loading && !Store.has-data) && Store.interventions-notice.kind == 1 && Store.interventions.length == 0;
+
+    spacing: Theme.space-4;
+
+    if Store.ficha-open: FichaView {
+        vertical-stretch: 1;
+    }
+
+    if !Store.ficha-open: HorizontalLayout {
         spacing: Theme.space-4;
         for group in Store.central-groups: KpiCard {
             label: group.label;
@@ -112,192 +912,49 @@ export component CentralPage inherits VerticalLayout {
         }
     }
 
-    HorizontalLayout {
+    if !Store.ficha-open: HorizontalLayout {
         spacing: Theme.space-4;
         vertical-stretch: 1;
 
         // Equal preferred widths: the stretch factors decide, never the length of a message.
-        Panel {
+        VerticalLayout {
             preferred-width: 1px;
-            min-width: 420px;
+            min-width: 400px;
             horizontal-stretch: 3;
-            vertical-stretch: 1;
-            title: "Precisa de você";
-            subtitle: Store.interventions-summary;
-            notice: Store.interventions-notice;
-            loading: Store.loading && !Store.has-data;
-            action-text: "Tentar novamente";
-            action => {
-                Bridge.refresh();
-            }
+            spacing: Theme.space-4;
 
-            RowList {
+            if root.calm: InterventionsCalm { }
+            // Exactly as tall as its rows when there is room; the fichas take the rest.
+            if !root.calm: InterventionsPanel {
+                min-height: 200px;
+                preferred-height: 48px + Math.max(1, Store.interventions.length) * 96px;
+                max-height: Math.max(220px, 48px + Store.interventions.length * 96px + 1px);
+                vertical-stretch: 0;
+            }
+            FichasPanel {
+                // Header and two rows.
+                min-height: 208px;
                 vertical-stretch: 1;
-                label: "Conversas que precisam de você";
-                count: Store.interventions.length;
-                current: Store.intervention-current;
-                row-height: 96px;
-                for row[index] in Store.interventions: RowFrame {
-                    height: 96px;
-                    selected: index == Store.intervention-current;
-                    label: row.priority + ", " + row.who + ", " + row.reason + ", " + row.last;
-                    clicked => {
-                        Store.intervention-current = index;
-                    }
-                    HorizontalLayout {
-                        padding-left: Theme.space-4;
-                        padding-right: Theme.space-4;
-                        spacing: Theme.space-3;
-                        VerticalLayout {
-                            alignment: center;
-                            spacing: Theme.space-1;
-                            HorizontalLayout {
-                                spacing: Theme.space-3;
-                                Cell {
-                                    text: row.who;
-                                    font-weight: 600;
-                                }
-                                Caption {
-                                    horizontal-stretch: 0;
-                                    text: row.when;
-                                }
-                            }
-                            HorizontalLayout {
-                                spacing: Theme.space-2;
-                                Badge {
-                                    text: row.priority;
-                                    tone: row.tone;
-                                }
-                                Body {
-                                    text: row.reason;
-                                    overflow: elide;
-                                }
-                            }
-                            Caption {
-                                text: row.phone + (row.last != "" ? "  ·  “" + row.last + "”" : "");
-                                overflow: elide;
-                            }
-                        }
-                        VerticalLayout {
-                            horizontal-stretch: 0;
-                            alignment: center;
-                            spacing: Theme.space-2;
-                            Btn {
-                                text: "Abrir conversa";
-                                kind: "primary";
-                                enabled: row.has-link;
-                                description: "Abre o WhatsApp do contato no navegador";
-                                clicked => {
-                                    Store.intervention-current = index;
-                                    Bridge.open-conversation(index);
-                                }
-                            }
-                            Btn {
-                                text: "Ficha do cliente";
-                                enabled: row.has-ficha;
-                                description: "Abre a ficha com o que o cliente pediu";
-                                clicked => {
-                                    Store.intervention-current = index;
-                                    Bridge.open-ficha(index);
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
 
-        Panel {
+        VerticalLayout {
             preferred-width: 1px;
             min-width: 240px;
             horizontal-stretch: 2;
-            vertical-stretch: 1;
-            title: "Mensagens recentes";
-            subtitle: Store.central-updated;
-            notice: Store.central-messages-notice;
-            loading: Store.loading && !Store.has-data;
-            action-text: "Tentar novamente";
-            action => {
-                Bridge.refresh();
+            spacing: Theme.space-4;
+            MessagesPanel {
+                vertical-stretch: 2;
             }
-
-            RowList {
+            if !root.wide: StatesCard {
+                min-height: 180px;
                 vertical-stretch: 1;
-                label: "Mensagens recentes de todos os contatos";
-                count: Store.central-messages.length;
-                current: -1;
-                row-height: 60px;
-                for row in Store.central-messages: RowFrame {
-                    height: 60px;
-                    label: (row.direction == "in" ? "Recebida de " : "Enviada para ") + row.who + ", " + row.text;
-                    VerticalLayout {
-                        padding-left: Theme.space-4;
-                        padding-right: Theme.space-4;
-                        alignment: center;
-                        spacing: Theme.space-1;
-                        HorizontalLayout {
-                            spacing: Theme.space-2;
-                            Cell {
-                                text: (row.direction == "in" ? "← " : "→ ") + row.who;
-                                font-weight: row.direction == "in" ? 600 : 400;
-                                color: row.needs-owner ? Theme.warning : Theme.text;
-                            }
-                            Caption {
-                                horizontal-stretch: 0;
-                                text: row.when;
-                            }
-                        }
-                        Body {
-                            text: row.text;
-                            color: Theme.text-muted;
-                            overflow: elide;
-                        }
-                    }
-                }
             }
         }
 
-        Card {
+        if root.wide: StatesCard {
             width: 248px;
             vertical-stretch: 1;
-            VerticalLayout {
-                padding: Theme.space-4;
-                spacing: Theme.space-1;
-                SectionTitle {
-                    text: "Estados";
-                }
-                Caption {
-                    text: "Todos os estados possíveis de um contato";
-                    wrap: word-wrap;
-                }
-                RowList {
-                    vertical-stretch: 1;
-                    label: "Contatos por estado";
-                    count: Store.central-states.length;
-                    current: -1;
-                    row-height: 30px;
-                    for tile in Store.central-states: HorizontalLayout {
-                        height: 30px;
-                        spacing: Theme.space-2;
-                        accessible-role: AccessibleRole.list-item;
-                        accessible-label: tile.group + ", " + tile.label + ": " + tile.count;
-                        Badge {
-                            text: tile.label;
-                            tone: tile.owner && tile.count != "0" ? 2 : 0;
-                        }
-                        Rectangle {
-                            horizontal-stretch: 1;
-                        }
-                        Cell {
-                            horizontal-stretch: 0;
-                            text: tile.count;
-                            font-weight: tile.count != "0" ? 600 : 400;
-                            color: tile.count != "0" ? Theme.text : Theme.text-subtle;
-                            horizontal-alignment: right;
-                        }
-                    }
-                }
-            }
         }
     }
 }

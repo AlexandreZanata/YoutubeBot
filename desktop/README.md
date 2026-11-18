@@ -15,13 +15,13 @@ desktop/
 │   ├── icon.svg                  menu icon installed by scripts/install.sh
 │   ├── src/main.rs               threads, timers, callbacks, preferences
 │   ├── src/view.rs               reports → display structs (formatting only)
-│   ├── src/thumbs.rs             off-thread Shorts thumbnail decoding
+│   ├── src/thumbs.rs             off-thread thumbnail decoding (Shorts, ficha photos)
 │   ├── tests/contrast.rs         WCAG AA check of the theme tokens
 │   └── ui/
 │       ├── theme.slint           design tokens (colors, spacing, radii, type)
 │       ├── store.slint           view-model structs, Store and Bridge globals
 │       ├── controls.slint        buttons, nav, badges, cards, states, lists
-│       ├── pages.slint           the eight pages (Central first)
+│       ├── pages.slint           the eight pages (Central first, with the ficha detail)
 │       └── app.slint             window, sidebar, header, shortcuts, footer
 ├── crates/reports/               pure aggregation, no UI
 │   ├── src/time.rs               America/Cuiaba clock, periods, pt-BR formatting
@@ -30,11 +30,12 @@ desktop/
 │   ├── src/community.rs          history with single-entry fallback
 │   ├── src/social.rs             X posts, replies, discovery
 │   ├── src/commercial.rs         WhatsApp events/rules, Mercado Livre capture
-│   ├── src/sales.rs              sales agent Central (central.json), safe wa.me/ficha targets
+│   ├── src/sales.rs              sales agent Central (central.json), client fichas, safe targets
 │   ├── src/snapshot.rs           one read of every source
 │   ├── src/overview.rs           counts per period/channel, upcoming slots
 │   ├── examples/summary.rs       month summary in the terminal
-│   └── tests/reports.rs          fixture months: published, scheduled, empty, broken
+│   ├── tests/reports.rs          fixture months: published, scheduled, empty, broken
+│   └── tests/sales.rs            Central and fichas: defaults, path rejection, safe opens
 ├── crates/manager-core/          sessions, live browser state, settings, CLI actions
 └── scripts/
     ├── install.sh                release build, ~/.local/bin binary and menu entry
@@ -88,10 +89,14 @@ python3 desktop/scripts/demo_root.py /tmp/ytbot-demo
 YTBOT_ROOT=/tmp/ytbot-demo desktop/target/debug/manager-app
 python3 desktop/scripts/capture.py --root /tmp/ytbot-demo --theme light --out docs/images/desktop
 python3 desktop/scripts/capture.py --root /tmp/ytbot-demo --theme dark --out docs/images/desktop
+python3 desktop/scripts/capture.py --root /tmp/ytbot-demo --theme light --out /tmp/shots \
+    --size 1920x1080 --only central,ficha-detail,ficha-detail-end
 ```
 
 `capture.py` needs `Xvfb` and ImageMagick `import`; never point it at the real root when the
-images are meant for Git.
+images are meant for Git. `--size` resizes the window to the virtual screen (the default
+1280x800 keeps the committed names; other sizes add `-WIDTHxHEIGHT`), `--only` limits the
+shots.
 
 ## Extending
 

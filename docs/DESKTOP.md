@@ -2,8 +2,8 @@
 
 `desktop/` is a Rust + Slint application: a read-only view of the bot's private records with
 monthly metrics and, on its home page (Central), every WhatsApp sales conversation that needs
-the owner, plus two bounded actions per network (open the visible login window, stop the
-hidden browser). Commands and layout of the code are in [desktop/README.md](../desktop/README.md).
+the owner and every client ficha, plus two bounded actions per network (open the visible login
+window, stop the hidden browser). Commands and layout of the code are in [desktop/README.md](../desktop/README.md).
 
 ## Contract
 
@@ -16,15 +16,24 @@ hidden browser). Commands and layout of the code are in [desktop/README.md](../d
   `python3 -m tools.ytbot commercial|social open|stop --network <key>` with a fixed argument
   list on a worker thread. No shell, no arbitrary command. YouTube profiles have no action
   here; their pipeline is `run`, `shorts` and `distribute`.
-- **Central links.** "Abrir conversa" and "Ficha do cliente" hand one validated target to
-  `xdg-open`: only `https://wa.me/<10 to 15 digits>` (the owner's own browser or WhatsApp
-  opens the chat) and only a `ficha.md` inside `.local/commercial/whatsapp/sales/clientes/`
-  (resolved, so `..` cannot leave it). Nothing else is opened and nothing is sent.
+- **Central links.** The Central's buttons hand one validated target to `xdg-open`: only
+  `https://wa.me/<10 to 15 digits>` (the owner's own browser or WhatsApp opens the chat) and
+  only paths inside `.local/commercial/whatsapp/sales/clientes/`: a `ficha.md`, a client
+  folder, or a media file of that client's own folder with a picture, audio, video or
+  office/PDF/text extension (anything else, such as a script or a `.desktop` launcher, is
+  only reachable through "Abrir pasta"). Paths are re-resolved on disk before every open, so
+  `..` or a symlink cannot leave the folder. Nothing else is opened and nothing is sent.
+- **Fichas.** `central.json` may carry `fichas` (missing in older files means none). Each
+  `folder` and `ficha_md` must resolve inside `clientes/` (canonical when it exists, otherwise
+  absolute and without `..`) and each `media.path` inside its own ficha's folder; a ficha or
+  media item that fails is dropped and counted as ignored in Configurações → Diagnóstico,
+  never failing the page. Photo thumbnails are decoded off the UI thread (PNG, JPEG, WebP,
+  at most 25 MB) and only after the same check.
 - **Never invent data.** A missing file shows "sem registro" (or "não conectada" for a
   session), a broken one shows an error with "Tentar novamente". Unknown fields are ignored,
   a broken JSONL line or `upload.json` is skipped and counted in Configurações → Diagnóstico.
-- **Non-blocking.** Records load on a worker thread, thumbnails decode on another, actions run
-  on a third; the footer reports every result.
+- **Non-blocking.** Records load on a worker thread, thumbnails (Shorts and ficha photos)
+  decode on another, actions run on a third; the footer reports every result.
 
 ## Data sources
 
@@ -37,7 +46,7 @@ hidden browser). Commands and layout of the code are in [desktop/README.md](../d
 | X | `social/x/{account,posts,replies,discovery}.json`, post text from `promotion/agenda.json` |
 | WhatsApp | `commercial/whatsapp/{account.json,rules.json,events.jsonl,journal.jsonl}` |
 | Mercado Livre | `commercial/mercadolivre/{account,products}.json` |
-| Central (sales) | `commercial/whatsapp/sales/central.json`, written by the agent after every cycle (contract in [WhatsApp sales](COMMERCIAL-WHATSAPP-SALES.md)) |
+| Central (sales) | `commercial/whatsapp/sales/central.json`, written by the agent after every cycle (contract in [WhatsApp sales](COMMERCIAL-WHATSAPP-SALES.md)); ficha photos and files from `commercial/whatsapp/sales/clientes/<slug>-<lead>/` |
 | Sessions | the account files above, `browser.pid` and Chrome's `SingletonLock` checked through `/proc` |
 
 ## Counting rules
@@ -64,7 +73,8 @@ All counts come from the `reports` crate; Slint only displays strings.
 
 | Section | Shortcut | Content |
 | --- | --- | --- |
-| Central | Ctrl+1 | Home. Funnel groups (Com você, Em conversa, Prospecção, Encerrados); "Precisa de você" with every conversation the owner must take over (priority, `barbearia-1 Nome`, reason, phone, last message, "Abrir conversa", "Ficha do cliente"); recent messages of every lead; the 14 states with counts |
+| Central | Ctrl+1 | Home. Funnel groups (Com você, Em conversa, Prospecção, Encerrados); "Precisa de você" with every conversation the owner must take over (priority, `barbearia-1 Nome`, reason, phone, last message, "Abrir conversa", "Ver ficha" or, without a ficha, "Ficha do cliente"), one line when nothing waits; "Fichas de clientes" (label and name, Site/Sistema, status, update time, photo/audio/pending counts); recent messages of every lead; the 14 states with counts |
+| Ficha do cliente | click, Enter or "Ver ficha" | Header (label, name, phone, state, status, kind), "Abrir conversa", "Abrir ficha.md", "Abrir pasta"; Resumo and every section as label/value rows; Pendências; Dúvidas do cliente; photo gallery (click opens the picture); audio, video and document rows with "Abrir". Esc or "Voltar" returns |
 | Visão geral | Ctrl+2 | Period and channel filters, six month cards, upcoming slots |
 | Canais | Ctrl+3 | One card per channel (binding, published × scheduled × drafts, last, next, Community); Enter opens the video table |
 | Shorts | Ctrl+4 | Zaflas Shorts with thumbnail, slot and state |
@@ -88,9 +98,9 @@ missing source, "ERRO" with a retry action, and a page-wide notice when the root
 | Ctrl+R | Reload every record |
 | Ctrl+K | Focus the search field (filters the current page, accent-insensitive) |
 | Ctrl+1 … Ctrl+8 | Go to a section (Ctrl+1 is the Central) |
-| ↑ ↓ ← → PageUp PageDown Home End | Move in the page's list; the selection scrolls into view |
-| Enter | Open the selected channel; on the Central, open the selected conversation |
-| Esc | Leave the channel detail, clear selection and search |
+| ↑ ↓ ← → PageUp PageDown Home End | Move in the page's list; the selection scrolls into view. On the Central the list is "Precisa de você" followed by the fichas; in an open ficha they scroll it |
+| Enter | Open the selected channel; on the Central, open the selected conversation or ficha |
+| Esc | Leave the channel or ficha detail, clear selection and search |
 | Tab / Shift+Tab | Next / previous control; every control draws a 2 px focus ring |
 
 ## Design system
@@ -110,6 +120,9 @@ on one line.
 - **Themes:** light and dark switch live (sidebar button or Configurações) and persist. The
   std-widgets inputs follow through `Palette.color-scheme`.
 - **Layout:** minimum 1024×720, opens at 1280×800, grids reflow from two to three columns.
+  Below 900 px of page width the Central moves "Estados" under the recent messages and the
+  ficha detail uses one column. Responsive switches read `Store.page-width`, which the window
+  assigns on resize: a binding on a layout's own width would be a binding loop.
 
 ## Layers
 
@@ -132,14 +145,18 @@ corrupted, striped frames on the owner's desktop session. If OpenGL is unavailab
 
 ## Screenshots
 
-`docs/images/desktop/` holds every page in both themes, captured from the synthetic root of
-`desktop/scripts/demo_root.py` (no private data) with `desktop/scripts/capture.py`, which
-drives the app only through its keyboard shortcuts.
+`docs/images/desktop/` holds every page in both themes, plus the open ficha (`ficha-detail`,
+and `ficha-detail-end` scrolled to the photos and files), captured from the synthetic root of
+`desktop/scripts/demo_root.py` (no private data, generated pictures, `(65) 90000-xxxx`
+numbers) with `desktop/scripts/capture.py`, which drives the app only through its keyboard
+shortcuts. `--size 1920x1080` or `--size 1024x720` and `--only central,ficha-detail` review
+other window sizes without touching the committed set.
 
 ## Known limits
 
 - Mercado Livre has no capture history; a `captures.jsonl` written by the commercial module
   would make the monthly product count exact.
 - Community history starts with this version; earlier months only know the last post.
-- Outside the Central, links are shown as text; only the Central's wa.me and ficha targets
-  are opened.
+- Outside the Central, links are shown as text; only the Central's wa.me and client-folder
+  targets are opened.
+- Audio and video play in the system's default application; the manager has no player.

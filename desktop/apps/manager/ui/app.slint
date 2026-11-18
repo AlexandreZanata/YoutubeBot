@@ -1,6 +1,7 @@
 // YoutubeBot Manager window: sidebar navigation, header with breadcrumb and search, the
 // active page and a status footer. Keyboard: Ctrl+R refresh, Ctrl+K search, Ctrl+1…8
-// sections, arrows/Home/End move in the page list, Enter opens, Esc clears.
+// sections, arrows/Home/End move in the page list, Enter opens, Esc clears or goes back.
+// On the Central the arrows walk "Precisa de você" and then the client fichas.
 
 import { LineEdit, Palette } from "std-widgets.slint";
 import { Theme } from "theme.slint";
@@ -14,7 +15,8 @@ import {
 export { Theme } from "theme.slint";
 export {
     Store, Bridge, Notice, Fact, Kpi, UpcomingRow, ChannelCard, VideoRow, ShortRow, XPostRow,
-    ContactRow, ProductRow, SourceRow, SessionRow,
+    ContactRow, ProductRow, SourceRow, SessionRow, FichaRow, FichaField, FichaSection, FichaPhoto,
+    FichaFile, FichaDetail,
 } from "store.slint";
 
 export component AppWindow inherits Window {
@@ -32,6 +34,7 @@ export component AppWindow inherits Window {
     forward-focus: keys;
 
     in-out property <bool> dark <=> Theme.dark;
+    property <length> sidebar-width: 232px;
     property <[string]> titles: [
         "Central", "Visão geral", "Canais", "Shorts", "Social (X)", "Comercial", "Sessões",
         "Configurações",
@@ -39,6 +42,17 @@ export component AppWindow inherits Window {
 
     init => {
         Palette.color-scheme = Theme.dark ? ColorScheme.dark : ColorScheme.light;
+        root.measure-page();
+    }
+
+    // Assigned, not bound: the window's width depends on the layout, so a binding that
+    // switches arrangements by width would be a binding loop.
+    changed width => {
+        root.measure-page();
+    }
+
+    function measure-page() {
+        Store.page-width = root.width - root.sidebar-width - 2 * Theme.space-8;
     }
 
     changed dark => {
@@ -51,7 +65,7 @@ export component AppWindow inherits Window {
 
     function list-length() -> int {
         if (Store.page == 0) {
-            return Store.interventions.length;
+            return Store.ficha-open ? 0 : Store.interventions.length + Store.fichas.length;
         }
         if (Store.page == 1) {
             return Store.upcoming.length;
@@ -76,7 +90,10 @@ export component AppWindow inherits Window {
 
     function list-current() -> int {
         if (Store.page == 0) {
-            return Store.intervention-current;
+            if (Store.intervention-current >= 0) {
+                return Store.intervention-current;
+            }
+            return Store.ficha-current >= 0 ? Store.interventions.length + Store.ficha-current : -1;
         }
         if (Store.page == 1) {
             return Store.upcoming-current;
@@ -101,7 +118,9 @@ export component AppWindow inherits Window {
 
     function set-current(value: int) {
         if (Store.page == 0) {
-            Store.intervention-current = value;
+            // One sequence: the interventions first, then the fichas.
+            Store.intervention-current = value < Store.interventions.length ? value : -1;
+            Store.ficha-current = value < Store.interventions.length ? -1 : value - Store.interventions.length;
         } else if (Store.page == 1) {
             Store.upcoming-current = value;
         } else if (Store.page == 2 && Store.channel-open) {
@@ -121,7 +140,20 @@ export component AppWindow inherits Window {
         }
     }
 
+    // The open ficha scrolls instead of moving a selection.
+    function scrolls-ficha() -> bool {
+        return Store.page == 0 && Store.ficha-open;
+    }
+
+    function scroll-ficha(target: length) {
+        Store.ficha-scroll = Math.max(-Store.ficha-scroll-max, Math.min(0px, target));
+    }
+
     function move-to(target: int) {
+        if (root.scrolls-ficha()) {
+            root.scroll-ficha(0px);
+            return;
+        }
         let count = root.list-length();
         if (count == 0) {
             return;
@@ -129,7 +161,19 @@ export component AppWindow inherits Window {
         root.set-current(Math.max(0, Math.min(count - 1, target)));
     }
 
+    function move-to-end() {
+        if (root.scrolls-ficha()) {
+            root.scroll-ficha(-Store.ficha-scroll-max);
+            return;
+        }
+        root.move-to(root.list-length() - 1);
+    }
+
     function move(delta: int) {
+        if (root.scrolls-ficha()) {
+            root.scroll-ficha(Store.ficha-scroll - delta * 48px);
+            return;
+        }
         let current = root.list-current();
         if (current < 0) {
             root.move-to(delta > 0 ? 0 : root.list-length() - 1);
@@ -139,8 +183,10 @@ export component AppWindow inherits Window {
     }
 
     function activate() {
-        if (Store.page == 0 && Store.intervention-current >= 0) {
+        if (Store.page == 0 && !Store.ficha-open && Store.intervention-current >= 0) {
             Bridge.open-conversation(Store.intervention-current);
+        } else if (Store.page == 0 && !Store.ficha-open && Store.ficha-current >= 0) {
+            Bridge.show-ficha(Store.ficha-current);
         }
         if (Store.page == 2 && !Store.channel-open && Store.channel-current >= 0) {
             Bridge.open-channel(Store.channel-current);
@@ -151,8 +197,12 @@ export component AppWindow inherits Window {
         if (Store.page == 2 && Store.channel-open) {
             Store.channel-open = false;
             Store.video-current = -1;
+        } else if (Store.page == 0 && Store.ficha-open) {
+            // Back to the Central with the ficha still selected.
+            Store.ficha-open = false;
         } else {
             Store.intervention-current = -1;
+            Store.ficha-current = -1;
             Store.upcoming-current = -1;
             Store.channel-current = -1;
             Store.short-current = -1;
@@ -284,7 +334,7 @@ export component AppWindow inherits Window {
         KeyBinding {
             keys: @keys(End);
             activated => {
-                root.move-to(root.list-length() - 1);
+                root.move-to-end();
             }
         }
         KeyBinding {
@@ -299,7 +349,7 @@ export component AppWindow inherits Window {
 
             // Sidebar
             Rectangle {
-                width: 232px;
+                width: root.sidebar-width;
                 background: Theme.sidebar;
 
                 Rectangle {
@@ -366,11 +416,13 @@ export component AppWindow inherits Window {
                             alignment: center;
                             spacing: Theme.space-1;
                             Caption {
-                                text: "YoutubeBot  /  " + root.titles[Store.page] + (Store.page == 2 && Store.channel-open ? "  /  " + Store.channel-detail.name : "");
+                                text: "YoutubeBot  /  " + root.titles[Store.page] + (Store.page == 2 && Store.channel-open ? "  /  " + Store.channel-detail.name : Store.page == 0 && Store.ficha-open ? "  /  Ficha  /  " + Store.ficha-detail.label : "");
+                                overflow: elide;
                                 accessible-label: "Caminho: " + self.text;
                             }
                             Text {
-                                text: Store.page == 2 && Store.channel-open ? Store.channel-detail.name : root.titles[Store.page];
+                                text: Store.page == 2 && Store.channel-open ? Store.channel-detail.name : Store.page == 0 && Store.ficha-open ? "Ficha do cliente" : root.titles[Store.page];
+                                overflow: elide;
                                 font-family: Theme.font;
                                 font-size: Theme.text-xl;
                                 font-weight: 700;

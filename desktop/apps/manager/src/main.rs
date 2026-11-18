@@ -38,8 +38,12 @@ struct App {
     session_rows: Vec<usize>,
     /// Visible card → channel slug (after search).
     channel_rows: Vec<&'static str>,
-    /// Visible Central intervention → (wa.me link, ficha path).
-    central_targets: Vec<(String, String)>,
+    /// Visible Central intervention → its link, ficha.md and lead.
+    central_targets: Vec<view::InterventionTarget>,
+    /// Visible Central ficha → lead.
+    ficha_rows: Vec<String>,
+    /// Lead of the ficha shown in the Central detail (kept while it is closed).
+    open_ficha: Option<String>,
     period: Period,
     channel: Option<&'static str>,
     search: String,
@@ -100,7 +104,8 @@ fn save_settings(app: &App) -> Result<(), String> {
     app.settings.save(path).map_err(|error| error.to_string())
 }
 
-/// Opens a validated wa.me link or ficha path with the desktop's default application.
+/// Opens a validated wa.me link or client path (ficha.md, folder, media) with the desktop's
+/// default application. Callers check the target first; nothing else reaches this.
 fn open_external(target: &str) -> std::io::Result<()> {
     std::process::Command::new("xdg-open")
         .arg(target)
@@ -145,7 +150,7 @@ fn render_sessions(ui: &AppWindow, app: &mut App) {
     app.session_rows = indices;
 }
 
-fn render_shorts(ui: &AppWindow, app: &mut App) -> Vec<PathBuf> {
+fn render_shorts(ui: &AppWindow, app: &mut App) -> Vec<thumbs::Request> {
     let Some(snapshot) = &app.snapshot else {
         return Vec::new();
     };
@@ -163,6 +168,69 @@ fn render_shorts(ui: &AppWindow, app: &mut App) -> Vec<PathBuf> {
     store.set_shorts_notice(shorts.notice);
     store.set_shorts_summary(shorts.summary.into());
     shorts.missing_thumbs
+}
+
+/// Fills the open ficha detail; closes it when the ficha left the record. Returns the photos
+/// that still need a thumbnail.
+fn render_ficha(ui: &AppWindow, app: &mut App) -> Vec<thumbs::Request> {
+    let store = ui.global::<Store>();
+    if !store.get_ficha_open() {
+        return Vec::new();
+    }
+    let (Some(snapshot), Some(lead)) = (&app.snapshot, &app.open_ficha) else {
+        return Vec::new();
+    };
+    match view::ficha_detail(snapshot, lead, &app.thumbs) {
+        Some((detail, requests)) => {
+            store.set_ficha_detail(detail);
+            requests
+        }
+        None => {
+            store.set_ficha_open(false);
+            set_status(ui, "Esta ficha não está mais no registro do bot de vendas");
+            app.open_ficha = None;
+            Vec::new()
+        }
+    }
+}
+
+fn show_ficha(ui: &AppWindow, app: &mut App, lead: String) {
+    let known = app
+        .snapshot
+        .as_ref()
+        .is_some_and(|snapshot| snapshot.sales.ficha(&lead).is_some());
+    if !known {
+        set_status(ui, "Este contato ainda não tem ficha");
+        return;
+    }
+    let store = ui.global::<Store>();
+    if app.open_ficha.as_ref() != Some(&lead) || !store.get_ficha_open() {
+        store.set_ficha_scroll(0.0);
+    }
+    app.open_ficha = Some(lead);
+    store.set_ficha_open(true);
+    let requests = render_ficha(ui, app);
+    request_thumbs(ui, app, requests);
+}
+
+/// The ficha open in the detail, for its buttons.
+fn open_ficha(app: &App) -> Option<&reports::sales::Ficha> {
+    app.snapshot
+        .as_ref()?
+        .sales
+        .ficha(app.open_ficha.as_deref()?)
+}
+
+/// Hands one checked target to `xdg-open` and reports it in the footer.
+fn open_checked(ui: &AppWindow, target: Option<PathBuf>, what: &str, missing: &str) {
+    let message = match target {
+        Some(path) => match open_external(&path.to_string_lossy()) {
+            Ok(()) => format!("Abrindo {what} {}", home_relative(&path)),
+            Err(error) => format!("Não foi possível abrir {what}: {error}"),
+        },
+        None => missing.to_owned(),
+    };
+    set_status(ui, message);
 }
 
 fn render_channel_detail(ui: &AppWindow, app: &App) {
@@ -312,6 +380,13 @@ fn render_all(ui: &AppWindow, app: &mut App) {
         store.set_central_updated(central.updated.into());
         app.central_targets = central.targets;
 
+        let fichas = view::fichas(&context);
+        store.set_ficha_current(clamp(store.get_ficha_current(), fichas.rows.len()));
+        store.set_fichas(model(fichas.rows));
+        store.set_fichas_notice(fichas.notice);
+        store.set_fichas_summary(fichas.summary.into());
+        app.ficha_rows = fichas.leads;
+
         let whatsapp = view::whatsapp(&context);
         store.set_contact_current(clamp(store.get_contact_current(), whatsapp.rows.len()));
         store.set_wa_facts(model(whatsapp.facts));
@@ -331,24 +406,28 @@ fn render_all(ui: &AppWindow, app: &mut App) {
         store.set_login_banner(view::login_banner(snapshot).into());
     }
     render_channel_detail(ui, app);
-    request_thumbs(ui, app, missing_thumbs);
+    let mut requests = missing_thumbs;
+    requests.extend(render_ficha(ui, app));
+    request_thumbs(ui, app, requests);
 }
 
-fn request_thumbs(ui: &AppWindow, app: &mut App, paths: Vec<PathBuf>) {
-    let paths: Vec<PathBuf> = paths
+fn request_thumbs(ui: &AppWindow, app: &mut App, requests: Vec<thumbs::Request>) {
+    let requests: Vec<thumbs::Request> = requests
         .into_iter()
-        .filter(|path| app.pending_thumbs.insert(path.clone()))
+        .filter(|request| app.pending_thumbs.insert(request.key.clone()))
         .collect();
-    if paths.is_empty() {
+    if requests.is_empty() {
         return;
     }
     let weak = ui.as_weak();
     std::thread::spawn(move || {
-        let decoded: Vec<(PathBuf, Option<SharedPixelBuffer<Rgba8Pixel>>)> = paths
+        let decoded: Vec<(PathBuf, Option<SharedPixelBuffer<Rgba8Pixel>>)> = requests
             .into_iter()
-            .map(|path| {
-                let buffer = thumbs::decode(&path);
-                (path, buffer)
+            .map(|request| {
+                let buffer = request
+                    .file
+                    .and_then(|file| thumbs::decode(&file, request.size));
+                (request.key, buffer)
             })
             .collect();
         let _ = slint::invoke_from_event_loop(move || {
@@ -356,11 +435,12 @@ fn request_thumbs(ui: &AppWindow, app: &mut App, paths: Vec<PathBuf>) {
             with_app(|app| {
                 for (path, buffer) in decoded {
                     app.pending_thumbs.remove(&path);
-                    // A file that cannot be decoded keeps the "sem thumb" placeholder.
+                    // A file that cannot be decoded keeps the "sem thumb"/"sem prévia" placeholder.
                     let image = buffer.map(Image::from_rgba8).unwrap_or_default();
                     app.thumbs.insert(path, image);
                 }
                 render_shorts(&ui, app);
+                render_ficha(&ui, app);
             });
         });
     });
@@ -583,6 +663,8 @@ fn main() -> Result<(), slint::PlatformError> {
             session_rows: Vec::new(),
             channel_rows: Vec::new(),
             central_targets: Vec::new(),
+            ficha_rows: Vec::new(),
+            open_ficha: None,
             period: Period::this_month(today),
             channel: None,
             search: String::new(),
@@ -623,6 +705,9 @@ fn main() -> Result<(), slint::PlatformError> {
         store.set_search_text("".into());
         if page == 2 {
             store.set_channel_open(false);
+        }
+        if page == 0 {
+            store.set_ficha_open(false);
         }
         with_app(|app| {
             app.search.clear();
@@ -729,9 +814,14 @@ fn main() -> Result<(), slint::PlatformError> {
     let weak = ui.as_weak();
     bridge.on_open_conversation(move |row| {
         let Some(ui) = weak.upgrade() else { return };
-        let target = with_app(|app| app.central_targets.get(row as usize).cloned()).flatten();
+        let target = with_app(|app| {
+            app.central_targets
+                .get(row as usize)
+                .map(|target| target.wa_link.clone())
+        })
+        .flatten();
         let message = match target {
-            Some((link, _)) if reports::sales::safe_wa_link(&link) => match open_external(&link) {
+            Some(link) if reports::sales::safe_wa_link(&link) => match open_external(&link) {
                 Ok(()) => format!("Abrindo a conversa ({link})"),
                 Err(error) => format!("Não foi possível abrir o navegador: {error}"),
             },
@@ -746,7 +836,7 @@ fn main() -> Result<(), slint::PlatformError> {
         let target = with_app(|app| {
             app.central_targets
                 .get(row as usize)
-                .and_then(|(_, ficha)| reports::sales::safe_ficha(&app.root, ficha))
+                .and_then(|target| reports::sales::safe_ficha(&app.root, &target.ficha))
         })
         .flatten();
         let message = match target {
@@ -755,6 +845,80 @@ fn main() -> Result<(), slint::PlatformError> {
                 Err(error) => format!("Não foi possível abrir a ficha: {error}"),
             },
             None => "A ficha deste contato ainda não existe".to_owned(),
+        };
+        set_status(&ui, message);
+    });
+
+    let weak = ui.as_weak();
+    bridge.on_show_ficha(move |row| {
+        let Some(ui) = weak.upgrade() else { return };
+        with_app(|app| {
+            if let Some(lead) = app.ficha_rows.get(row as usize).cloned() {
+                show_ficha(&ui, app, lead);
+            }
+        });
+    });
+
+    let weak = ui.as_weak();
+    bridge.on_show_lead_ficha(move |row| {
+        let Some(ui) = weak.upgrade() else { return };
+        with_app(|app| {
+            if let Some(target) = app.central_targets.get(row as usize).cloned() {
+                show_ficha(&ui, app, target.lead);
+            }
+        });
+    });
+
+    let weak = ui.as_weak();
+    bridge.on_open_ficha_media(move |index| {
+        let Some(ui) = weak.upgrade() else { return };
+        let target = with_app(|app| {
+            let index = usize::try_from(index).ok()?;
+            open_ficha(app)?.open_media(&app.root, index)
+        })
+        .flatten();
+        open_checked(
+            &ui,
+            target,
+            "o arquivo",
+            "Arquivo indisponível ou de um tipo que não é aberto daqui; use “Abrir pasta”",
+        );
+    });
+
+    let weak = ui.as_weak();
+    bridge.on_open_ficha_folder(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        let target = with_app(|app| open_ficha(app)?.open_folder(&app.root)).flatten();
+        open_checked(
+            &ui,
+            target,
+            "a pasta",
+            "A pasta deste cliente não existe neste computador",
+        );
+    });
+
+    let weak = ui.as_weak();
+    bridge.on_open_ficha_markdown(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        let target = with_app(|app| open_ficha(app)?.open_markdown(&app.root)).flatten();
+        open_checked(
+            &ui,
+            target,
+            "a ficha",
+            "A ficha.md deste cliente ainda não existe",
+        );
+    });
+
+    let weak = ui.as_weak();
+    bridge.on_open_ficha_conversation(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        let link = with_app(|app| open_ficha(app).map(|ficha| ficha.wa_link.clone())).flatten();
+        let message = match link {
+            Some(link) if reports::sales::safe_wa_link(&link) => match open_external(&link) {
+                Ok(()) => format!("Abrindo a conversa ({link})"),
+                Err(error) => format!("Não foi possível abrir o navegador: {error}"),
+            },
+            _ => "Este contato não tem um link de WhatsApp válido".to_owned(),
         };
         set_status(&ui, message);
     });

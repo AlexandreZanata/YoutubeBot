@@ -211,9 +211,10 @@ retry an unconfirmed publish blindly. See [community](docs/COMMUNITY.md).
 
 `desktop/` is a Rust + Slint manager that lists every profile and logged network from the
 private registries and exposes only open/stop actions through the typed CLI. Its home page,
-the Central, reads the sales agent's `central.json` and may only hand a validated
-`https://wa.me/<digits>` link or a client `ficha.md` to `xdg-open`. Keep the domain
-crate free of UI types. See [desktop](docs/DESKTOP.md) and
+the Central, reads the sales agent's `central.json` (interventions, messages and client
+fichas) and may only hand a validated `https://wa.me/<digits>` link or a re-checked path
+inside that client's folder under `sales/clientes/` (the folder, its `ficha.md`, or a media
+file of a known type) to `xdg-open`. Keep the domain crate free of UI types. See [desktop](docs/DESKTOP.md) and
 [desktop/README.md](desktop/README.md).
 
 ## Generation and upload profiles
