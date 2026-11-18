@@ -637,7 +637,16 @@ fn main() -> Result<(), slint::PlatformError> {
     let (root, root_origin) = resolve_root(&settings);
     let today = view::now().date();
 
+    // Match the desktop entry's StartupWMClass so the taskbar pins and reuses this window.
+    // The platform must exist before the app id is set, and the id before the first window.
+    slint::BackendSelector::new()
+        .backend_name("winit".into())
+        .select()?;
+    slint::set_xdg_app_id("ytbot-manager")?;
     let ui = AppWindow::new()?;
+    // Ask for the full size before the window is mapped; a post-show resize left a tiny
+    // surface on COSMIC in the owner's report of 2026-11-18.
+    ui.window().set_size(slint::LogicalSize::new(1280.0, 800.0));
     ui.global::<Theme>()
         .set_dark(settings.theme == ThemeChoice::Dark);
     let store = ui.global::<Store>();
@@ -1030,13 +1039,7 @@ fn main() -> Result<(), slint::PlatformError> {
 
     reload(&ui, false);
     ui.show()?;
-    // The initial size is applied once the window exists; afterwards the owner resizes freely.
-    let weak = ui.as_weak();
-    Timer::single_shot(Duration::from_millis(0), move || {
-        if let Some(ui) = weak.upgrade() {
-            ui.window().set_size(slint::LogicalSize::new(1280.0, 800.0));
-        }
-    });
+    // The owner resizes freely afterwards; the initial size was requested before mapping.
     slint::run_event_loop()?;
     ui.hide()
 }

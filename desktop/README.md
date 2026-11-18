@@ -62,7 +62,10 @@ bash desktop/scripts/install.sh
 bash desktop/scripts/install.sh --root /path/to/project
 ```
 
-Run it again after an update; it replaces the binary in place.
+Run it again after an update; it replaces the binary in place. The menu entry carries
+`StartupWMClass=ytbot-manager` and the app sets the same XDG app id, so COSMIC keeps the pinned
+icon associated with the window. The initial 1280×800 size is requested before the window is
+shown; a post-show resize left a tiny surface on COSMIC (owner report, 2026-11-18).
 
 ## Check
 
