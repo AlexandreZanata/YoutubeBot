@@ -128,12 +128,20 @@ class SalesFlowTests(unittest.TestCase):
         self.assertEqual(len(self.sent()), sent)
         self.assertEqual(self.notes[-1]["reason"], self.rules.intent("payment_sent").reason)
 
-    def test_closing_a_system_goes_to_the_owner_without_keys(self):
+    def test_closing_a_system_collects_the_requirements_then_goes_to_the_owner(self):
         self.say("Vocês fazem aplicativo de agendamento?")
         self.say("Quero fechar")
+        # Owner, 2026-11-18: understand the system before handing it over.
+        self.assertEqual(self.state(), "qualifying")
+        self.assertIn(self.rules.brief_system["start_buy"][0], self.sent())
+        self.assertEqual(self.notes, [])
+        self.say("Barbearia Navalha, quero que os clientes marquem horário pelo celular")
+        self.say("Só eu e mais dois barbeiros, hoje é tudo no caderno")
         self.assertEqual(self.state(), "buying")
         self.assertNotIn("financeiro@zaflas.com.br", self.sent())
-        self.assertEqual(self.notes[-1]["reason"], self.rules.intent("ready_to_buy").reason)
+        self.assertEqual(self.notes[-1]["priority"], "hot")
+        self.assertIn("ficha de requisitos completa", self.notes[-1]["reason"])
+        self.assertEqual(self.sent()[-1], self.rules.brief_system["done_messages_buy"][0])
 
     def test_giving_up_after_interest_is_lost_not_blocked(self):
         self.say("Vocês fazem aplicativo de agendamento?")
@@ -150,6 +158,8 @@ class SalesFlowTests(unittest.TestCase):
     def test_central_shows_the_new_states(self):
         self.say("Vocês fazem aplicativo de agendamento?")
         self.say("Quero fechar")
+        self.say("Barbearia Navalha, agenda pelo celular")
+        self.say("Somos três barbeiros")
         self.agent.cycle([])
         data = json.loads(self.store.central_path.read_text(encoding="utf-8"))
         counts = {item["state"]: (item["count"], item["group"]) for item in data["states"]}

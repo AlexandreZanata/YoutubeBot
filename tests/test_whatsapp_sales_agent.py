@@ -226,10 +226,14 @@ class SalesAgentTests(unittest.TestCase):
         agent.ingest([self.event("Sim", event_id="e2")])
         agent.reply_pending()
         self.assertEqual(self.store.lead(lead["id"])["state"], "qualifying")
+        # A system: the requirements interview, not the site questions (owner, 2026-11-18).
+        self.assertEqual([item["text"] for item in channel.sent[-2:]],
+                         self.rules.brief_system["start"]
+                         + [self.rules.brief_system["first_question"]])
         agent.ingest([self.event("Barbearia, quero agenda online com lembrete", event_id="e3")])
         agent.reply_pending()
         self.assertEqual(self.store.lead(lead["id"])["state"], "qualifying")
-        self.assertEqual(channel.sent[-1]["text"], self.rules.brief["fallback_question"])
+        self.assertEqual(channel.sent[-1]["text"], self.rules.brief_system["fallback_question"])
         agent.ingest([self.event("É isso", event_id="e4")])
         agent.reply_pending()
         self.assertEqual(self.store.lead(lead["id"])["state"], "quote-requested")

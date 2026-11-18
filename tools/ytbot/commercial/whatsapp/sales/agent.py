@@ -43,6 +43,14 @@ NEXT_STATE = {"qualify": "qualifying", "collect": "qualifying", "quote": "quote-
               "close": "closed", "block": "do-not-contact", "handoff": "needs-owner",
               "won": "won", "buy": "buying", "lose": "lost", "refer": "referred"}
 OWNER_ACTIONS = ("handoff", "quote", "won", "buy", "lose")
+# An app or system already offered (the offer question was asked once): when the client keeps
+# describing it, the requirements interview starts instead of offering again.
+SYSTEM_OFFERS = ("system_request", "system_price", "app_at_site_price")
+# A correction or an addition after the summary, not a plain "yes".
+CORRECTION = re.compile(r"\b(mas|porem|faltou|falta|so que|corrig\w*|acrescent\w*|tambem|"
+                        r"alem disso|errad\w*|nao)\b")
+CONFIRMED = re.compile(r"\b(certo|correto|exato|isso mesmo|perfeito|esta certo|ta certo|"
+                       r"tudo certo|pode seguir|isso ai)\b")
 SYSTEM_WORDS = re.compile(r"sistema|aplicativo|\bapps?\b|loja (virtual|online)|e-?commerce|"
                           r"agendamento|cadastro|\blogin\b|painel|delivery")
 SITE_WORDS = re.compile(r"\bsite\b|institucional|pagina")
@@ -449,8 +457,85 @@ class SalesAgent:
                              self.rules.raw.get("agent_name", "Alexandre"))
         return str(path)
 
+    def _collect_system(self, lead: dict, decision: Decision, text: str) -> Decision:
+        """App/system requirements: ask, restate, confirm the summary, then hand over.
+
+        Owner, 2026-11-18: the bot does not hand the chat over as soon as the client wants a
+        system; it asks gently until the requirements are clear, shows its understanding for
+        the client to confirm, and only then passes the complete ficha to the owner.
+        """
+        texts = self.rules.brief_system
+        work = {**lead, **decision.updates}
+        brief, error = dossier.extract(self.rules, work, self.store.history(lead["id"]),
+                                       self.llm, self.now(), usage=self.store.log_usage,
+                                       kind="system")
+        starting = bool(decision.start)
+        turns = 0 if starting else int(lead.get("collect_turns", 0)) + 1
+        stage = "asking" if starting else (lead.get("collect_stage") or "asking")
+        buy = bool(work.get("buy_intent"))
+        model_ready = self.llm is not None and not error
+        decision.brief, decision.collect_turns = brief, turns
+        decision.intent, decision.action = "quote_details", "collect"
+        if stage == "confirming":
+            confirmations = int(lead.get("confirmations", 0)) + 1
+            plain = normalize(text)
+            agreed = (not CORRECTION.search(plain)
+                      and (bool(CONFIRMED.search(plain)) or dossier.client_said_done(self.rules, text)
+                           or any(re.search(pattern, plain)
+                                  for pattern in self.rules.context["affirmative"])))
+            summary = self._summary(brief) if model_ready else ""
+            if agreed or not summary or confirmations >= int(texts["max_confirmations"]):
+                return self._finish_system(decision, buy)
+            # A correction or an addition: show the updated understanding once more.
+            decision.updates.update(collect_stage="confirming", confirmations=confirmations)
+            decision.messages = [texts["confirm_intro"], summary, texts["confirm_question"]]
+            decision.source = "model"
+            return decision
+        question = (brief.get("proxima_pergunta") or "").strip()
+        done = ((not starting and (dossier.client_said_done(self.rules, text)
+                                   or brief.get("cliente_terminou")))
+                or turns >= int(texts["max_collect_turns"])
+                or (not model_ready and turns >= 2)
+                or (model_ready and not brief.get("faltando") and not question))
+        intro = list(texts["start_buy" if decision.start == "buy" else "start"]) if starting else []
+        if done:
+            summary = self._summary(brief) if model_ready else ""
+            if not summary:
+                return self._finish_system(decision, buy)
+            decision.updates.update(collect_stage="confirming", confirmations=0)
+            decision.messages = intro + [texts["confirm_intro"], summary, texts["confirm_question"]]
+            decision.source = "model"
+            return decision
+        decision.updates.setdefault("collect_stage", "asking")
+        if question:
+            decision.messages, decision.source = intro + [question], "model"
+        else:
+            fallback = texts["first_question"] if starting else texts["fallback_question"]
+            decision.messages, decision.source = intro + [fallback], "fixed"
+        return decision
+
+    def _summary(self, brief: dict) -> str:
+        """The client-facing summary to confirm; empty when it is missing or unsafe."""
+        for key in ("confirmacao", "resumo"):
+            text = (brief.get(key) or "").strip()
+            if text and not guard.violations(self.rules, [text]):
+                return text
+        return ""
+
+    def _finish_system(self, decision: Decision, buy: bool) -> Decision:
+        texts = self.rules.brief_system
+        decision.action = "buy" if buy else "quote"
+        decision.messages = list(texts["done_messages_buy" if buy else "done_messages"])
+        decision.source, decision.priority = "fixed", "hot"
+        decision.owner_reason = ("Quer comprar o sistema: ficha de requisitos completa" if buy
+                                 else "Ficha do sistema completa: orçamento a fazer")
+        decision.updates.update(collect_stage="done")
+        return decision
+
     def _collect(self, lead: dict, decision: Decision, text: str) -> Decision:
         """Gather the project details; finish the brief when complete or the client is done."""
+        if (decision.updates.get("brief_kind") or lead.get("brief_kind")) == "system":
+            return self._collect_system(lead, decision, text)
         history = self.store.history(lead["id"])
         brief, error = dossier.extract(self.rules, lead, history, self.llm, self.now(),
                                        usage=self.store.log_usage)
@@ -562,7 +647,20 @@ class SalesAgent:
         member is asked for the decision maker's contact.
         """
         interest = interest_of(text) or lead.get("interest", "")
-        if decision.intent == "ready_to_buy" and interest == "site":
+        interviewing = lead["state"] == "qualifying" and lead.get("brief_kind") == "system"
+        if decision.intent == "ready_to_buy" and interest == "system" and interviewing:
+            # Wants to close in the middle of the interview: finish the requirements first.
+            decision = Decision("quote_details", "collect", [], "local", decision.hint,
+                                updates={"buy_intent": True})
+        elif decision.intent == "ready_to_buy" and interest == "system":
+            decision = self._start_interview(decision, "buy")
+        elif interest == "system" and lead["state"] == "engaged" and (
+                decision.intent in ("quote_accept", "unknown")
+                or (decision.intent in SYSTEM_OFFERS
+                    and any(item in SYSTEM_OFFERS for item in lead.get("intents") or []))):
+            # Owner, 2026-11-18: never stop at "it is a different system"; understand it first.
+            decision = self._start_interview(decision, "quote")
+        elif decision.intent == "ready_to_buy" and interest == "site":
             decision = _fixed(self.rules, "close_site", decision.hint, "fixed")
         elif decision.intent == "ready_to_buy" and interest != "system":
             decision.owner_reason = "Quer fechar, mas não ficou claro se é site ou sistema"
@@ -573,6 +671,13 @@ class SalesAgent:
                                                 and decision.intent != "referral"):
             decision = self._gatekeeper(lead, decision, text)
         return decision
+
+    def _start_interview(self, decision: Decision, start: str) -> Decision:
+        """Begin the app/system requirements interview (the first question comes from _collect)."""
+        return Decision("quote_details", "collect", [], "local", decision.hint, start=start,
+                        updates={"brief_kind": "system", "buy_intent": start == "buy",
+                                 "collect_stage": "asking", "confirmations": 0,
+                                 "interest": "system"})
 
     def _gatekeeper(self, lead: dict, decision: Decision, text: str) -> Decision:
         found = referral.names(text, self.llm, f"zaflas-staff-{lead['id']}")
@@ -701,9 +806,14 @@ class SalesAgent:
         if getattr(decision, "referred", ""):
             changes["referred_to"] = decision.referred
         ficha = ""
+        changes.update(decision.updates)
         if decision.brief is not None:
-            status = "pronta para orçamento" if decision.action == "quote" else "coletando dados"
-            ficha = self._write_dossier(lead, decision.brief, status)
+            stage = decision.updates.get("collect_stage") or lead.get("collect_stage")
+            status = ("pronta para orçamento" if decision.action == "quote"
+                      else "quer comprar: ficha completa" if decision.action == "buy"
+                      else "aguardando confirmação do cliente" if stage == "confirming"
+                      else "coletando dados")
+            ficha = self._write_dossier({**lead, **decision.updates}, decision.brief, status)
             changes.update(ficha=ficha, collect_turns=decision.collect_turns)
             result["ficha"] = ficha
         self.store.update_lead(lead["id"], **changes)

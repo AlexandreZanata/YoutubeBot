@@ -51,6 +51,8 @@ class Decision:
     collect_turns: int = 0
     referred: str = ""
     model: str = ""
+    start: str = ""                  # "quote" or "buy": the app/system interview begins now
+    updates: dict = field(default_factory=dict)  # lead fields the step changes (live only)
 
     def record(self) -> dict:
         return {"intent": self.intent, "action": self.action, "source": self.source,

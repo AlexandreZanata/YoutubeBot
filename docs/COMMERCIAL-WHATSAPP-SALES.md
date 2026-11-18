@@ -95,8 +95,13 @@ apply to all of them.
 After every cycle and every owner command the agent writes `sales/central.json` for the desktop
 manager's Central page: `states` (19 states with Portuguese label, group and count),
 `interventions` (conversations with the owner, hot first, with label, name, phone, wa.me link,
-reason, last message and ficha), `messages` (the 100 most recent, both directions) and
-`leads`. `sales central` refreshes it and prints what needs the owner.
+reason, last message and ficha), `messages` (the 100 most recent, both directions), `leads`
+and `fichas`: every client folder with a `ficha.json` (also one from an earlier test cycle
+whose lead link was reset), newest first, with `kind` (`site` or `sistema`), `status`,
+`resumo`, `sections` (only the filled fields, as label/value), `pendencias`, `duvidas` (client
+questions for the quote), `media` (absolute paths inside the client folder only: kind, name,
+caption, time), `ficha_md`, `folder`, phone and wa.me link. The desktop Central shows them
+with the photos. `sales central` refreshes it and prints what needs the owner.
 
 | Group | States |
 | --- | --- |
@@ -310,6 +315,40 @@ and the owner gets a 🔥 notification with the ficha path.
 | `conversa.md` | Whole conversation; audio shows its transcript, media its file |
 | `midia/` | Images and voice messages the client sent (`20261117-155800-image.jpg`) |
 
+### Apps and systems: the requirements interview (owner, 2026-11-18)
+
+The bot does not hand the chat over just because the client wants more than the institutional
+site. It interviews first, gently, and only then calls the owner:
+
+```text
+system_request (first time) → "Sim, nós podemos fazer isso" + clarification + offer question
+the interview starts when the interest is an app or system and the client
+  accepts the offer ("sim")                                   ┐
+  describes the system again after the offer                  ├→ state qualifying, brief_kind system
+  asks something outside the facts ("emite nota fiscal?")     │   [brief_system] start + first question
+  wants to close ("quero fechar")  → start_buy, buy_intent    ┘
+each answer → the model (`sales/dossier_system.md`) updates the requirements and writes the next
+  message: a short restatement of what it understood + at most two simple questions, in the
+  `[brief_system] required` order (company; the problem to solve; who uses it and roughly how
+  many; main functions; how it is done today; phone app, browser or both; links to Pix,
+  invoices, WhatsApp or other systems), then the optional items once
+  a client question (price, deadline, "is it possible") is noted in `duvidas_do_cliente` and
+  answered by the owner with the quote; the bot never promises a function
+nothing missing, "é isso", or `max_collect_turns` (10) → the summary to confirm:
+  "Deixa eu confirmar se entendi tudo certinho:" → summary → "Está certo? Se quiser ajustar…"
+  a correction ("faltou…", "mas…") → updated summary (at most `max_confirmations` 2)
+  "sim / certo / isso mesmo" → "Perfeito, anotei tudo! …" and 🔥 owner:
+    quote-requested "Ficha do sistema completa: orçamento a fazer", or
+    buying "Quer comprar o sistema: ficha de requisitos completa" when the client wanted to close
+```
+
+The summary and every question pass the guard (no numbers, prices, deadlines, links, promises);
+an unsafe summary falls back to `resumo`, and without a safe one the bot hands over directly.
+Overrides still win during the interview: opt-out, refusal, human or call request, links that
+do not open, the robot question. The ficha (`kind` sistema) holds company, problem and goal, who
+uses it, functions, data and reports, platforms and integrations, references, deadline, brand,
+client questions and open items.
+
 Material that arrives after the hand-off (a forgotten logo) is still downloaded and the ficha
 is rebuilt (status "orçamento com o dono") without any message to the client; the owner gets
 one reminder. `sales ficha --lead L…` rebuilds a folder on demand.
@@ -471,7 +510,14 @@ live in `[opening]` and `[pacing]` of the rules file.
    A small optional lookup (the staff or decider name in a gatekeeper message) is `quick`:
    `quick_timeout_seconds` (8) per model and `quick_attempts` (2) models, then the local
    pattern result is used. Measured 2026-11-18: a hung `longcat-2.5-free` held that lookup,
-   and the reply, for 20 s.
+   and the reply, for 20 s. The client ficha is `long`: a large compact JSON written after
+   reasoning. The healthy free models race (`long_race` 4: all asked at once, the first JSON
+   wins, the losers are abandoned), each with `long_timeout_seconds` (45),
+   `long_max_output_tokens` (8192) and `reasoning_effort` `long_reasoning_effort` ("low"; a
+   model that rejects the field is asked again without it and remembered). Measured
+   2026-11-18: the system ficha took 30 to 90 s with 5000 to 7000 output tokens, mostly
+   reasoning, and sequential timeouts made some turns last 3 to 5 minutes; "low" effort took
+   beam-free from 40 s to 11 s and muse-spark from 54 s to 22 s.
 4. **Fallback.** With no free model answering: `deepseek-v4.1-flash`, then
    `muse-spark-1.3-contributor` (the only paid models the code accepts).
 5. Models without JSON mode (`iceman-contributor-free` rejects `response_format`) are called

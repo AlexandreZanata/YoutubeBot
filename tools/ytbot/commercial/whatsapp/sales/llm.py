@@ -27,7 +27,7 @@ import socket
 import time
 import urllib.error
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -142,11 +142,14 @@ class OpenCodeGo:
     def __repr__(self) -> str:
         return f"OpenCodeGo(model={self.model!r})"
 
-    def build_request(self, messages: list[dict], session_id: str,
-                      json_mode: bool = True) -> urllib.request.Request:
+    def build_request(self, messages: list[dict], session_id: str, json_mode: bool = True,
+                      max_tokens: int | None = None,
+                      effort: str | None = None) -> urllib.request.Request:
         body = {"model": self.model, "messages": messages,
                 "temperature": float(self.settings["temperature"]),
-                "max_tokens": int(self.settings["max_output_tokens"])}
+                "max_tokens": int(max_tokens or self.settings["max_output_tokens"])}
+        if effort:
+            body["reasoning_effort"] = effort
         if json_mode:
             body["response_format"] = {"type": "json_object"}
         endpoint = self.settings["base_url"].rstrip("/") + "/chat/completions"
@@ -156,8 +159,9 @@ class OpenCodeGo:
                      "User-Agent": USER_AGENT, SESSION_HEADER: session_id})
 
     def complete(self, messages: list[dict], session_id: str, timeout: float | None = None,
-                 json_mode: bool = True) -> LlmReply:
-        request = self.build_request(messages, session_id, json_mode)
+                 json_mode: bool = True, max_tokens: int | None = None,
+                 effort: str | None = None) -> LlmReply:
+        request = self.build_request(messages, session_id, json_mode, max_tokens, effort)
         started = time.monotonic()
         limit = float(timeout or self.settings["timeout_seconds"])
         try:
@@ -201,6 +205,8 @@ class OpenCodeGo:
                             "no-credits")
         if status == 400 and "response_format" in lowered:
             return LlmError(f"{self.model}: JSON mode not supported", "json-unsupported")
+        if status == 400 and "reasoning" in lowered:
+            return LlmError(f"{self.model}: reasoning effort not supported", "effort-unsupported")
         kind = "server" if status >= 500 else "bad-request"
         return LlmError(_truncate(f"{self.model}: HTTP {status}: {detail}"), kind)
 
@@ -226,6 +232,7 @@ class ModelRouter:
         self._fetched = None
         self._cooldown: dict[str, tuple[float, str]] = {}
         self._no_json: set[str] = set()
+        self._no_effort: set[str] = set()
         self._cursor = 0
         self.last_model = ""
 
@@ -326,18 +333,26 @@ class ModelRouter:
 
     # Calls -----------------------------------------------------------------------------
     def _call(self, model_id: str, messages: list[dict], session_id: str,
-              timeout: float) -> LlmReply:
+              timeout: float, max_tokens: int | None = None,
+              effort: str | None = None) -> LlmReply:
         info = self._info(model_id)
         free = bool(info and info.free)
         client = OpenCodeGo(self.settings, self._key, self._opener, model_id, free=free)
-        json_mode = model_id not in self._no_json and (info.json if info else True)
-        try:
-            return client.complete(messages, session_id, timeout, json_mode)
-        except LlmError as error:
-            if error.kind != "json-unsupported":
-                raise
-            self._no_json.add(model_id)
-            return client.complete(messages, session_id, timeout, json_mode=False)
+        effort = None if model_id in self._no_effort else effort
+        for _ in range(3):
+            json_mode = model_id not in self._no_json and (info.json if info else True)
+            try:
+                return client.complete(messages, session_id, timeout, json_mode, max_tokens,
+                                       effort)
+            except LlmError as error:
+                if error.kind == "json-unsupported" and json_mode:
+                    self._no_json.add(model_id)
+                elif error.kind in ("effort-unsupported", "bad-request") and effort:
+                    self._no_effort.add(model_id)
+                    effort = None
+                else:
+                    raise
+        raise LlmError(f"{model_id}: request rejected", "bad-request")
 
     def candidates(self) -> list[tuple[str, bool]]:
         free = [model for model in self.free_models() if not self.cooling(model)]
@@ -350,25 +365,45 @@ class ModelRouter:
         # A paused fallback is still tried last: better a late answer than none.
         return [(model, True) for model in free] + [(model, False) for model in ready + paused]
 
-    def complete(self, messages: list[dict], session_id: str, quick: bool = False) -> LlmReply:
+    def complete(self, messages: list[dict], session_id: str, quick: bool = False,
+                 long: bool = False) -> LlmReply:
         """First model that answers with a JSON object.
 
         `quick` is for small optional lookups (a name in a message) whose caller has a local
         fallback: each model gets `quick_timeout_seconds` and only `quick_attempts` are tried,
         so one hung free model cannot hold a reply for the full `free_timeout_seconds`.
+        `long` is for the client ficha, a large JSON written after reasoning: free models get
+        `long_timeout_seconds`, every model `long_max_output_tokens` and
+        `long_reasoning_effort`, and the healthy free models race (`long_race`). Measured
+        2026-11-18: the system ficha took 30 to 90 s with 5000 to 7000 output tokens, mostly
+        reasoning; "low" effort took beam-free from 40 s to 11 s.
         """
+        max_tokens = int(self.settings.get("long_max_output_tokens", 8192)) if long else None
+        effort = (self.settings.get("long_reasoning_effort") or None) if long else None
         self.refresh()
         failures = []
         attempts = int(self.settings.get("quick_attempts", 2)) if quick else None
-        for model_id, free in self.candidates():
+        candidates = self.candidates()
+        width = int(self.settings.get("long_race", 2)) if long else 1
+        racers = [model_id for model_id, free in candidates if free][:width]
+        if len(racers) > 1:
+            # The ficha: the healthiest free models at once, the first JSON answer wins, so
+            # one slow or hung model no longer costs a full timeout before the next one.
+            reply = self._race(racers, messages, session_id, max_tokens, effort, failures)
+            if reply is not None:
+                return reply
+            candidates = [item for item in candidates if item[0] not in racers]
+        for model_id, free in candidates:
             if attempts is not None and len(failures) >= attempts:
                 break
             timeout = float(self.settings["free_timeout_seconds"] if free
                             else self.settings["timeout_seconds"])
             if quick:
                 timeout = min(timeout, float(self.settings.get("quick_timeout_seconds", 8)))
+            elif long and free:
+                timeout = float(self.settings.get("long_timeout_seconds", 45))
             try:
-                reply = self._call(model_id, messages, session_id, timeout)
+                reply = self._call(model_id, messages, session_id, timeout, max_tokens, effort)
             except LlmError as error:
                 if error.kind in ("auth", "config"):
                     raise
@@ -384,3 +419,35 @@ class ModelRouter:
             self.last_model = model_id
             return reply
         raise LlmError("no model answered (" + "; ".join(failures) + ")", "exhausted")
+
+    def _race(self, models: list[str], messages: list[dict], session_id: str,
+              max_tokens: int | None, effort: str | None,
+              failures: list[str]) -> LlmReply | None:
+        timeout = float(self.settings.get("long_timeout_seconds", 45))
+        pool = ThreadPoolExecutor(max_workers=len(models))
+        pending = {pool.submit(self._call, model_id, messages, session_id, timeout,
+                               max_tokens, effort): model_id for model_id in models}
+        try:
+            while pending:
+                done, _ = wait(pending, return_when=FIRST_COMPLETED)
+                for future in done:
+                    model_id = pending.pop(future)
+                    try:
+                        reply = future.result()
+                    except LlmError as error:
+                        if error.kind in ("auth", "config"):
+                            raise
+                        self._cool(model_id, error.kind)
+                        failures.append(f"{model_id}: {error.kind}")
+                        continue
+                    if not json_object(reply.content):
+                        self._cool(model_id, "format")
+                        failures.append(f"{model_id}: format")
+                        continue
+                    self._cursor += 1
+                    self.last_model = model_id
+                    return reply
+            return None
+        finally:
+            # The slower call is abandoned: its thread ends at its own timeout.
+            pool.shutdown(wait=False, cancel_futures=True)

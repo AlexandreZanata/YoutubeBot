@@ -137,5 +137,25 @@
   "AH links nao abrem": [
     "Eu não estou conseguindo abrir o link de exemplos",
     "Salvei, agora abriu! Quanto custa um site?"
+  ],
+  "AI sistema: entrevista de requisitos": [
+    "Vocês fazem aplicativo de agendamento?",
+    "Sim",
+    "Barbearia Navalha. Os clientes ligam e mandam WhatsApp para marcar, vira uma bagunça",
+    "Só eu e mais dois barbeiros. Hoje anoto tudo num caderno",
+    "Queria que o cliente marcasse pelo celular e recebesse um lembrete. Dá pra cobrar pelo Pix?",
+    "Pode ser no celular e no computador, não uso nenhum outro sistema",
+    "É isso",
+    "Faltou: quero ver no fim do mês quanto cada barbeiro atendeu",
+    "Isso mesmo, está certo"
+  ],
+  "AJ sistema: quer fechar logo": [
+    "Preciso de um sistema de pedidos para minha distribuidora de bebidas",
+    "Quero fechar, como faço?",
+    "Distribuidora Gelada. Os vendedores anotam os pedidos no papel e depois digitam",
+    "Uns cinco vendedores na rua pelo celular e o escritório no computador",
+    "Precisa controlar estoque e emitir nota fiscal",
+    "Só isso",
+    "Certo"
   ]
 }

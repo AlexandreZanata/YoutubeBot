@@ -2,6 +2,7 @@ import io
 import json
 import socket
 import tempfile
+import time
 import unittest
 import urllib.error
 from pathlib import Path
@@ -46,6 +47,8 @@ class FakeProvider:
         self.catalog = catalog
         self.calls = []
         self.timeouts = []
+        self.max_tokens = []
+        self.efforts = []
 
     def __call__(self, request, timeout):
         if request.full_url.endswith("/models"):
@@ -54,9 +57,16 @@ class FakeProvider:
         name = body["model"]
         self.calls.append((name, "response_format" in body))
         self.timeouts.append(timeout)
+        self.max_tokens.append(body.get("max_tokens"))
+        self.efforts.append(body.get("reasoning_effort"))
         how = self.behavior.get(name, "ok")
         if how == "timeout":
             raise socket.timeout("timed out")
+        if how == "slow":
+            time.sleep(1.0)
+        if how == "noeffort" and "reasoning_effort" in body:
+            raise urllib.error.HTTPError(request.full_url, 400, "bad", {}, io.BytesIO(
+                b'{"error":{"type":"invalid_request_error","message":"Unknown parameter: reasoning_effort"}}'))
         if how == "credits":
             raise urllib.error.HTTPError(request.full_url, 429, "limit", {},
                                          io.BytesIO(b'{"error":{"type":"rate_limit","message":"quota exceeded"}}'))
@@ -131,6 +141,55 @@ class ModelRouterTests(unittest.TestCase):
         self.assertEqual([name for name, _ in provider.calls],
                          ["longcat-2.5-free", "beam-free"])
         self.assertEqual(provider.timeouts[-2:], [8.0, 8.0])
+
+    def test_the_client_ficha_gets_more_time_and_room_for_reasoning(self):
+        # Measured 2026-11-18: 20 to 30 s on free models; 4096 tokens left an empty JSON.
+        provider = FakeProvider()
+        router = self.router(provider, settings={**self.settings, "long_race": 1})
+        router.refresh(force=True)
+        provider.timeouts.clear()
+        provider.max_tokens.clear()
+        provider.efforts.clear()
+        router.complete([{"role": "user", "content": "ficha"}], "s", long=True)
+        self.assertEqual(provider.timeouts, [45.0])
+        self.assertEqual(provider.max_tokens, [8192])
+        self.assertEqual(provider.efforts, ["low"])
+        router.complete([{"role": "user", "content": "oi"}], "s")
+        self.assertEqual(provider.timeouts[-1], 20.0)
+        self.assertEqual(provider.max_tokens[-1], 4096)
+        self.assertIsNone(provider.efforts[-1])
+
+    def test_a_model_without_reasoning_effort_is_asked_again_without_it(self):
+        provider = FakeProvider()
+        router = self.router(provider, settings={**self.settings, "long_race": 1})
+        router.refresh(force=True)
+        provider.behavior = {name: "noeffort" for name in router.free_models()}
+        provider.efforts.clear()
+        reply = router.complete([{"role": "user", "content": "ficha"}], "s", long=True)
+        self.assertTrue(reply.content)
+        self.assertEqual(provider.efforts, ["low", None])
+        router.complete([{"role": "user", "content": "ficha"}], "s", long=True)
+        self.assertIsNone(provider.efforts[-1], "remembered: no second rejected call")
+
+    def test_the_ficha_races_two_free_models_and_takes_the_first_json(self):
+        provider = FakeProvider()
+        router = self.router(provider)
+        router.refresh(force=True)
+        provider.behavior = {"longcat-2.5-free": "slow"}
+        started = time.monotonic()
+        reply = router.complete([{"role": "user", "content": "ficha"}], "s", long=True)
+        self.assertEqual(reply.model, "beam-free")
+        self.assertLess(time.monotonic() - started, 0.8, "the slow model is not awaited")
+
+    def test_when_both_racers_fail_the_next_models_still_answer(self):
+        provider = FakeProvider()
+        router = self.router(provider, settings={**self.settings, "long_race": 2})
+        router.refresh(force=True)
+        provider.behavior = {"longcat-2.5-free": "timeout", "beam-free": "garbage"}
+        reply = router.complete([{"role": "user", "content": "ficha"}], "s", long=True)
+        self.assertEqual(reply.model, "iceman-contributor-free")
+        self.assertTrue(router.cooling("longcat-2.5-free"))
+        self.assertTrue(router.cooling("beam-free"))
 
     def test_without_free_credits_the_paid_fallback_answers_in_order(self):
         provider = FakeProvider({"longcat-2.5-free": "credits", "beam-free": "credits",

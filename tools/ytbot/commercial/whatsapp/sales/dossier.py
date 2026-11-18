@@ -25,6 +25,7 @@ from .notify import format_phone
 from .rules import SalesRules, normalize
 
 PROMPT_PATH = Path(__file__).with_name("dossier.md")
+SYSTEM_PROMPT_PATH = Path(__file__).with_name("dossier_system.md")
 PROMPT_SCHEMA = {
     "empresa": {"nome": None, "segmento": None, "cidade": None,
                 "sobre_e_diferenciais": None, "publico_alvo": None},
@@ -43,7 +44,24 @@ EMPTY_BRIEF = {
     **PROMPT_SCHEMA,
     "pedido": {**PROMPT_SCHEMA["pedido"], "nome_do_site_ou_dominio": None,
                "estilo_e_cores": None, "referencias": []},
+    "kind": "site",
 }
+# Apps and systems: the requirements the bot interviews for (owner, 2026-11-18).
+SYSTEM_SCHEMA = {
+    "empresa": {"nome": None, "segmento": None, "cidade": None, "sobre_e_diferenciais": None},
+    "projeto": {"tipo": None, "objetivo": None, "problema_atual": None, "como_faz_hoje": None,
+                "usuarios": [], "quantidade_de_usuarios": None, "funcionalidades": [],
+                "plataformas": [], "integracoes": [], "dados_e_relatorios": [],
+                "referencias": [], "prazo_desejado": None, "identidade_visual": None},
+    "materiais_citados": [], "duvidas_do_cliente": [], "observacoes": [], "resumo": "",
+    "confirmacao": "", "faltando": [], "cliente_terminou": False, "proxima_pergunta": "",
+}
+EMPTY_SYSTEM = {**SYSTEM_SCHEMA, "kind": "sistema"}
+
+
+def kind_of(lead: dict) -> str:
+    """"system" once the lead is in the app/system requirements interview, else "site"."""
+    return "system" if lead.get("brief_kind") == "system" else "site"
 
 
 def slug(text: str) -> str:
@@ -114,25 +132,33 @@ def _merge(base: dict, data: dict) -> dict:
 
 
 def extract(rules: SalesRules, lead: dict, history: list[dict], llm, now: datetime,
-            usage=None) -> tuple[dict, str]:
-    """The brief from the conversation; ("", error) never raises."""
+            usage=None, kind: str | None = None) -> tuple[dict, str]:
+    """The brief from the conversation; ("", error) never raises.
+
+    `kind` "system" uses the app/system requirements schema; the default follows the lead.
+    """
+    kind = kind or kind_of(lead)
+    empty = EMPTY_SYSTEM if kind == "system" else EMPTY_BRIEF
     if llm is None:
-        return dict(EMPTY_BRIEF), "no model"
-    template = Template(PROMPT_PATH.read_text(encoding="utf-8"))
-    system = template.safe_substitute(
-        company=rules.company, required="\n".join(f"- {item}" for item in rules.brief["required"]),
-        optional="\n".join(f"- {item}" for item in rules.brief["optional"]),
-        schema=json.dumps(PROMPT_SCHEMA, ensure_ascii=False, indent=1))
+        return json.loads(json.dumps(empty)), "no model"
     agent_name = rules.raw.get("agent_name", "Alexandre")
+    settings = rules.brief_system if kind == "system" else rules.brief
+    path = SYSTEM_PROMPT_PATH if kind == "system" else PROMPT_PATH
+    schema = SYSTEM_SCHEMA if kind == "system" else PROMPT_SCHEMA
+    system = Template(path.read_text(encoding="utf-8")).safe_substitute(
+        company=rules.company, agent_name=agent_name,
+        required="\n".join(f"- {item}" for item in settings["required"]),
+        optional="\n".join(f"- {item}" for item in settings["optional"]),
+        schema=json.dumps(schema, ensure_ascii=False, separators=(",", ":")))
     user = "\n".join([f"EMPRESA NO GOOGLE MAPS: {lead.get('name', '')} — {lead.get('category', '')}"
                       f" — {lead.get('city', '')}", "", "CONVERSA:",
                       *transcript(history, agent_name)])
     try:
         reply = llm.complete([{"role": "system", "content": system},
                               {"role": "user", "content": user}],
-                             session_id=f"zaflas-brief-{lead['id']}")
+                             session_id=f"zaflas-brief-{lead['id']}", long=True)
     except Exception as error:  # the brief must never stop the conversation
-        return dict(EMPTY_BRIEF), str(error)[:300]
+        return json.loads(json.dumps(empty)), str(error)[:300]
     if usage is not None:
         usage({"at": now.isoformat(timespec="seconds"), "lead": lead["id"], "kind": "brief",
                "model": reply.model, "input_tokens": reply.input_tokens,
@@ -141,11 +167,14 @@ def extract(rules: SalesRules, lead: dict, history: list[dict], llm, now: dateti
         text = reply.content.strip()
         data = json.loads(text[text.find("{"):text.rfind("}") + 1])
     except ValueError:
-        return dict(EMPTY_BRIEF), "invalid brief output"
-    brief = approximate_brief(_merge(EMPTY_BRIEF, data))
-    question = (brief.get("proxima_pergunta") or "").strip()
-    if question and guard.violations(rules, guard.split_links([question])):
-        brief["proxima_pergunta"] = ""
+        return json.loads(json.dumps(empty)), "invalid brief output"
+    brief = _merge(empty, data)
+    if kind != "system":
+        brief = approximate_brief(brief)
+    for key in ("proxima_pergunta", "confirmacao"):
+        text = (brief.get(key) or "").strip()
+        if text and guard.violations(rules, guard.split_links([text])):
+            brief[key] = ""
     return brief, ""
 
 
@@ -197,18 +226,87 @@ def _value(value) -> str:
     return str(value)
 
 
-def render(lead: dict, brief: dict, files: list[dict], status: str, now: datetime) -> str:
+def sections(lead: dict, brief: dict) -> list[tuple[str, list[tuple[str, object]]]]:
+    """The ficha as (title, [(label, value)]) for ficha.md and the desktop Central."""
     company = brief.get("empresa") or {}
+    head = [("Empresa", [
+        ("Nome", company.get("nome") or lead.get("name")),
+        ("Segmento", company.get("segmento") or lead.get("category")),
+        ("Cidade / região", company.get("cidade") or lead.get("city")),
+        ("Sobre / diferenciais", company.get("sobre_e_diferenciais")),
+    ])]
+    if brief.get("kind") == "sistema":
+        project = brief.get("projeto") or {}
+        return head + [
+            ("O problema e o objetivo", [
+                ("Tipo", project.get("tipo")),
+                ("Objetivo", project.get("objetivo")),
+                ("Problema hoje", project.get("problema_atual")),
+                ("Como faz hoje", project.get("como_faz_hoje")),
+            ]),
+            ("Quem usa", [
+                ("Usuários", project.get("usuarios")),
+                ("Quantidade", project.get("quantidade_de_usuarios")),
+            ]),
+            ("Funções pedidas", [("Funções", project.get("funcionalidades")),
+                                 ("Dados e relatórios", project.get("dados_e_relatorios"))]),
+            ("Onde vai rodar e integrações", [
+                ("Plataformas", project.get("plataformas")),
+                ("Integrações", project.get("integracoes")),
+            ]),
+            ("Referências, prazo e marca", [
+                ("Referências", project.get("referencias")),
+                ("Prazo desejado", project.get("prazo_desejado")),
+                ("Logo e cores", project.get("identidade_visual")),
+            ]),
+        ]
     order = brief.get("pedido") or {}
     visual = brief.get("identidade_visual") or {}
     domain = brief.get("dominio") or {}
     contact = brief.get("contato_no_site") or {}
-    domain_name = domain.get("nome_desejado") or order.get("nome_do_site_ou_dominio")
-    colors = visual.get("cores_principais") or order.get("estilo_e_cores")
-    refs = visual.get("referencias") or order.get("referencias")
+    head[0][1].append(("Público-alvo", company.get("publico_alvo")))
+    return head + [
+        ("O site / projeto", [
+            ("Tipo", order.get("tipo")),
+            ("Objetivo", order.get("objetivo")),
+            ("Serviços ou produtos", order.get("servicos_ou_produtos")),
+            ("Mostrar preços no site", order.get("mostrar_precos")),
+            ("Páginas / seções", order.get("paginas")),
+            ("Funcionalidades", order.get("funcionalidades")),
+        ]),
+        ("Identidade visual e marca", [
+            ("Cores principais da marca", visual.get("cores_principais")
+             or order.get("estilo_e_cores")),
+            ("Estilo visual desejado", visual.get("estilo_visual")),
+            ("Preferência de fundo (claro/escuro)", visual.get("preferencia_fundo")),
+            ("Possui logotipo", visual.get("possui_logo")),
+            ("Fotos e vídeos", visual.get("fotos_e_videos")),
+            ("Referências / inspirações", visual.get("referencias") or order.get("referencias")),
+        ]),
+        ("Domínio (endereço na internet)", [
+            ("Já possui domínio", domain.get("ja_possui")),
+            ("Nome desejado (registro.br)", domain.get("nome_desejado")
+             or order.get("nome_do_site_ou_dominio")),
+            ("Opção de compra / configuração", domain.get("opcao_compra")),
+        ]),
+        ("Contato e redes que vão no site", [
+            ("WhatsApp", contact.get("whatsapp")),
+            ("Telefone", contact.get("telefone")),
+            ("E-mail", contact.get("email")),
+            ("Endereço", contact.get("endereco")),
+            ("Horário", contact.get("horario")),
+            ("Redes sociais", contact.get("redes_sociais")),
+        ]),
+    ]
+
+
+def render(lead: dict, brief: dict, files: list[dict], status: str, now: datetime) -> str:
+    company = brief.get("empresa") or {}
+    system = brief.get("kind") == "sistema"
     lines = [
         f"# Ficha do cliente — {company.get('nome') or lead.get('name', '')}",
         "",
+        f"- Tipo de projeto: **{'aplicativo ou sistema' if system else 'site'}**",
         f"- Status: **{status}**",
         f"- Gerada em: {now.strftime('%d/%m/%Y %H:%M')}",
         f"- WhatsApp do contato: {format_phone(lead.get('phone', ''))}",
@@ -218,56 +316,20 @@ def render(lead: dict, brief: dict, files: list[dict], status: str, now: datetim
         "",
         brief.get("resumo") or "—",
         "",
-        "## Empresa",
-        "",
-        f"- Nome: {_value(company.get('nome') or lead.get('name'))}",
-        f"- Segmento: {_value(company.get('segmento') or lead.get('category'))}",
-        f"- Cidade / região: {_value(company.get('cidade') or lead.get('city'))}",
-        f"- Sobre / diferenciais: {_value(company.get('sobre_e_diferenciais'))}",
-        f"- Público-alvo: {_value(company.get('publico_alvo'))}",
-        "",
-        "## O site / projeto",
-        "",
-        f"- Tipo: {_value(order.get('tipo'))}",
-        f"- Objetivo: {_value(order.get('objetivo'))}",
-        f"- Serviços ou produtos: {_value(order.get('servicos_ou_produtos'))}",
-        f"- Mostrar preços no site: {_value(order.get('mostrar_precos'))}",
-        f"- Páginas / seções: {_value(order.get('paginas'))}",
-        f"- Funcionalidades: {_value(order.get('funcionalidades'))}",
-        "",
-        "## Identidade visual e marca",
-        "",
-        f"- Cores principais da marca: {_value(colors)}",
-        f"- Estilo visual desejado: {_value(visual.get('estilo_visual'))}",
-        f"- Preferência de fundo (claro/escuro): {_value(visual.get('preferencia_fundo'))}",
-        f"- Possui logotipo: {_value(visual.get('possui_logo'))}",
-        f"- Fotos e vídeos: {_value(visual.get('fotos_e_videos'))}",
-        f"- Referências / inspirações: {_value(refs)}",
-        "",
-        "## Domínio (endereço na internet)",
-        "",
-        f"- Já possui domínio: {_value(domain.get('ja_possui'))}",
-        f"- Nome desejado (registro.br): {_value(domain_name)}",
-        f"- Opção de compra / configuração: {_value(domain.get('opcao_compra'))}",
-        "",
-        "## Contato e redes que vão no site",
-        "",
-        f"- WhatsApp: {_value(contact.get('whatsapp'))}",
-        f"- Telefone: {_value(contact.get('telefone'))}",
-        f"- E-mail: {_value(contact.get('email'))}",
-        f"- Endereço: {_value(contact.get('endereco'))}",
-        f"- Horário: {_value(contact.get('horario'))}",
-        f"- Redes sociais: {_value(contact.get('redes_sociais'))}",
-        "",
-        "## Materiais recebidos",
-        "",
     ]
+    for title, items in sections(lead, brief):
+        lines += [f"## {title}", ""] + [f"- {label}: {_value(value)}" for label, value in items]
+        lines.append("")
+    lines += ["## Materiais recebidos", ""]
     lines += [f"- {item['tipo']}: [{item['arquivo']}]({item['arquivo']})"
               + (f" — {item['legenda']}" if item.get("legenda") else "") for item in files]
     if not files:
         lines.append("- Nenhum arquivo recebido ainda.")
     if brief.get("materiais_citados"):
         lines.append(f"- Citados na conversa: {_value(brief['materiais_citados'])}")
+    if brief.get("duvidas_do_cliente"):
+        lines += ["", "## Dúvidas do cliente (responder no orçamento)", ""]
+        lines += [f"- {item}" for item in brief["duvidas_do_cliente"]]
     lines += ["", "## Pendências (perguntar ao cliente)", ""]
     lines += [f"- {item}" for item in brief.get("faltando") or []] or ["- Nenhuma."]
     if brief.get("observacoes"):
@@ -285,6 +347,7 @@ def write(root: Path, lead: dict, history: list[dict], brief: dict, status: str,
         directory.chmod(0o700)
     files = media_files(history)
     record = {"gerada_em": now.isoformat(timespec="seconds"), "status": status,
+              "tipo": brief.get("kind") or "site",
               "lead": {key: lead.get(key) for key in ("id", "name", "city", "category",
                                                       "maps_url")},
               "whatsapp": format_phone(lead.get("phone", "")), "ficha": brief,

@@ -112,6 +112,10 @@ class SalesRules:
         return self.raw["brief"]
 
     @property
+    def brief_system(self) -> dict:
+        return self.raw["brief_system"]
+
+    @property
     def company(self) -> str:
         return self.raw["company"]
 
@@ -185,6 +189,11 @@ def _texts(raw: dict) -> list[str]:
     texts += list(raw["brief"].get("domain_messages", []))
     if raw["brief"].get("fallback_question"):
         texts.append(raw["brief"]["fallback_question"])
+    system = raw.get("brief_system") or {}
+    for key in ("start", "start_buy", "done_messages", "done_messages_buy"):
+        texts += list(system.get(key, []))
+    texts += [system[key] for key in ("first_question", "fallback_question", "confirm_intro",
+                                      "confirm_question") if system.get(key)]
     for items in raw["facts"].values():
         texts.extend(items)
     for intent in raw["intents"]:
@@ -234,6 +243,10 @@ def build(raw: dict) -> SalesRules:
                             "done_patterns", "fallback_question"))
     if not raw["brief"]["domain_messages"]:
         raise RulesError("brief.domain_messages must not be empty")
+    _require(raw, "brief_system", ("max_collect_turns", "max_confirmations", "required",
+                                   "optional", "start", "start_buy", "first_question",
+                                   "fallback_question", "confirm_intro", "confirm_question",
+                                   "done_messages", "done_messages_buy"))
     for pattern in raw["brief"]["done_patterns"]:
         try:
             re.compile(pattern)

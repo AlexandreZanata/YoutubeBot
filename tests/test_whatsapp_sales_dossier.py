@@ -60,12 +60,12 @@ class ClientDossierTests(unittest.TestCase):
     def qualifying(self, channel, model=None):
         if model is not None:
             model.answers = [
-                {"intent": "system_request", "messages": []},
+                {"intent": "site_institutional", "messages": []},
                 {"intent": "quote_accept", "messages": [
                     "Ótimo! Me conta o nome da empresa e o que o site deve mostrar?"]}]
         agent = self.agent(channel, model)
         agent.prospect()
-        agent.ingest([self.event("Faz sistema de agendamento?", "e1")])
+        agent.ingest([self.event("Quero um site para a barbearia", "e1")])
         agent.reply_pending()
         agent.ingest([self.event("Sim", "e2")])
         agent.reply_pending()

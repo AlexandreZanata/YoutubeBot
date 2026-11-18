@@ -68,6 +68,10 @@ timeout_seconds = 90                # paid fallback
 probe_timeout_seconds = 8           # parallel health check of every free model
 quick_timeout_seconds = 8           # small optional lookups (a name in a message) per model
 quick_attempts = 2                  # models tried for such a lookup before the local fallback
+long_timeout_seconds = 45           # the client ficha (large JSON after reasoning) on free models
+long_max_output_tokens = 8192       # the client ficha: room for reasoning plus the JSON
+long_race = 4                       # free models asked at once for the ficha; the first JSON wins
+long_reasoning_effort = "low"       # the ficha needs little reasoning (40 s -> 11 s on beam-free)
 cooldown_seconds = 120              # pause after a timeout or an error
 no_credit_cooldown_seconds = 1800   # pause after "no credits" / rate limit (402, 429, quota)
 catalog_refresh_seconds = 3600      # re-read the catalog (and probe) every hour
@@ -185,6 +189,41 @@ done_patterns = [
   '^(obrigad[oa]|valeu|ok|blz|beleza)[!. ]*$',
 ]
 fallback_question = "Anotei! Para completar sua ficha, pode me contar também o endereço e horário de atendimento, as cores principais da sua marca, o estilo que você imagina para o site (mais moderno, tradicional, claro ou escuro) e mandar a logo ou fotos se tiver. Quando terminar, é só me avisar."
+
+[brief_system]
+# Apps and systems (owner, 2026-11-18): the bot does not hand the chat over as soon as the
+# client wants something beyond the institutional site. It interviews the client gently, one
+# or two simple questions at a time, restating what it understood, until the requirements
+# below are clear; then it shows the client a summary to confirm and hands the complete ficha
+# to the owner (quote-requested, or buying when the client already wants to close).
+max_collect_turns = 10
+max_confirmations = 2
+required = [
+  "nome da empresa e o que ela faz",
+  "qual problema do dia a dia o sistema ou aplicativo deve resolver (o objetivo principal)",
+  "quem vai usar (clientes, funcionários ou só o dono) e mais ou menos quantas pessoas",
+  "as principais funções que precisa ter (por exemplo agendamento, cadastro de clientes, pedidos, estoque, pagamentos, relatórios)",
+  "como isso é feito hoje (caderno, planilha, WhatsApp ou outro sistema)",
+  "onde vai usar: aplicativo de celular, sistema no navegador do computador, ou os dois",
+  "se precisa se ligar a algo que já usa (Pix ou pagamento online, nota fiscal, WhatsApp ou outro sistema)",
+]
+optional = [
+  "algum aplicativo ou sistema que usa ou acha bom como exemplo",
+  "se existe uma data importante para começar a usar",
+  "logotipo e cores da marca, se já tiver",
+]
+start = [
+  "Ótimo! Para eu entender direitinho o que você precisa e o orçamento sair certo, vou te fazer algumas perguntas rápidas, uma ou duas por vez. Se preferir, pode responder por áudio.",
+]
+start_buy = [
+  "Que ótimo! Para eu preparar a proposta certinha, preciso entender alguns detalhes do sistema antes. Vou te fazer algumas perguntas rápidas, uma ou duas por vez. Se preferir, pode responder por áudio.",
+]
+first_question = "Para começar: qual é o nome da empresa e qual problema do dia a dia você quer resolver com esse sistema ou aplicativo?"
+fallback_question = "Anotei! Me conta um pouco mais: quem vai usar no dia a dia e quais são as principais coisas que ele precisa fazer?"
+confirm_intro = "Deixa eu confirmar se entendi tudo certinho:"
+confirm_question = "Está certo? Se quiser ajustar ou acrescentar alguma coisa, é só me falar."
+done_messages = ["Perfeito, anotei tudo! Com essas informações eu preparo o orçamento do seu sistema e te mando por aqui."]
+done_messages_buy = ["Perfeito, anotei tudo! Já te respondo pessoalmente com a proposta e os próximos passos."]
 
 [referral]
 # A staff member who does not decide is asked, politely, for the decision maker's contact.
