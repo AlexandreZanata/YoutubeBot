@@ -292,10 +292,8 @@ def upload_and_schedule_with_context(context, run_dir: Path, meta: dict, slot, *
         try:
             video_details.apply_details(page, run_dir, meta, custom_thumbnail=custom_thumbnail)
         except upload_guard.UploadBlocked as error:
-            if "did not persist" not in str(error):
-                raise
             details_deferred = True
-            log("draft details are read-only; scheduling first and editing after")
+            log(f"details blocked ({error}); scheduling first and editing after")
             page.close()
             result["endScreen"] = end_screen
             write_result(run_dir, result)
