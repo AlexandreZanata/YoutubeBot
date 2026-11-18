@@ -58,6 +58,18 @@ def city_matches(listing: dict, target: str) -> bool:
     return normalize(target) in normalize(address)
 
 
+def category_exclusion(listing: dict, rules: MapsRules) -> str | None:
+    """Category and chain exclusions, also used to skip pointless confirmations."""
+    text = normalize(f"{listing.get('category', '')} {listing.get('name', '')}")
+    term = _excluded_terms(text, rules.exclusions["category_terms"])
+    if term:
+        return f"categoria excluída: {term}"
+    term = _excluded_terms(text, rules.exclusions["name_terms"])
+    if term:
+        return f"rede ou franquia: {term}"
+    return None
+
+
 def exclusion_reason(listing: dict, rules: MapsRules, lead_keys: set[str],
                      dnc_keys: set[str]) -> str | None:
     """First hard filter that drops the business, in the contract's order."""
@@ -80,13 +92,9 @@ def exclusion_reason(listing: dict, rules: MapsRules, lead_keys: set[str],
     if details is None:
         return "telefone inválido"
 
-    text = normalize(f"{listing.get('category', '')} {listing.get('name', '')}")
-    term = _excluded_terms(text, rules.exclusions["category_terms"])
-    if term:
-        return f"categoria excluída: {term}"
-    term = _excluded_terms(text, rules.exclusions["name_terms"])
-    if term:
-        return f"rede ou franquia: {term}"
+    reason = category_exclusion(listing, rules)
+    if reason:
+        return reason
 
     key = phone_key(details["canonical"])
     if key in lead_keys:
