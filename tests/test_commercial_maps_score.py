@@ -20,6 +20,10 @@ class MapsScoreTests(unittest.TestCase):
                          "free-builder")
         self.assertEqual(score.website_class("https://www.ifood.com.br/loja", self.rules),
                          "marketplace")
+        self.assertEqual(score.website_class("https://mechameaqui.com.br/v2/x", self.rules),
+                         "marketplace")
+        self.assertEqual(score.website_class("http://bit.ly/agendamento", self.rules),
+                         "social-only")
         self.assertEqual(score.website_class("https://lojaexemplo.com.br", self.rules), "own")
 
     def test_phone_details_format_and_mobile_flag(self):
@@ -77,6 +81,12 @@ class MapsScoreTests(unittest.TestCase):
         self.assertEqual(score.exclusion_reason(listing(name="Prefeitura Municipal"),
                                                 self.rules, set(), set()),
                          "categoria excluída: prefeitura")
+        self.assertEqual(score.exclusion_reason(listing(name="OrthoDontic"), self.rules,
+                                                set(), set()),
+                         "rede ou franquia: orthodontic")
+        self.assertEqual(score.exclusion_reason(listing(name="Rident Clinica Odontológica"),
+                                                self.rules, set(), set()),
+                         "rede ou franquia: rident")
         self.assertEqual(score.exclusion_reason(listing(outcome="has-site"), self.rules, set(),
                                                 set()), "já tem site funcionando")
 

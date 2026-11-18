@@ -74,7 +74,9 @@ class MapsVerifyTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "weak-site")
 
     def test_directories_are_ignored(self):
-        results = [{"title": "Clínica Exemplo", "url": "https://www.guiamais.com.br/x"}]
+        results = [{"title": "Clínica Exemplo", "url": "https://www.guiamais.com.br/x"},
+                   {"title": "Clínica Exemplo", "url": "https://cadeodentista.com.br/x"},
+                   {"title": "Clínica Exemplo", "url": "https://magicpin.com/brazil/x"}]
         result = verify.evaluate(NAME, CITY, PHONE, "", results, self.rules, fetcher({}))
         self.assertEqual(result["outcome"], "no-site")
         self.assertFalse(any(item["source"] == "search" for item in result["evidence"]))

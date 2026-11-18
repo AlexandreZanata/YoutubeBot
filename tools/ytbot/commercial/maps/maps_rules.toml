@@ -81,12 +81,13 @@ google_search = ["resultados da pesquisa"]
 social = [
   "instagram.com", "facebook.com", "fb.com", "tiktok.com", "linktr.ee", "beacons.ai",
   "bio.link", "linkin.bio", "linkfly.to", "wa.me", "api.whatsapp.com", "whatsapp.com",
-  "t.me",
+  "t.me", "bit.ly",
 ]
 marketplace = [
   "ifood.com.br", "aiqfome.com", "anota.ai", "goomer.app", "goomer.com.br",
   "doctoralia.com.br", "booking.com", "trinks.com", "agendei.com.br",
   "appbarber.com.br", "withflow.com.br", "salaovip.com.br", "salonsoft.com.br",
+  "mechameaqui.com.br",
 ]
 free_builder = ["business.site", "sites.google.com"]
 
@@ -104,7 +105,9 @@ ignore_domains = [
   "solutudo.com.br", "econodata.com.br", "casadosdados.com.br", "reclameaqui.com.br",
   "tripadvisor.com", "doctoralia.com.br", "ifood.com.br", "olx.com.br",
   "mercadolivre.com.br", "cnpj.biz", "cnpj.ws", "jusbrasil.com.br",
-  "serasaexperian.com.br", "wikipedia.org", "gov.br",
+  "serasaexperian.com.br", "wikipedia.org", "gov.br", "cadeodentista.com.br",
+  "magicpin.com", "agendarconsulta.com", "dentmap.com.br", "mechameaqui.com.br",
+  "boaconsulta.com",
 ]
 parking_markers = [
   "dominio a venda", "dominio esta a venda", "this domain is for sale",
@@ -469,5 +472,5 @@ name_terms = [
   "ultrafarma", "posto ipiranga", "shell", "petrobras", "br mania", "localiza",
   "movida", "unidas", "bradesco", "itau", "santander", "caixa economica",
   "banco do brasil", "sicredi", "sicoob", "correios", "rappi", "betano", "bet365",
-  "sportingbet", "pixbet",
+  "sportingbet", "pixbet", "rident", "orthodentic", "orthodontic",
 ]
