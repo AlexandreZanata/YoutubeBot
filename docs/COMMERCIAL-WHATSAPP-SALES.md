@@ -256,6 +256,7 @@ the model using only the facts.
 | "Quem é?" | `who_are_you` | reply | Alexandre, Zaflas Inova Simples, what it does |
 | Wants a simple site, "como funciona?" | `site_institutional` | reply | Static site explained for laypeople; R$ 500 average, R$ 250 down, about 15 days; server R$ 39,90/month (boleto or Pix) or R$ 45 (card); offer a quote |
 | Asks for a system, app, scheduling, store, login | `system_request` | reply | Fixed: "Sim, nós podemos fazer isso." + "Você gostaria que eu fizesse um orçamento?" |
+| Asks for an unusual project or custom platform (casino, betting, raffle, marketplace, social network, portal, SaaS) | `custom_platform` | qualify | Starts the requirements interview directly (`brief_kind: system`), asking how the system should work and what features it needs before handing off to the owner |
 | "Quanto custa?" | `price` | reply | Site values from the facts; systems need a quote; offer a quote |
 | "Qual o prazo?" | `deadline` | reply | About 15 days for a site; systems in the quote |
 | Server, hosting, monthly fee | `hosting` | reply | Server values |
@@ -388,8 +389,9 @@ site. It interviews first, gently, and only then calls the owner:
 system_request (first time) → "Sim, nós podemos fazer isso" + clarification + offer question
 the interview starts when the interest is an app or system and the client
   accepts the offer ("sim")                                   ┐
-  describes the system again after the offer                  ├→ state qualifying, brief_kind system
-  asks something outside the facts ("emite nota fiscal?")     │   [brief_system] start + first question
+  asks for an unusual/custom platform ("site de cassino?")    │→ state qualifying, brief_kind system
+  describes the system again after the offer                  ├→ [brief_system] start/start_custom
+  asks something outside the facts ("emite nota fiscal?")     │   + tailored question
   wants to close ("quero fechar")  → start_buy, buy_intent    ┘
 each answer → the model (`sales/dossier_system.md`) updates the requirements and writes the next
   message: a short restatement of what it understood + at most two simple questions, in the

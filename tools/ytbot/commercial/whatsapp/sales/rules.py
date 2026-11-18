@@ -16,9 +16,9 @@ ALLOWED_MODELS = ("deepseek-v4.1-flash", "muse-spark-1.3-contributor")
 ACTIONS = ("reply", "qualify", "quote", "collect", "close", "block", "handoff", "ignore", "won",
            "buy", "refer")
 REQUIRED_INTENTS = ("opt_out", "refusal", "auto_reply", "bot_question", "unknown",
-                    "quote_accept", "quote_details", "system_request", "site_institutional",
-                    "domain", "human_request", "stuck", "ready_to_buy", "close_site",
-                    "payment_sent", "referral", "gatekeeper")
+                    "quote_accept", "quote_details", "custom_platform", "system_request",
+                    "site_institutional", "domain", "human_request", "stuck", "ready_to_buy",
+                    "close_site", "payment_sent", "referral", "gatekeeper")
 HANDOFF_ACTIONS = ("handoff", "quote", "collect", "won", "buy", "refer")
 PRIORITIES = ("hot", "needed", "alert")
 MONEY = re.compile(r"r\$\s*(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?")
@@ -215,9 +215,10 @@ def _texts(raw: dict) -> list[str]:
     if raw["brief"].get("fallback_question"):
         texts.append(raw["brief"]["fallback_question"])
     system = raw.get("brief_system") or {}
-    for key in ("start", "start_buy", "done_messages", "done_messages_buy"):
+    for key in ("start", "start_buy", "start_custom", "done_messages", "done_messages_buy"):
         texts += list(system.get(key, []))
-    texts += [system[key] for key in ("first_question", "fallback_question", "confirm_intro",
+    texts += [system[key] for key in ("first_question", "first_question_custom",
+                                      "fallback_question", "confirm_intro",
                                       "confirm_question") if system.get(key)]
     for items in raw["facts"].values():
         texts.extend(items)
@@ -273,9 +274,10 @@ def build(raw: dict) -> SalesRules:
     if not raw["brief"]["domain_messages"]:
         raise RulesError("brief.domain_messages must not be empty")
     _require(raw, "brief_system", ("max_collect_turns", "max_confirmations", "required",
-                                   "optional", "start", "start_buy", "first_question",
-                                   "fallback_question", "confirm_intro", "confirm_question",
-                                   "done_messages", "done_messages_buy"))
+                                   "optional", "start", "start_buy", "start_custom",
+                                   "first_question", "first_question_custom", "fallback_question",
+                                   "confirm_intro", "confirm_question", "done_messages",
+                                   "done_messages_buy"))
     for pattern in raw["brief"]["done_patterns"]:
         try:
             re.compile(pattern)

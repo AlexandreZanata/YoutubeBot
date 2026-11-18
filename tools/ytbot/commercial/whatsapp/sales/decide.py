@@ -128,13 +128,18 @@ def decide(rules: SalesRules, lead: dict, history: list[dict], text: str, llm=No
         intent_id = "refusal"
     elif _stronger_handoff(rules, hint, intent_id):
         intent_id = hint
+    elif hint == "custom_platform" and intent_id in ("unknown", "site_institutional",
+                                                     "system_request"):
+        # A custom/unusual platform request starts the requirements interview directly.
+        intent_id = hint
     elif intent_id == "unknown" and hint != "unknown" and rules.intent(hint).fixed \
             and rules.intent(hint).action in MODEL_TEXT_ACTIONS:
         # The owner's fixed answer for what the local classifier recognized beats "unknown".
         intent_id = hint
     intent = rules.intent(intent_id)
     reason = str(data.get("reason", ""))[:300]
-    if intent.action in MODEL_TEXT_ACTIONS and data.get("handoff") is True:
+    if intent.action in MODEL_TEXT_ACTIONS and data.get("handoff") is True \
+            and intent_id != "custom_platform":
         decision = Decision(intent_id, "handoff", rules.handoff_messages(), "fixed", hint,
                             reason, priority="needed",
                             owner_reason=f"O modelo pediu ajuda: {reason or intent_id}")
