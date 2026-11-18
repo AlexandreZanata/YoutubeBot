@@ -68,6 +68,79 @@ class WhatsAppListenerTests(unittest.TestCase):
         self.assertEqual(first, listener.event_id("Renê", "Já mudei", "12:32 PM"))
         self.assertNotEqual(first, listener.event_id("Renê", "Já mudei", "12:33 PM"))
 
+    def test_scan_once_reads_ready_chat_list_without_reloading(self):
+        class FakeLocator:
+            def __init__(self, present):
+                self._present = present
+
+            def count(self):
+                return 1 if self._present else 0
+
+        class ReadyPage:
+            url = "https://web.whatsapp.com/send?phone=5566999999999"
+
+            def __init__(self):
+                self.visits = 0
+
+            def goto(self, url, timeout=None):
+                self.visits += 1
+
+            def locator(self, selector):
+                return FakeLocator(selector in (listener.CHAT_LIST, listener.ROW))
+
+            def evaluate(self, script, arg):
+                return [
+                    {"title": "João Flávio", "stamp": "12:27 PM", "preview": "Issae chefia",
+                     "outgoing": False, "unread": True, "fallbackText": ""},
+                    {"title": "Felipe", "stamp": "12:20 PM", "preview": "Certo!",
+                     "outgoing": True, "unread": False, "fallbackText": ""},
+                ]
+
+        page = ReadyPage()
+        events = listener.scan_once(page, set(), {"mode": "allow", "contacts": ["João Flávio"]})
+        self.assertEqual(page.visits, 0)
+        self.assertEqual(len(events), 1)
+        self.assertEqual((events[0]["chat"], events[0]["text"], events[0]["allowed"]),
+                         ("João Flávio", "Issae chefia", True))
+
+    def test_scan_once_navigates_when_chat_list_is_not_mounted(self):
+        class FakeLocator:
+            def __init__(self, ready_ref):
+                self.ready_ref = ready_ref
+
+            def count(self):
+                return 1 if self.ready_ref[0] else 0
+
+        class ColdPage:
+            url = "about:blank"
+
+            def __init__(self):
+                self.visits = 0
+                self.mounted = [False]
+
+            def goto(self, url, timeout=None):
+                self.visits += 1
+                self.url = url
+                self.mounted[0] = True
+
+            def wait_for_selector(self, selector, timeout=None):
+                return None
+
+            def wait_for_timeout(self, ms):
+                pass
+
+            def locator(self, selector):
+                return FakeLocator(self.mounted)
+
+            def evaluate(self, script, arg):
+                return [{"title": "Ana", "stamp": "12:00 PM", "preview": "Oi",
+                         "outgoing": False, "unread": True, "fallbackText": ""}]
+
+        page = ColdPage()
+        events = listener.scan_once(page, set(), {"mode": "allow", "contacts": ["Ana"]})
+        self.assertEqual(page.visits, 1)
+        self.assertEqual(len(events), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

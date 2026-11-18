@@ -103,6 +103,14 @@ class MapsRecordTests(unittest.TestCase):
         text = (self.run.path / "report.md").read_text(encoding="utf-8")
         self.assertIn("fora da cidade: Sorriso", text)
 
+    def test_chain_without_confirmation_is_excluded_not_pending(self):
+        self.run.append_listing({**listing(name="OrthoDontic", phone="(66) 90000-0003"),
+                                 "state": "read"})
+        report = render.export_run(self.run, self.rules, NOW, set(), set())
+        self.assertEqual((report["excluded"], report["pending"]), (1, 0))
+        self.assertIn("rede ou franquia: orthodontic",
+                      (self.run.path / "report.md").read_text(encoding="utf-8"))
+
     def test_pending_confirmation_is_not_exported(self):
         self.run.append_listing({**listing(), "state": "read"})
         report = render.export_run(self.run, self.rules, NOW, set(), set())

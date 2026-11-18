@@ -50,7 +50,8 @@ class SalesAgentTests(unittest.TestCase):
     def test_opening_sends_the_script_in_order_and_records_memory(self):
         lead, _, channel = self.opened_lead()
         texts = [item["text"] for item in channel.sent]
-        self.assertEqual(texts, self.rules.opening_messages(MONDAY))
+        self.assertEqual(texts, self.rules.opening_messages(MONDAY, lead["name"]))
+        self.assertIn(f"a empresa {lead['name']} ainda não tem site", texts[2])
         self.assertEqual(self.store.lead(lead["id"])["state"], "opened")
         history = self.store.history(lead["id"])
         self.assertEqual([entry["kind"] for entry in history], ["opening"] * 8)
@@ -194,6 +195,29 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual([entry["dir"] for entry in history[-2:]], ["in", "out"])
         self.assertIsNone(self.store.lead(lead["id"])["awaiting"])
 
+    def test_new_lead_writes_first_and_is_answered_before_an_opening(self):
+        lead = self.leads(1)[0]
+        agent, channel = self.agent()
+        agent.ingest([self.event("Oi, vi o site de vocês e quero saber mais")])
+        stored = self.store.lead(lead["id"])
+        self.assertEqual(stored["state"], "engaged")
+        self.assertTrue(stored["awaiting"])
+        results = agent.reply_pending()
+        self.assertEqual(results[0]["lead"], lead["id"])
+        self.assertTrue(channel.sent)
+        self.assertNotIn("sales-opening", {entry.get("kind") for entry in self.store.history(lead["id"])})
+
+    def test_paused_lead_gets_a_handoff_not_an_automatic_reply(self):
+        lead = self.leads(1)[0]
+        self.store.set_reply_active(lead["id"], False)
+        agent, channel = self.agent()
+        agent.ingest([self.event("Oi, preciso de um site")])
+        self.assertEqual(agent.reply_pending(), [])
+        self.assertEqual(channel.sent, [])
+        self.assertTrue(self.notes)
+        self.assertEqual(self.store.lead(lead["id"])["state"], "needs-owner")
+        self.assertIn("pausadas", self.notes[-1]["reason"])
+
     def test_messages_from_other_chats_are_ignored(self):
         _, agent, channel = self.opened_lead()
         agent.ingest([{"id": "x", "chat": "Mãe", "text": "Oi filho"}])
@@ -288,7 +312,8 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(len(channel.sent), 8)
 
     def opening_bubbles(self):
-        return [{"dir": "out", "text": text} for text in self.rules.opening_messages(MONDAY)]
+        return [{"dir": "out", "text": text}
+                for text in self.rules.opening_messages(MONDAY, "Empresa 0")]
 
     def test_owner_message_anywhere_after_the_bot_pauses_it(self):
         lead, agent, channel = self.opened_lead()

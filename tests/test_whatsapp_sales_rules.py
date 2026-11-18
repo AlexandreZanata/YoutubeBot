@@ -13,17 +13,37 @@ class SalesRulesTests(unittest.TestCase):
         self.raw = tomllib.loads(sales_rules.RULES_PATH.read_text(encoding="utf-8"))
 
     def test_opening_is_the_owner_script_with_one_link_per_message(self):
-        self.assertEqual(self.rules.opening_messages(MONDAY), [
+        self.assertEqual(self.rules.opening_messages(MONDAY, "Barbearia do Zé"), [
             "Bom dia",
             "Tudo bem?",
             "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, "
-            "sites e aplicativos. Eu vi que no Google Maps vocês não têm site.",
+            "sites e aplicativos. Eu vi que no Google Maps a empresa Barbearia do Zé ainda "
+            "não tem site.",
             "Nós temos alguns exemplos de sistemas e sites que nós criamos:",
             "https://sorrifit.com",
             "https://zaflas.com.br",
             "https://musicalizese.com.br",
             "https://abastevo.com.br",
         ])
+
+    def test_opening_without_a_company_name_keeps_the_vocês_text(self):
+        for name in ("", "   "):
+            self.assertEqual(self.rules.opening_messages(MONDAY, name)[2],
+                             "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa "
+                             "cria sistemas, sites e aplicativos. Eu vi que no Google Maps "
+                             "vocês não têm site.")
+
+    def test_company_name_is_normalized_and_cut_at_a_word(self):
+        self.assertEqual(sales_rules.company_name("  Oficina   2 Irmãos  "), "Oficina 2 Irmãos")
+        long_name = "Comércio " + "Atacadista " * 20
+        cut = sales_rules.company_name(long_name)
+        self.assertLessEqual(len(cut), 120)
+        self.assertTrue(long_name.startswith(cut))
+        self.assertTrue(cut.endswith("Atacadista"))
+        self.assertIn(cut, self.rules.opening_messages(MONDAY, long_name)[2])
+        self.assertEqual(sales_rules.company_name("<b>Bar & Cia</b>"), "<b>Bar & Cia</b>")
+        self.assertEqual(sales_rules.company_name("Vem Sorrir em Sinop."), "Vem Sorrir em Sinop")
+        self.assertEqual(sales_rules.company_name("Dra. Ana Lima"), "Dra. Ana Lima")
 
     def test_opening_intervals_are_the_owner_values(self):
         self.assertEqual(self.rules.opening_delays(), [4, 2, 8, 8, 4, 4, 4, 4])
@@ -64,6 +84,15 @@ class SalesRulesTests(unittest.TestCase):
         self.assertEqual(intent.messages[0], "Sim, nós podemos fazer isso.")
         self.assertIn("aplicativos e sistemas são feitos sob medida", intent.messages[1])
         self.assertEqual(intent.messages[-1], "Você gostaria que eu fizesse um orçamento?")
+
+    def test_custom_platform_intent_passes_guard_and_starts_qualifying(self):
+        from tools.ytbot.commercial.whatsapp.sales import guard
+        intent = self.rules.intent("custom_platform")
+        self.assertEqual((intent.action, intent.fixed), ("qualify", True))
+        self.assertEqual(guard.violations(self.rules, list(intent.messages)), [])
+        self.assertEqual(guard.violations(self.rules, self.rules.brief_system["start_custom"]), [])
+        self.assertEqual(
+            guard.violations(self.rules, [self.rules.brief_system["first_question_custom"]]), [])
 
     def test_site_prices_are_stated_as_site_only(self):
         facts = " ".join(self.rules.raw["facts"]["sistemas"])

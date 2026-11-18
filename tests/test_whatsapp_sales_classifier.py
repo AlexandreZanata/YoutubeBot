@@ -33,6 +33,9 @@ class SalesClassifierTests(unittest.TestCase):
             "Já temos site": "already_has_site",
             "vou pensar": "later",
             "Vocês fazem aplicativo de delivery?": "system_request",
+            "Fazem site de cassino?": "custom_platform",
+            "Tenho interesse. Vocês fazem site de tigrinho?": "custom_platform",
+            "Vocês fazem plataforma de rifas ou marketplace?": "custom_platform",
             "quero um site simples": "site_institutional",
             "Quanto custa?": "price",
             "qual o prazo?": "deadline",
@@ -44,7 +47,12 @@ class SalesClassifierTests(unittest.TestCase):
             "tem mais exemplos?": "examples",
             "tenho interesse": "interested",
             "Tudo bem e você?": "greeting_reply",
+            "Pois não?": "greeting_reply",
+            "Pode falar": "greeting_reply",
             "Obrigado!": "thanks",
+            "obg": "thanks",
+            "Entendi": "thanks",
+            "kkkk": "thanks",
             "Vocês atendem em Sinop?": "unknown",
         }
         for text, expected in cases.items():
@@ -96,6 +104,9 @@ class SalesClassifierTests(unittest.TestCase):
     def test_short_answers_read_the_offer_question(self):
         self.check("Sim", "quote_accept", OFFER)
         self.check("pode sim", "quote_accept", OFFER)
+        self.check("Issae", "quote_accept", OFFER)
+        self.check("Fechou", "quote_accept", OFFER)
+        self.check("Show", "quote_accept", OFFER)
         self.check("Não", "refusal", OFFER)
 
     def test_qualifying_text_is_the_project_description(self):

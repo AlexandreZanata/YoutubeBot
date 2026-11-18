@@ -81,6 +81,22 @@ class MapsVerifyTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "no-site")
         self.assertFalse(any(item["source"] == "search" for item in result["evidence"]))
 
+    def test_saved_evidence_is_reclassified_with_current_ignore_lists(self):
+        directory = {
+            "maps_class": "social-only",
+            "evidence": [{"source": "search", "url": "https://cadeodentista.com.br/x",
+                          "final_url": "https://cadeodentista.com.br/x", "status": 200,
+                          "https": True, "name_signal": True, "page_signal": True,
+                          "parking": False, "error": "", "title": "Clínica Exemplo",
+                          "source_kind": "search"}],
+        }
+        self.assertEqual(verify.reclassify(directory, self.rules)["outcome"], "no-site")
+        own = {**directory, "evidence": [{**directory["evidence"][0],
+                                          "url": "https://clinicaexemplo.com.br/",
+                                          "final_url": "https://clinicaexemplo.com.br/"}]}
+        self.assertEqual(verify.reclassify(own, self.rules)["outcome"],
+                         "site-not-on-maps")
+
     def test_domain_probe_falls_back_to_http(self):
         https = "https://clinica-exemplo.com.br"
         http = "http://clinica-exemplo.com.br"

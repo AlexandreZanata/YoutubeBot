@@ -90,9 +90,14 @@ link_delay = 4
 messages = [
   "{greeting}",
   "Tudo bem?",
-  "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e aplicativos. Eu vi que no Google Maps vocês não têm site.",
+  "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e aplicativos. Eu vi que no Google Maps a empresa {company} ainda não tem site.",
   "Nós temos alguns exemplos de sistemas e sites que nós criamos:",
 ]
+# {company} is the business name exactly as on Google Maps (the lead `name`, spaces
+# normalized, at most `company_max_chars`, cut at a word). Without a name, `unnamed` replaces
+# that message (owner, 2026-11-18). The opening is fixed text: the model never writes it.
+unnamed = "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e aplicativos. Eu vi que no Google Maps vocês não têm site."
+company_max_chars = 120
 # Each link goes in its own message so WhatsApp loads the preview card.
 links = [
   "https://sorrifit.com",
@@ -131,6 +136,7 @@ sistemas = [
   "Aplicativos e sistemas NÃO custam R$ 500 e não seguem nenhum valor do site institucional.",
   "Cada aplicativo ou sistema é feito sob medida: valor e prazo dependem das funções e dos requisitos do cliente (login, cadastro, agendamento, pagamentos, estoque, painel, área do cliente, integrações).",
   "Por isso aplicativos e sistemas sempre passam por um orçamento, que o Alexandre faz pessoalmente.",
+  "Pedidos incomuns ou plataformas personalizadas (cassino, apostas, rifa, marketplace, rede social, portal ou qualquer projeto fora do site institucional simples) entram direto na entrevista de requisitos para entender exatamente como o sistema funcionaria, sem passar valor de site institucional e sem prometer viabilidade antes do orçamento.",
 ]
 
 [guard]
@@ -140,6 +146,9 @@ sistemas = [
 system_words = [
   'aplicativo', '\bapps?\b', 'sistema', 'loja (virtual|online)', 'e-?commerce', 'agendamento',
   '\bcadastro', '\blogin\b', '\bpainel\b', 'area do cliente',
+  'cassino', 'tigrinho', 'aposta', '\bbets?\b', '\brifas?\b', 'sorteio', 'plataforma',
+  'marketplace', 'rede social', 'leilao', 'streaming', 'area de membros', '\bsaas\b',
+  '\berp\b', '\bcrm\b', '\bpdv\b',
 ]
 # Terms the model may never write (checked after removing accents).
 forbidden = [
@@ -184,9 +193,10 @@ domain_messages = [
   "Você já pensou em algum nome para o endereço do site e qual dessas opções prefere?",
 ]
 done_patterns = [
-  '\be isso\b', '\bso isso\b', 'mandei tudo', 'pode (fazer|montar|mandar) o orcamento', 'por enquanto e isso',
+  '\be isso\b', '\bso isso\b', '\bisso a[ie]\b', '\biss[ao]e\b', 'mandei tudo',
+  'pode (fazer|montar|mandar) o orcamento', 'por enquanto e isso',
   'acho que e isso', 'ta bom assim', 'era isso', '^pode fazer[.! ]*$',
-  '^(obrigad[oa]|valeu|ok|blz|beleza)[!. ]*$',
+  '^(obrigad[oa]|valeu|ok|blz|beleza|fechou|show|top|joia|positivo|afirmativo|confirmado|confirmo|combinado|perfeito|tudo certo|ta certo|esta certo|tudo ok|ta ok|pode seguir|manda ver)[!. ]*$',
 ]
 fallback_question = "Anotei! Para completar sua ficha, pode me contar também o endereço e horário de atendimento, as cores principais da sua marca, o estilo que você imagina para o site (mais moderno, tradicional, claro ou escuro) e mandar a logo ou fotos se tiver. Quando terminar, é só me avisar."
 
@@ -203,7 +213,7 @@ required = [
   "qual problema do dia a dia o sistema ou aplicativo deve resolver (o objetivo principal)",
   "quem vai usar (clientes, funcionários ou só o dono) e mais ou menos quantas pessoas",
   "as principais funções que precisa ter (por exemplo agendamento, cadastro de clientes, pedidos, estoque, pagamentos, relatórios)",
-  "como isso é feito hoje (caderno, planilha, WhatsApp ou outro sistema)",
+  "como isso é feito hoje, se já existir (caderno, planilha, WhatsApp, outro sistema ou projeto novo)",
   "onde vai usar: aplicativo de celular, sistema no navegador do computador, ou os dois",
   "se precisa se ligar a algo que já usa (Pix ou pagamento online, nota fiscal, WhatsApp ou outro sistema)",
 ]
@@ -218,7 +228,11 @@ start = [
 start_buy = [
   "Que ótimo! Para eu preparar a proposta certinha, preciso entender alguns detalhes do sistema antes. Vou te fazer algumas perguntas rápidas, uma ou duas por vez. Se preferir, pode responder por áudio.",
 ]
+start_custom = [
+  "Para projetos personalizados assim, a gente avalia tudo sob medida para ver como montar e calcular o orçamento certinho. Vou te fazer algumas perguntas rápidas, uma ou duas por vez (se preferir, pode responder por áudio).",
+]
 first_question = "Para começar: qual é o nome da empresa e qual problema do dia a dia você quer resolver com esse sistema ou aplicativo?"
+first_question_custom = "Para eu entender direitinho: como exatamente você imagina esse sistema funcionando na prática e o que as pessoas precisam conseguir fazer nele?"
 fallback_question = "Anotei! Me conta um pouco mais: quem vai usar no dia a dia e quais são as principais coisas que ele precisa fazer?"
 confirm_intro = "Deixa eu confirmar se entendi tudo certinho:"
 confirm_question = "Está certo? Se quiser ajustar ou acrescentar alguma coisa, é só me falar."
@@ -253,7 +267,7 @@ contact_card = "Mandou o contato do responsável em cartão: salve o número e c
 # `qualifying`, any other text is `quote_details`.
 offer_question = 'orcamento\?'
 affirmative = [
-  '^(sim|s|quero|queremos|pode|pode sim|pode ser|claro|com certeza|gostaria|gostaria sim|bora|vamos|manda|faz|faca|isso|aceito|por favor|pfv|ok,? pode|quero sim)\b',
+  '^(sim+|ss+|s|quero|queremos|pode|pode sim|pode ser|pode fazer|pode mandar|claro|com certeza|com ctz|ctz|gostaria|gostaria sim|bora|vamos|vamos sim|vamos la|manda|manda ver|manda ai|faz|faz sim|faca|isso|isso a[ie]|iss[ao]e|e isso|aceito|por favor|pfv|ok,? pode|ok,? quero|quero sim|fechou|beleza|blz|show|top|positivo|opa,? (pode|quero|sim|bora))\b',
 ]
 negative = ['^(nao|n|nop|negativo)\b']
 
@@ -593,6 +607,24 @@ messages = [
 ]
 
 [[intents]]
+id = "custom_platform"
+action = "qualify"
+fixed = true
+when = "Pede ou pergunta se fazemos um projeto incomum, plataforma complexa ou site que na verdade é um sistema sob medida (cassino, tigrinho, apostas, bet, rifa, sorteio, leilão, marketplace, rede social, streaming, área de membros, portal com usuários, ERP, CRM, SaaS ou outro modelo específico que foge do site institucional simples). Inicia direto a entrevista para entender como o sistema funcionaria."
+patterns = [
+  'cassino', 'tigrinho', 'jogo do bicho', 'jogo de (aposta|azar|cassino)',
+  '\bbets?\b', 'aposta', 'roleta', 'caca[- ]?niquel', '\bslots?\b', '\bpoker\b', '\bbingo\b',
+  '\brifas?\b', 'sorteio', '\bbolao\b', 'loteria',
+  'plataforma', 'marketplace', 'rede social', '\bleilao\b', '\bsaas\b', 'streaming',
+  'area de membros', 'clube de assinatura', 'portal (de|do|da|para|com)',
+  'cripto', 'exchange', '\berp\b', '\bcrm\b', '\bpdv\b',
+]
+messages = [
+  "Para projetos personalizados assim, a gente avalia tudo sob medida para ver como montar e calcular o orçamento certinho. Vou te fazer algumas perguntas rápidas, uma ou duas por vez (se preferir, pode responder por áudio).",
+  "Para eu entender direitinho: como exatamente você imagina esse sistema funcionando na prática e o que as pessoas precisam conseguir fazer nele?",
+]
+
+[[intents]]
 id = "system_request"
 action = "reply"
 fixed = true
@@ -726,8 +758,11 @@ messages = ["Que bom que gostou!", "Você gostaria que eu fizesse um orçamento?
 id = "greeting_reply"
 action = "reply"
 fixed = false
-when = "Só responde ao cumprimento: 'tudo bem e você?', 'oi', 'bom dia'."
-patterns = ['^(oi|ola|opa|bom dia|boa tarde|boa noite|tudo (bem|bom|otimo|certo|tranquilo|joia))\b', 'e (voce|vc|com voce)\??$', '^(sim|tudo),? (e )?(voce|vc)']
+when = "Só responde ao cumprimento: 'tudo bem e você?', 'oi', 'bom dia', 'pois não', 'pode falar'."
+patterns = [
+  '^(oi|ola|opa|bom dia|boa tarde|boa noite|tudo (bem|bom|otimo|certo|tranquilo|joia)|pois nao|pode falar|diga|alo|estou aqui|to aqui)\b',
+  'e (voce|vc|com voce)\??$', '^(sim|tudo),? (e )?(voce|vc)',
+]
 messages = [
   "Tudo ótimo também, obrigado!",
   "Ficou com alguma dúvida sobre os exemplos? Posso te explicar como funcionaria um site para vocês.",
@@ -737,8 +772,11 @@ messages = [
 id = "thanks"
 action = "ignore"
 fixed = true
-when = "Só agradece ou se despede, sem pergunta: 'obrigado', 'valeu', 'ok', '👍'."
-patterns = ['^(obrigad[oa]|valeu|vlw|ok|beleza|blz|show|certo|tmj)[!. ]*$', '^\W+$']
+when = "Só agradece, acusa recebimento ou se despede, sem pergunta: 'obrigado', 'obg', 'valeu', 'ok', 'entendi', '👍'."
+patterns = [
+  '^(obrigad[oa]|obg|obgd|agradeco|valeu|vlw|ok|oks|beleza|blz|show|certo|tmj|entendi|entendido|anotado|ta bom|ta certo|bom trabalho|sucesso|igualmente|deus abencoe|kk+|haha+|rs+)[!. ]*$',
+  '^\W+$',
+]
 messages = []
 
 [[intents]]

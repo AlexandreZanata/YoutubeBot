@@ -163,6 +163,22 @@ class SalesDecisionTests(unittest.TestCase):
         self.assertEqual(model.calls, [])
         self.assertEqual(decision.action, "block")
 
+    def test_custom_platform_beats_model_unknown_site_or_handoff(self):
+        for answer in (
+            {"intent": "unknown", "messages": [], "handoff": True},
+            {"intent": "site_institutional", "messages": ["Fica R$ 500."], "handoff": False},
+            {"intent": "custom_platform", "messages": [], "handoff": True},
+        ):
+            decision, _ = self.run_model("Fazem site de cassino?", answer)
+            self.assertEqual((decision.intent, decision.action), ("custom_platform", "qualify"))
+
+    def test_unusual_platform_chosen_by_model_starts_custom_platform_without_handoff(self):
+        decision, _ = self.run_model(
+            "Vocês fazem um site onde vários vendedores cadastram produtos e recebem comissão?",
+            {"intent": "custom_platform", "messages": [], "handoff": True},
+        )
+        self.assertEqual((decision.intent, decision.action), ("custom_platform", "qualify"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -177,6 +177,107 @@ class InterviewTests(unittest.TestCase):
         [ficha] = central.snapshot(self.store, self.clock())["fichas"]
         self.assertEqual((ficha["lead"], ficha["label"]), (self.lead["id"], "barbearia-1"))
 
+    def test_unusual_platform_request_starts_interview_directly_with_questions(self):
+        question = brief(
+            empresa={"nome": None, "segmento": "Entretenimento", "cidade": None,
+                     "sobre_e_diferenciais": None},
+            projeto={"tipo": "plataforma web", "objetivo": "site de cassino",
+                     "como_faz_hoje": "Projeto novo", "funcionalidades": []},
+            duvidas_do_cliente=["Fazem site de cassino?"],
+            faltando=["como o sistema deve funcionar", "quais jogos e pagamentos precisa ter"],
+            proxima_pergunta=("Entendi que você pensa em um site de cassino. Como exatamente "
+                              "você imagina esse sistema funcionando na prática e quais jogos "
+                              "ou funções principais ele precisa ter?"),
+        )
+        self.say("Fazem site de cassino?",
+                 {"intent": "unknown", "messages": [], "handoff": True}, question)
+        lead = self.lead_now()
+        self.assertEqual((lead["state"], lead["brief_kind"], lead["interest"]),
+                         ("qualifying", "system", "system"))
+        self.assertEqual(self.notes, [], "unusual request must interview before calling the owner")
+        self.assertEqual(self.sent()[-2:], self.rules.brief_system["start_custom"]
+                         + [question["proxima_pergunta"]])
+
+        done = brief(
+            faltando=[], proxima_pergunta="",
+            confirmacao=("Você precisa de uma plataforma web com jogos estilo tigrinho e roleta, "
+                         "cadastro de jogadores, depósitos por Pix e painel para acompanhar tudo."),
+        )
+        self.say("Quero jogos tipo tigrinho e roleta, cadastro de usuários, Pix e painel admin",
+                 done)
+        self.assertEqual(self.lead_now()["state"], "qualifying")
+        self.say("Isso mesmo, está certo", done)
+        self.assertEqual(self.lead_now()["state"], "quote-requested")
+        self.assertEqual(self.notes[-1]["priority"], "hot")
+
+    def test_unusual_platform_without_model_uses_custom_fallback_questions(self):
+        offline = SalesAgent(self.rules, self.store, self.channel, None, live=True,
+                             clock=self.clock, sleep=lambda seconds: None,
+                             notify=self.notes.append, log=lambda message: None)
+        self.count += 1
+        offline.ingest([{"id": f"e{self.count}", "chat": "+55 65 90000-0001",
+                         "text": "Fazem site de tigrinho?"}])
+        offline.reply_pending()
+        lead = self.lead_now()
+        self.assertEqual((lead["state"], lead["brief_kind"], lead["interest"]),
+                         ("qualifying", "system", "system"))
+        self.assertEqual(self.sent()[-2:], self.rules.brief_system["start_custom"]
+                         + [self.rules.brief_system["first_question_custom"]])
+
+    def test_closing_a_custom_platform_never_sends_site_pix_keys(self):
+        self.say("Quero fechar um site de cassino",
+                 {"intent": "ready_to_buy", "messages": []}, brief())
+        self.assertEqual(self.lead_now()["state"], "qualifying")
+        self.assertTrue(self.lead_now()["buy_intent"])
+        self.assertNotIn("financeiro@zaflas.com.br", self.sent())
+
+    def test_informal_confirmation_slang_finishes_on_first_reply_and_keeps_corrections(self):
+        self.say("Fazem site de cassino?",
+                 {"intent": "custom_platform", "messages": []}, brief())
+        ready = brief(
+            empresa={"nome": "Zaflas Restaurantes", "segmento": "Restaurante", "cidade": "Cuiabá",
+                     "sobre_e_diferenciais": None},
+            projeto={"tipo": "site de cassino",
+                     "objetivo": "criar um site de cassino com sistema de tigrinho",
+                     "como_faz_hoje": "Projeto novo",
+                     "usuarios": ["jogadores", "equipe de gerenciamento"],
+                     "quantidade_de_usuarios": "1000 pessoas",
+                     "funcionalidades": ["sistema de tigrinho", "100% self service"],
+                     "plataformas": ["navegador do computador"],
+                     "integracoes": ["Pix", "cartão", "boleto"]},
+            duvidas_do_cliente=["Se fazem site de cassino"],
+            faltando=[],
+            proxima_pergunta="",
+            confirmacao=("Entendi que você precisa de um site de cassino com sistema de tigrinho, "
+                         "totalmente self service, rodando no navegador e ligado a Pix, cartão e boleto."),
+        )
+        self.say("tigrinho self service, mil pessoas no navegador, jogadores e equipe, Pix cartão boleto",
+                 ready)
+        self.assertEqual(self.lead_now()["collect_stage"], "confirming")
+        # A correction with slang ("Beleza, mas faltou...") must update, not confirm prematurely.
+        self.say("Beleza, mas faltou relatório diário", ready)
+        self.assertEqual(self.lead_now()["collect_stage"], "confirming")
+        self.assertEqual(self.lead_now()["state"], "qualifying")
+        # Informal PT-BR confirmation ("Issae chefia") must confirm immediately without repeating.
+        self.say("Issae chefia", ready)
+        lead = self.lead_now()
+        self.assertEqual(lead["state"], "quote-requested")
+        self.assertEqual(self.notes[-1]["priority"], "hot")
+        ficha = Path(lead["ficha"]).read_text(encoding="utf-8")
+        self.assertIn("1000 pessoas", ficha)
+        self.assertIn("Se fazem site de cassino", ficha)
+        self.assertIn("Pix; cartão; boleto", ficha)
+
+    def test_ready_to_buy_at_confirmation_stage_finishes_as_buying(self):
+        self.offered()
+        self.say("Sim", {"intent": "quote_accept", "messages": []}, brief())
+        done = brief(faltando=[], proxima_pergunta="", confirmacao=SUMMARY)
+        self.say("Tudo certo, só isso", done)
+        self.assertEqual(self.lead_now()["collect_stage"], "confirming")
+        self.say("Quero fechar, pode começar", {"intent": "ready_to_buy", "messages": []}, done)
+        self.assertEqual(self.lead_now()["state"], "buying")
+        self.assertEqual(self.sent()[-1], self.rules.brief_system["done_messages_buy"][0])
+
 
 if __name__ == "__main__":
     unittest.main()

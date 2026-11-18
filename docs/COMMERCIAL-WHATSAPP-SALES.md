@@ -119,6 +119,8 @@ commands work offline.
 python3 -m tools.ytbot commercial sales check    --network whatsapp [--ping]
 python3 -m tools.ytbot commercial sales models   --network whatsapp
 python3 -m tools.ytbot commercial sales import   --network whatsapp --csv ~/leads.csv
+python3 -m tools.ytbot commercial sales activate --network whatsapp --all
+python3 -m tools.ytbot commercial sales pause    --network whatsapp --lead L1a2b3c4d5e
 python3 -m tools.ytbot commercial sales leads    --network whatsapp [--state opened]
 python3 -m tools.ytbot commercial sales contacts --network whatsapp
 python3 -m tools.ytbot commercial sales central  --network whatsapp [--json]
@@ -127,6 +129,9 @@ python3 -m tools.ytbot commercial sales rehearse --network whatsapp [--only nego
 python3 -m tools.ytbot commercial sales run      --network whatsapp --once
 python3 -m tools.ytbot commercial sales run      --network whatsapp --live --interval 10
 python3 -m tools.ytbot commercial sales run      --network whatsapp --live --prospect --limit 3
+python3 -m tools.ytbot commercial sales queue list --network whatsapp
+python3 -m tools.ytbot commercial sales queue send --network whatsapp --dry-run
+python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --limit 1
 python3 -m tools.ytbot commercial sales handoffs --network whatsapp
 python3 -m tools.ytbot commercial sales history  --network whatsapp --lead L1a2b3c4d5e
 python3 -m tools.ytbot commercial sales resolve  --network whatsapp --lead L1a2b3c4d5e --state engaged
@@ -151,6 +156,65 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   hidden browser. A second `SIGTERM` stops at once; `SIGKILL` still leaves the tab open.
 - `resolve` hands a conversation back to the agent after the owner handled it; `block` adds the
   number to the do-not-contact list.
+- Every imported number starts with `reply_active: true`. If it writes before an opening, the
+  agent stores the message and answers it (the lead moves to `engaged`); it never sends an
+  opening to someone already in conversation. `activate --all` re-enables older leads,
+  `pause --lead <id>` stops automatic replies and sends the message to "Precisa de você". `sales leads` and the
+  Central show `reply: ativo` or `pausado`.
+- Openings stay one number at a time, in import order, up to 10/day and only in the opening
+  window. Use `--limit 1` to start exactly one number per invocation or `--limit 10` for the
+  daily batch; the existing pacing, journal and repeat fences apply to both.
+- The owner's selected list may be kept in
+  `.local/commercial/whatsapp/sales/importar/<city>-<date>.csv`, using the same columns as
+  `import` (`name,phone,city,category,maps_url,website,note`). The folder is private and is
+  never read automatically; importing is still the owner's explicit command.
+
+## Opening queue (owner, 2026-11-18)
+
+One number per command, in the order of the owner's CSV, with the business name in the
+opening. There is no second store: the queue is a view of `leads.json`.
+
+```bash
+python3 -m tools.ytbot commercial sales import --network whatsapp \
+  --csv .local/commercial/whatsapp/sales/importar/<city>-<date>.csv --source google-maps-manual
+python3 -m tools.ytbot commercial sales queue list --network whatsapp          # order, status, next
+python3 -m tools.ytbot commercial sales queue send --network whatsapp --dry-run   # exact messages
+python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --limit 1
+```
+
+- **Membership and order.** `import` gives each new lead from a Maps source
+  (`google-maps-reviewed`, `google-maps-manual`) a `queue_position` in CSV row order; earlier
+  imports come first. Referrals (their own opening and limit), other sources, duplicates and
+  do-not-contact numbers never enter the queue, and nothing is sent at import. The order is
+  never re-sorted by score at send time.
+- **Status** comes from the lead, never from a separate file: `pending` (`new`), `sending`
+  (`opening`), `sent` (opened, whatever happened after), `unconfirmed`, `skipped`
+  (do-not-contact, no WhatsApp, or the number wrote first and is already being answered) and
+  `error` (the chat did not open; nothing was typed, so a later manual `send` may try again).
+  `queue list` masks every phone.
+- **Sending.** `queue send` is a dry run unless `--live`; `--limit` defaults to 1 (use 10 for the
+  day's batch, still one conversation at a time). Live, it takes the same run lock as `run`,
+  opens the same hidden WhatsApp browser and goes through `prospect` → `open_lead` →
+  `send_sequence`: the lead becomes `opening` with `opened_at` before the browser acts, the
+  journal fences every bubble, and a lead is `sent` only when `open_lead` returns `opened`. It
+  stops at the first `unconfirmed` or `error` and retries nothing by itself. The opening window
+  (08:30 to 17:30, Monday to Friday), the 10/day limit, pacing, do-not-contact and invalid
+  numbers apply exactly as in `run --prospect`; a blocked run prints the reason.
+- **One sender at a time.** `queue send --live` and `run` share the lock, so one refuses while
+  the other runs. Stop the `run` loop (SIGTERM ends it between two steps), send, then start it
+  again; replies wait for the next `run` cycle meanwhile.
+- **Crash recovery.** A lead left in `opening` (the process died mid-send) is reconciled by the
+  next `queue send --live` or `run --live`: it becomes `unconfirmed`, the owner is notified,
+  and it is never sent again. `queue send` then stops so the owner checks that chat first.
+- **The message.** The third bubble names the business exactly as on Google Maps:
+  "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e
+  aplicativos. Eu vi que no Google Maps a empresa {company} ainda não tem site." `{company}`
+  is the lead `name` (never the label, the saved contact name, a staff name or the note),
+  spaces normalized, trailing punctuation removed ("Vem Sorrir em Sinop." would end the
+  sentence) and cut at a word within `company_max_chars` (120); without a name the
+  previous "vocês não têm site" text (`[opening] unnamed`) is sent. Greeting, order, delays and
+  the four links are unchanged, and the opening never goes through the model. The phone number
+  is never written in a message.
 
 ## Conversation state machine
 
@@ -183,7 +247,7 @@ the model using only the facts.
 
 | Case | Intent | Action | Answer |
 | --- | --- | --- | --- |
-| First contact | opening | — | "Bom dia" (Boa tarde/Boa noite by hour) → "Tudo bem?" → introduction → "Nós temos alguns exemplos…" → four links, one per message |
+| First contact | opening | — | "Bom dia" (Boa tarde/Boa noite by hour) → "Tudo bem?" → introduction naming the business ("…a empresa {company} ainda não tem site.") → "Nós temos alguns exemplos…" → four links, one per message |
 | "Nesse momento não estou precisando", "não, obrigado", "agora não", "não" after the quote offer | `refusal` | block | Fixed thanks, then never contact again |
 | "Para de mandar", "spam", "vou denunciar" | `opt_out` | block | Fixed apology, never contact again |
 | Business auto-reply (absence, hours, menu) | `auto_reply` | ignore | Nothing, avoids bot loops |
@@ -192,6 +256,7 @@ the model using only the facts.
 | "Quem é?" | `who_are_you` | reply | Alexandre, Zaflas Inova Simples, what it does |
 | Wants a simple site, "como funciona?" | `site_institutional` | reply | Static site explained for laypeople; R$ 500 average, R$ 250 down, about 15 days; server R$ 39,90/month (boleto or Pix) or R$ 45 (card); offer a quote |
 | Asks for a system, app, scheduling, store, login | `system_request` | reply | Fixed: "Sim, nós podemos fazer isso." + "Você gostaria que eu fizesse um orçamento?" |
+| Asks for an unusual project or custom platform (casino, betting, raffle, marketplace, social network, portal, SaaS) | `custom_platform` | qualify | Starts the requirements interview directly (`brief_kind: system`), asking how the system should work and what features it needs before handing off to the owner |
 | "Quanto custa?" | `price` | reply | Site values from the facts; systems need a quote; offer a quote |
 | "Qual o prazo?" | `deadline` | reply | About 15 days for a site; systems in the quote |
 | Server, hosting, monthly fee | `hosting` | reply | Server values |
@@ -324,8 +389,9 @@ site. It interviews first, gently, and only then calls the owner:
 system_request (first time) → "Sim, nós podemos fazer isso" + clarification + offer question
 the interview starts when the interest is an app or system and the client
   accepts the offer ("sim")                                   ┐
-  describes the system again after the offer                  ├→ state qualifying, brief_kind system
-  asks something outside the facts ("emite nota fiscal?")     │   [brief_system] start + first question
+  asks for an unusual/custom platform ("site de cassino?")    │→ state qualifying, brief_kind system
+  describes the system again after the offer                  ├→ [brief_system] start/start_custom
+  asks something outside the facts ("emite nota fiscal?")     │   + tailored question
   wants to close ("quero fechar")  → start_buy, buy_intent    ┘
 each answer → the model (`sales/dossier_system.md`) updates the requirements and writes the next
   message: a short restatement of what it understood + at most two simple questions, in the
@@ -468,7 +534,8 @@ contact sees the messages arrive at these gaps. Owner values (2026-11-17):
 | Between two chats | 10–30 s (none when the next reply stays in the same chat) |
 
 The send is confirmed as soon as the new bubble appears (polled for up to 8 s). The chat list
-is scanned every 10 s (`--interval`). A chat that is already open for the same lead is reused:
+is scanned every 2 s (`--interval`, without reloading WhatsApp Web when the chat list is already
+mounted, reading the top rows in one DOM evaluation). A chat that is already open for the same lead is reused:
 no page reload and no between-chats pause, so a reply goes out about 10 to 20 s after the
 message instead of 40 to 70 s (measured 2026-11-18: 43 s from the scan to the delivered reply,
 30 s of it in the pause and the reload). One conversation at a time; typing stays the sender's chunked typing, never a paste. All values

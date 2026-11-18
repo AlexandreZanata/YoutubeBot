@@ -12,13 +12,14 @@ from zoneinfo import ZoneInfo
 from .. import listener as whatsapp_listener
 from . import central
 from . import llm as sales_llm
+from . import queue as sales_queue
 from . import rehearsal
 from .agent import (SalesAgent, WhatsAppChannel, owner_block, owner_reset, owner_resolve,
                     split_pending)
 from .decide import decide
 from .pacing import SalesPacing
 from .rules import RULES_PATH, RulesError, load
-from .store import AUTOMATED_STATES, SOURCES, SalesStore, mask, stamp
+from .store import AUTOMATED_STATES, SOURCES, SalesStore, mask, reply_is_active, stamp
 
 OWNER_STATES = ("needs-owner", "quote-requested", "owner", "unconfirmed")
 
@@ -55,6 +56,7 @@ def _public(lead: dict, show_phone: bool = False) -> dict:
                                            "opened_at", "followups", "last_in_at",
                                            "last_out_at", "handoff_reason")}
     view["phone"] = lead["phone"] if show_phone else mask(lead["phone"])
+    view["reply"] = "ativo" if reply_is_active(lead) else "pausado"
     return view
 
 
@@ -70,6 +72,39 @@ def command_import(args, store_factory) -> None:
     report["daily_openings"] = rules.limits["daily_openings"]
     central.write(store, now)
     _print(report)
+
+
+def _set_reply_active(args, store_factory, active: bool) -> None:
+    _, store, now = _context(args, store_factory)
+    leads = store.ensure_labels()
+    if args.lead and args.all:
+        raise SystemExit("[sales] use --lead <id> or --all, not both")
+    if args.lead:
+        lead = leads.get(args.lead)
+        if lead is None:
+            raise SystemExit(f"[sales] unknown lead {args.lead}")
+        selected = [lead]
+    elif args.all:
+        selected = list(leads.values())
+    else:
+        raise SystemExit("[sales] use --lead <id> or --all")
+    for lead in selected:
+        store.set_reply_active(lead["id"], active)
+    central.write(store, now)
+    _print({("activated" if active else "paused"): len(selected),
+            "leads": [{"id": lead["id"], "label": lead.get("label", ""),
+                       "name": lead.get("name", ""),
+                       "reply": "ativo" if active else "pausado"} for lead in selected]})
+
+
+def command_activate(args, store_factory) -> None:
+    """Keep answering every selected imported number when it writes first."""
+    _set_reply_active(args, store_factory, True)
+
+
+def command_pause(args, store_factory) -> None:
+    """Stop automatic replies for one number or all of them."""
+    _set_reply_active(args, store_factory, False)
 
 
 def command_leads(args, store_factory) -> None:
@@ -218,7 +253,7 @@ def command_simulate(args, store_factory) -> None:
         lead = {"id": "Lsimulacao", "name": args.name, "category": "", "city": "",
                 "state": args.state, "phone": ""}
         history = [{"at": stamp(now), "dir": "out", "text": text, "state": "sent"}
-                   for text in rules.opening_messages(now)]
+                   for text in rules.opening_messages(now, lead["name"])]
     decision = decide(rules, lead, history, args.text, _model(rules, store, not args.no_llm),
                       now)
     pacing = SalesPacing.from_rules(rules)
@@ -384,10 +419,76 @@ def command_run(args, store_factory, page_factory) -> None:
     try:
         agent = SalesAgent(rules, store, session.channel if args.live else None, model,
                            live=args.live)
+        if args.live:
+            for item in agent.reconcile_openings():
+                print(json.dumps({"reconciled": item}, ensure_ascii=False), flush=True)
         run_cycles(agent, session, args, stopped=lambda: bool(requested))
     finally:
         signal.signal(signal.SIGTERM, previous)
         session.close()
+        store.release()
+
+
+def _queue_preview(rules, store, now, limit: int) -> list[dict]:
+    rows = [row for row in sales_queue.items(store) if row["status"] in sales_queue.SENDABLE]
+    return [{**row, "messages": rules.opening_messages(now, store.lead(row["lead"])["name"])}
+            for row in rows[:limit]]
+
+
+def command_queue(args, store_factory, page_factory) -> None:
+    """The opening queue: `list` it, or `send` the next number(s), one conversation at a time.
+
+    The queue is `leads.json` itself (Maps leads in CSV order). `send` is a dry run unless
+    `--live`; live, it holds the same run lock as `run`, reconciles an interrupted opening
+    first, and sends through the same `prospect` -> `open_lead` -> `send_sequence` path.
+    """
+    rules, store, now = _context(args, store_factory)
+    quiet = SalesAgent(rules, store, None, None, live=False, log=lambda message: None)
+    limit = max(1, int(args.limit))
+    if args.operation == "list":
+        rows = sales_queue.items(store)
+        sendable = [row for row in rows if row["status"] in sales_queue.SENDABLE]
+        _print({"items": rows, "next": sendable[0] if sendable else None,
+                "blocked": quiet.opening_blocker(queue_only=True),
+                "openings_today": quiet.openings_today("cold"),
+                "daily_limit": int(rules.limits["daily_openings"])})
+        return
+    if args.live and args.dry_run:
+        raise SystemExit("[sales] use --live or --dry-run, not both")
+    if not args.live:
+        _print({"dry_run": True, "blocked": quiet.opening_blocker(queue_only=True),
+                "would_send": _queue_preview(rules, store, now, limit)})
+        return
+    if not store.acquire():
+        raise SystemExit("[sales] another sales process is sending (run or queue send); "
+                         "only one process sends at a time")
+    session = None
+    try:
+        reconciled = SalesAgent(rules, store, None, None, live=False).reconcile_openings()
+        if reconciled:
+            central.write(store, now)
+            _print({"sent": [], "stopped": "abertura interrompida encontrada: confira a "
+                    "conversa antes de continuar; nada foi reenviado", "reconciled": reconciled})
+            raise SystemExit(1)
+        blocked = quiet.opening_blocker(queue_only=True)
+        if blocked or not _queue_preview(rules, store, now, 1):
+            _print({"sent": [], "blocked": blocked or "nenhum número pendente na fila"})
+            return
+        try:
+            session = Session(args, page_factory, rules, store)
+        except RuntimeError as error:
+            raise SystemExit(f"[sales] {error}")
+        agent = SalesAgent(rules, store, session.channel, None, live=True)
+        results = agent.prospect(limit, queue_only=True)
+        central.write(store, agent.now())
+        _print({"sent": results, "queue": [row for row in sales_queue.items(store)
+                                           if row["lead"] in {item["lead"] for item in results}]})
+        if any(item["state"] in ("unconfirmed", "error") for item in results):
+            raise SystemExit("[sales] the queue stopped: a send was not confirmed or failed. "
+                             "Check the chat; nothing is retried automatically.")
+    finally:
+        if session is not None:
+            session.close()
         store.release()
 
 
@@ -408,6 +509,14 @@ def add_parser(actions, store_factory, page_factory) -> None:
     importer.add_argument("--csv", required=True)
     importer.add_argument("--source", choices=SOURCES, default="google-maps-reviewed",
                           help="where the reviewed rows came from (default: google-maps-reviewed)")
+    activate = action("activate", "answer replies from every selected imported number",
+                      partial(command_activate, store_factory=store_factory))
+    activate.add_argument("--lead", default=None)
+    activate.add_argument("--all", action="store_true")
+    pause = action("pause", "pause automatic replies for one number or all",
+                   partial(command_pause, store_factory=store_factory))
+    pause.add_argument("--lead", default=None)
+    pause.add_argument("--all", action="store_true")
     leads = action("leads", "list leads (phones masked)",
                    partial(command_leads, store_factory=store_factory))
     leads.add_argument("--state", default=None)
@@ -458,6 +567,15 @@ def add_parser(actions, store_factory, page_factory) -> None:
     rehearse.add_argument("--only", default=None, help="scenarios whose name contains this")
     rehearse.add_argument("--json", action="store_true")
     rehearse.add_argument("--no-llm", action="store_true")
+    queue = action("queue", "the opening queue: list it or send the next number(s)",
+                   partial(command_queue, store_factory=store_factory,
+                           page_factory=page_factory))
+    queue.add_argument("operation", choices=("list", "send"))
+    queue.add_argument("--live", action="store_true", help="actually send (send only)")
+    queue.add_argument("--dry-run", action="store_true",
+                       help="show what would be sent (the default for send)")
+    queue.add_argument("--limit", type=int, default=1,
+                       help="numbers to open in this run, one conversation at a time (default 1)")
     run = action("run", "listen, answer, follow up and (with --prospect) open new leads",
                  partial(command_run, store_factory=store_factory, page_factory=page_factory))
     run.add_argument("--live", action="store_true", help="actually send")
@@ -465,8 +583,8 @@ def add_parser(actions, store_factory, page_factory) -> None:
                      help="also send openings to new leads (daily limit applies)")
     run.add_argument("--limit", type=int, default=None, help="max openings in this run")
     run.add_argument("--once", action="store_true")
-    run.add_argument("--interval", type=int, default=10,
-                     help="seconds between two scans of the chat list (default 10)")
+    run.add_argument("--interval", type=int, default=2,
+                     help="seconds between two scans of the chat list (default 2)")
     run.add_argument("--max-cycles", type=int, default=0)
     run.add_argument("--max-chats", type=int, default=30)
     run.add_argument("--no-llm", action="store_true")

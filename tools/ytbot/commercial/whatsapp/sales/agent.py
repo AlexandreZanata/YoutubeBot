@@ -26,7 +26,8 @@ from .context import effective
 from .decide import Decision, _fixed, decide, stuck
 from .pacing import SalesPacing
 from .rules import SalesRules, normalize
-from .store import SalesStore, stamp
+from .queue import in_queue, order_key
+from .store import SalesStore, reply_is_active, stamp
 from .transcribe import local_transcriber
 
 REPLYABLE = ("engaged", "qualifying", "gatekeeper")
@@ -47,12 +48,24 @@ OWNER_ACTIONS = ("handoff", "quote", "won", "buy", "lose")
 # describing it, the requirements interview starts instead of offering again.
 SYSTEM_OFFERS = ("system_request", "system_price", "app_at_site_price")
 # A correction or an addition after the summary, not a plain "yes".
-CORRECTION = re.compile(r"\b(mas|porem|faltou|falta|so que|corrig\w*|acrescent\w*|tambem|"
-                        r"alem disso|errad\w*|nao)\b")
-CONFIRMED = re.compile(r"\b(certo|correto|exato|isso mesmo|perfeito|esta certo|ta certo|"
-                       r"tudo certo|pode seguir|isso ai)\b")
-SYSTEM_WORDS = re.compile(r"sistema|aplicativo|\bapps?\b|loja (virtual|online)|e-?commerce|"
-                          r"agendamento|cadastro|\blogin\b|painel|delivery")
+CORRECTION = re.compile(r"\b(mas|porem|faltou|falta|so que|corrig\w*|acrescent\w*|adicion\w*|"
+                        r"esquec\w*|inclu\w*|tambem|alem disso|errad\w*|nao|mudar|alterar|trocar)\b")
+CONFIRMED = re.compile(
+    r"\b(certo|correto|exat\w*|isso mesmo|isso msm|perfeit\w*|esta certo|ta certo|"
+    r"tudo certo|tudo ok|ta ok|pode seguir|pode mandar|pode tocar|manda ver|manda brasa|"
+    r"bota pra frente|isso a[ie]|iss[ao]e|e isso a[ie]|positivo|afirmativo|confirmad[oa]|"
+    r"confirmo|concordo|de acordo|fechou|combinado|beleza|blz|show|top|joia|maravilha|"
+    r"tranquilo)\b"
+)
+SYSTEM_WORDS = re.compile(
+    r"sistema|aplicativo|\bapps?\b|loja (virtual|online)|e-?commerce|"
+    r"agendamento|cadastro|\blogin\b|painel|delivery|"
+    r"cassino|tigrinho|jogo do bicho|jogo de (aposta|azar|cassino)|"
+    r"\bbets?\b|aposta|roleta|caca[- ]?niquel|\bslots?\b|\bpoker\b|\bbingo\b|"
+    r"\brifas?\b|sorteio|\bbolao\b|loteria|plataforma|marketplace|rede social|"
+    r"\bleilao\b|\bsaas\b|streaming|area de membros|clube de assinatura|"
+    r"portal (de|do|da|para|com)|cripto|exchange|\berp\b|\bcrm\b|\bpdv\b"
+)
 SITE_WORDS = re.compile(r"\bsite\b|institucional|pagina")
 
 
@@ -292,6 +305,15 @@ class SalesAgent:
                                              "message_at": event.get("message_at", ""),
                                              "source": "preview"})
             changes = {"last_in_at": now, "chat": event.get("chat") or lead.get("chat")}
+            if not reply_is_active(lead) and lead["state"] not in ("do-not-contact",
+                                                                       "invalid-number"):
+                changes["state"] = "needs-owner"
+                self.store.update_lead(lead["id"], **changes)
+                if self._remind(lead):
+                    self._handoff(lead, "Mensagem de um contato com respostas automáticas "
+                                  "pausadas", event["text"], "needed")
+                touched.append(lead["id"])
+                continue
             if lead["state"] in REOPENS:
                 changes["state"] = "engaged"
                 changes["awaiting"] = event.get("id")
@@ -480,7 +502,9 @@ class SalesAgent:
             confirmations = int(lead.get("confirmations", 0)) + 1
             plain = normalize(text)
             agreed = (not CORRECTION.search(plain)
-                      and (bool(CONFIRMED.search(plain)) or dossier.client_said_done(self.rules, text)
+                      and (bool(CONFIRMED.search(plain)) or bool(decision.updates.get("buy_intent"))
+                           or bool(brief.get("cliente_terminou"))
+                           or dossier.client_said_done(self.rules, text)
                            or any(re.search(pattern, plain)
                                   for pattern in self.rules.context["affirmative"])))
             summary = self._summary(brief) if model_ready else ""
@@ -492,12 +516,14 @@ class SalesAgent:
             decision.source = "model"
             return decision
         question = (brief.get("proxima_pergunta") or "").strip()
-        done = ((not starting and (dossier.client_said_done(self.rules, text)
-                                   or brief.get("cliente_terminou")))
+        done = (not starting and (
+                    dossier.client_said_done(self.rules, text)
+                    or brief.get("cliente_terminou")
+                    or (model_ready and not brief.get("faltando") and not question))
                 or turns >= int(texts["max_collect_turns"])
-                or (not model_ready and turns >= 2)
-                or (model_ready and not brief.get("faltando") and not question))
-        intro = list(texts["start_buy" if decision.start == "buy" else "start"]) if starting else []
+                or (not model_ready and turns >= 2))
+        start_key = {"buy": "start_buy", "custom": "start_custom"}.get(decision.start, "start")
+        intro = list(texts[start_key]) if starting else []
         if done:
             summary = self._summary(brief) if model_ready else ""
             if not summary:
@@ -510,7 +536,8 @@ class SalesAgent:
         if question:
             decision.messages, decision.source = intro + [question], "model"
         else:
-            fallback = texts["first_question"] if starting else texts["fallback_question"]
+            first_key = "first_question_custom" if decision.start == "custom" else "first_question"
+            fallback = texts[first_key] if starting else texts["fallback_question"]
             decision.messages, decision.source = intro + [fallback], "fixed"
         return decision
 
@@ -654,6 +681,9 @@ class SalesAgent:
                                 updates={"buy_intent": True})
         elif decision.intent == "ready_to_buy" and interest == "system":
             decision = self._start_interview(decision, "buy")
+        elif decision.intent == "custom_platform" and lead["state"] == "engaged":
+            # Unusual or custom platform request: start the requirements interview directly.
+            decision = self._start_interview(decision, "custom")
         elif interest == "system" and lead["state"] == "engaged" and (
                 decision.intent in ("quote_accept", "unknown")
                 or (decision.intent in SYSTEM_OFFERS
@@ -796,7 +826,8 @@ class SalesAgent:
         if decision.action in OWNER_ACTIONS:
             changes["handoff_reason"] = decision.intent
         interest = interest_of(text) or lead.get("interest", "")
-        if decision.intent in ("system_request", "system_price", "app_at_site_price"):
+        if decision.intent in ("system_request", "system_price", "app_at_site_price",
+                               "custom_platform"):
             interest = "system"
         elif decision.intent in ("site_institutional", "hosting", "domain", "close_site") and \
                 interest != "system":
@@ -827,22 +858,53 @@ class SalesAgent:
         return {**result, "state": state}
 
     # Openings and follow-ups ---------------------------------------------------------
-    def prospect(self, limit: int | None = None) -> list[dict]:
-        now = self.now()
-        if not self.rules.in_window(now, "opening"):
-            self.log("outside opening hours; no first contact now")
+    def opening_blocker(self, queue_only: bool = False) -> str:
+        """Why no first contact may start now ("" when one may), in the owner's words."""
+        hours = self.rules.raw["hours"]
+        if not self.rules.in_window(self.now(), "opening"):
+            days = ("segunda a sexta" if list(hours["opening_days"]) == [0, 1, 2, 3, 4]
+                    else "nos dias de abertura")
+            return (f"fora do horário de abertura ({hours['opening_start']} às "
+                    f"{hours['opening_end']}, {days})")
+        limit = int(self.rules.limits["daily_openings"])
+        cold = limit - self.openings_today("cold")
+        referral = int(self.rules.raw["referral"]["daily_limit"]) - self.openings_today("referral")
+        if cold <= 0 and (queue_only or referral <= 0):
+            return f"limite diário de {limit} aberturas atingido"
+        return ""
+
+    def reconcile_openings(self) -> list[dict]:
+        """An opening that started and never finished (a crash) becomes unconfirmed.
+
+        It is never sent again and the owner checks the chat. Only safe while this process
+        holds the run lock, so no other process is in the middle of that send.
+        """
+        found = []
+        for lead in list(self.store.leads().values()):
+            if lead.get("state") != "opening":
+                continue
+            self.store.update_lead(lead["id"], state="unconfirmed",
+                                   handoff_reason="abertura interrompida")
+            self._handoff(lead, "Abertura interrompida antes de confirmar: confira a conversa "
+                          "no WhatsApp; nada foi reenviado")
+            found.append({"lead": lead["id"], "name": lead["name"], "state": "unconfirmed"})
+        return found
+
+    def prospect(self, limit: int | None = None, queue_only: bool = False) -> list[dict]:
+        """Open new leads one at a time; `queue_only` keeps to the Maps queue (`sales queue`)."""
+        blocked = self.opening_blocker(queue_only)
+        if blocked:
+            self.log(f"no first contact now: {blocked}")
             return []
         left = {"cold": int(self.rules.limits["daily_openings"]) - self.openings_today("cold"),
                 "referral": int(self.rules.raw["referral"]["daily_limit"])
                 - self.openings_today("referral")}
-        if left["cold"] <= 0 and left["referral"] <= 0:
-            self.log("daily opening limit reached")
-            return []
-        # Referred numbers first: someone at the business asked us to talk to them.
+        # Referred numbers first: someone at the business asked us to talk to them. Maps
+        # leads keep the owner's CSV order (`queue_position`).
         candidates = sorted((lead for lead in self.store.leads().values()
-                             if lead["state"] == "new" and not lead.get("opened_at")),
-                            key=lambda lead: (not lead.get("referral"),
-                                              lead.get("imported_at") or ""))
+                             if lead["state"] == "new" and not lead.get("opened_at")
+                             and (in_queue(lead) or not queue_only)),
+                            key=lambda lead: (not lead.get("referral"), *order_key(lead)))
         results = []
         for lead in candidates:
             kind = "referral" if lead.get("referral") else "cold"
@@ -871,7 +933,7 @@ class SalesAgent:
         source = lead.get("referral") or {}
         messages = (self.rules.referral_opening(now, source.get("staff", ""),
                                                 source.get("company", lead["name"]))
-                    if source else self.rules.opening_messages(now))
+                    if source else self.rules.opening_messages(now, lead.get("name", "")))
         if not self.live:
             return {**result, "state": "planned", "messages": messages}
         items = self._items(lead, "opening", messages, None, self.rules.opening_delays())
@@ -884,12 +946,15 @@ class SalesAgent:
         try:
             status = self._open_chat(lead)
         except Exception as error:
-            self.store.update_lead(lead["id"], state="new", opened_at=None)
+            # Nothing was typed yet: the lead stays new and the error is shown in the queue.
+            self.store.update_lead(lead["id"], state="new", opened_at=None,
+                                   open_error=str(error)[:200])
             return {**result, "state": "error", "error": str(error)[:300]}
         if status != "ready":
             self.store.update_lead(lead["id"], state="invalid-number", opened_at=None)
             return {**result, "state": "invalid-number"}
         listener.allow_contact(self.store.contact_rules_path, self._contact_entry(lead))
+        self.store.update_lead(lead["id"], open_error=None)
         results = self.channel.send(lead, items, {"kind": "sales-opening", "lead": lead["id"]})
         done, worst = self._remember_sent(lead, items, results, "opening")
         if not done:

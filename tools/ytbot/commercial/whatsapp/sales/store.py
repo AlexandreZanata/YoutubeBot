@@ -33,6 +33,8 @@ TERMINAL_STATES = ("do-not-contact", "no-response", "invalid-number")
 # Where leads come from; the acquisition module (Receita Federal, manual Maps search) adds rows
 # through `import_rows` with its own source so numbering and contact export stay the same.
 SOURCES = ("google-maps-reviewed", "google-maps-manual", "receita-federal", "manual", "referral")
+# Sources that enter the opening queue (`sales queue`), in CSV row order.
+QUEUE_SOURCES = ("google-maps-reviewed", "google-maps-manual")
 
 
 def stamp(now: datetime) -> str:
@@ -56,6 +58,11 @@ def canonical_phone(raw: str) -> str | None:
     if len(subscriber) == 9 and not subscriber.startswith("9"):
         return None
     return "55" + national
+
+
+def reply_is_active(lead: dict) -> bool:
+    """Imported leads answer replies by default; the owner can pause one or all."""
+    return bool(lead.get("reply_active", True))
 
 
 def phone_key(phone: str) -> str | None:
@@ -223,6 +230,13 @@ class SalesStore:
         self.save_leads(leads)
         return leads[identifier]
 
+    def set_reply_active(self, identifier: str, active: bool) -> dict:
+        """Activate or pause automatic replies for one imported number."""
+        changes = {"reply_active": bool(active)}
+        if not active:
+            changes["awaiting"] = None
+        return self.update_lead(identifier, **changes)
+
     def ensure_labels(self, leads: dict[str, dict] | None = None) -> dict[str, dict]:
         """Give every lead a category number (barbearia-1, barbearia-2, ...), never reused."""
         own = leads is None
@@ -327,6 +341,9 @@ class SalesStore:
                   "labels": [], "contacts_file": None, "ids": []}
         leads = self.ensure_labels(self.leads())
         added = []
+        queued = source in QUEUE_SOURCES and not (extra or {}).get("referral")
+        position = max((int(lead.get("queue_position") or 0) for lead in leads.values()),
+                       default=0)
         for line, row in enumerate(rows, start=first_line):
             reason = self._reject_reason(row)
             if reason:
@@ -344,15 +361,20 @@ class SalesStore:
                 "id": identifier, "name": row["name"], "phone": phone,
                 "city": row.get("city", ""), "category": row.get("category", ""),
                 "maps_url": row.get("maps_url", ""), "note": row.get("note", ""),
-                "source": source, "state": "new",
+                "source": source, "state": "new", "reply_active": True,
                 "imported_at": stamp(now), "opened_at": None, "followups": 0,
                 "last_out_at": None, "last_in_at": None, "awaiting": None,
                 "replies": {}, "handoff_reason": None, "chat": None, **(extra or {}),
             }
+            if queued:
+                # The owner's CSV order is the opening order; never re-sorted at send time.
+                position += 1
+                leads[identifier]["queue_position"] = position
             self.ensure_labels(leads)
             added.append(leads[identifier])
             report["imported"] += 1
         self.save_leads(leads)
+        report["reply_active"] = len(added)
         report["labels"] = [f"{lead['label']} {lead['name']}" for lead in added]
         report["ids"] = [lead["id"] for lead in added]
         if added:
