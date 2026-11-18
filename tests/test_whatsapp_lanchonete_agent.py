@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from sales_fixtures import Clock, FakeChannel, FakeModel
-from tools.ytbot.commercial.whatsapp.lanchonete.agent import LanchoneteAgent, owner_resolve
+from tools.ytbot.commercial.whatsapp.lanchonete.agent import (LanchoneteAgent, is_ours,
+                                                              owner_resolve, text_plain)
 from tools.ytbot.commercial.whatsapp.lanchonete.rules import load
 from tools.ytbot.commercial.whatsapp.lanchonete.store import LanchoneteStore
 
@@ -30,10 +31,10 @@ class LanchoneteAgentTests(unittest.TestCase):
     def tearDown(self):
         self.directory.cleanup()
 
-    def say(self, text):
+    def say(self, text, chat=None):
         self.count += 1
         self.clock.now += timedelta(minutes=1)
-        self.agent.ingest([{"id": f"e{self.count}", "chat": self.chat, "text": text}])
+        self.agent.ingest([{"id": f"e{self.count}", "chat": chat or self.chat, "text": text}])
         return self.agent.reply_pending()
 
     def customer(self):
@@ -189,6 +190,51 @@ class LanchoneteAgentTests(unittest.TestCase):
         agent.reply_pending()
         self.assertEqual(store.find_lead("(65) 90000-0003")["cart"], [])
 
+    def test_two_customers_keep_separate_carts_and_states(self):
+        self.say("oi")
+        self.say("quero um x-tudo")
+        other = "(65) 90000-0002"
+        self.say("oi", chat=other)
+        self.say("quero uma coca", chat=other)
+        felipe = self.store.find_lead(self.chat)
+        thainan = self.store.find_lead(other)
+        self.assertEqual([line["item_id"] for line in felipe["cart"]], ["x-tudo"])
+        self.assertEqual([line["item_id"] for line in thainan["cart"]], ["coca-lata"])
+        self.assertEqual(felipe["state"], "ordering")
+        self.assertEqual(thainan["state"], "ordering")
+        self.assertNotEqual(felipe["id"], thainan["id"])
+
+    def test_a_new_agent_restores_the_saved_cart_and_state(self):
+        self.say("oi")
+        self.say("quero um x-tudo")
+        agent = LanchoneteAgent(self.rules, self.store, self.channel, None, live=True,
+                                clock=self.clock, sleep=lambda seconds: None,
+                                notify=self.notes.append, log=lambda message: None)
+        self.agent = agent
+        self.say("mais uma coca")
+        cart = [line["item_id"] for line in self.customer()["cart"]]
+        self.assertEqual(cart, ["x-tudo", "coca-lata"])
+
+    def test_recover_clears_only_the_unconfirmed_state(self):
+        self.say("oi")
+        self.store.update_lead(self.customer()["id"], state="unconfirmed",
+                               handoff_reason="send failed")
+        recovered = self.store.recover_unconfirmed(self.clock.now)
+        self.assertEqual(len(recovered), 1)
+        customer = self.customer()
+        self.assertEqual(customer["state"], "ordering")
+        self.assertIsNone(customer["handoff_reason"])
+
+    def test_opening_sends_the_menu_once_without_replaying_the_history(self):
+        customer = self.store.ensure_customer(self.chat, self.clock.now)
+        self.store.update_lead(customer["id"], phone="556696384527", chat=self.chat)
+        result = self.agent.opening(customer)
+        self.assertEqual(result["state"], "ordering")
+        self.assertTrue(any("X-Bacon" in text for text in self.sent()))
+        before = len(self.sent())
+        self.agent.opening(customer)
+        self.assertEqual(len(self.sent()), before)
+
     def test_allowlist_answers_only_the_selected_numbers_or_titles(self):
         agent = LanchoneteAgent(self.rules, self.store, self.channel, None, live=True,
                                 clock=self.clock, sleep=lambda seconds: None,
@@ -254,6 +300,12 @@ class LanchoneteAgentTests(unittest.TestCase):
         self.say("quero uma coca")
         cart = self.customer()["cart"]
         self.assertEqual([line["item_id"] for line in cart], ["coca-lata"])
+
+    def test_formatted_menu_bubbles_are_recognized_as_the_bots_own(self):
+        sent = [text_plain("*Hot dogs*\n• Hot Dog — R$ 12,00\n• Hot Dog Completo — R$ 16,00")]
+        self.assertTrue(is_ours("Hot dogs\n\nHot Dog — R$ 12,00\nHot Dog Completo — R$ 16,00",
+                                sent))
+        self.assertFalse(is_ours("quero pedir a atendente", sent))
 
     def test_owner_typing_in_the_chat_pauses_the_automation(self):
         self.say("oi")

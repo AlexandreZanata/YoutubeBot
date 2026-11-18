@@ -651,7 +651,9 @@ priority = "hot"
 reason = "Cliente pediu para falar com uma pessoa"
 patterns = [
   'falar com (um |o |a )?(atendente|humano|pessoa|responsavel|dono|gerente|atendimento)',
-  'quero (um |o )?atendente', 'atendimento humano', 'chama (o )?(atendente|responsavel|gerente)',
+  'quero (um |o )?atendente', 'quero pedir (o |a |um |uma )?atendente',
+  'pedir (o |a |um |uma )?atendente', 'atendimento humano',
+  'chama (o )?(atendente|responsavel|gerente)',
   'quero falar com alguem', 'me passa para (um |o )?(atendente|responsavel)',
 ]
 messages = ["Claro! Já chamo o atendente e ele continua com você por aqui. 😊"]

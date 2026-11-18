@@ -83,6 +83,26 @@ class LanchoneteStore(SalesStore):
     def customer_dir(self, customer: dict) -> Path:
         return dossier.client_dir(self.root, customer)
 
+    def recover_unconfirmed(self, now: datetime) -> list[dict]:
+        """Owner/service recovery: clear a transient failed-send state without retrying it.
+
+        The message that was uncertain is left in the journal and the conversation; the
+        customer is not messaged again. A new incoming message starts a clean turn.
+        """
+        leads = self.leads()
+        recovered = []
+        for lead in leads.values():
+            if lead.get("state") != "unconfirmed":
+                continue
+            lead.update(state="ordering" if lead.get("cart") else "ordering",
+                        awaiting=None, awaiting_field="", closing=False,
+                        handoff_reason=None, unknown_count=0, confirmations=0,
+                        recovered_at=stamp(now))
+            recovered.append(lead)
+        if recovered:
+            self.save_leads(leads)
+        return recovered
+
     # Orders --------------------------------------------------------------------------
     def orders(self) -> list[dict]:
         data = _read_json(self.orders_path, {})

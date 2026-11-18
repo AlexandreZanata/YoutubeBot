@@ -102,7 +102,7 @@ owner typed in the chat ─▶ human        send not confirmed ─▶ unconfirme
 | `cancelled` | "Pedido cancelado" | New message starts a new order |
 | `closed` | Closed notice once per hour | Window opens and customer writes |
 | `needs-owner`, `human` | None; new messages notify the owner | `resolve` |
-| `unconfirmed` | None; the owner checks the chat | `resolve` |
+| `unconfirmed` | None; the owner checks the chat | `recover` or `resolve` |
 | `do-not-contact` | Never | Owner decision; a new message only notifies |
 
 The bot collects, in this order: order type (delivery or pickup), full address (delivery only),
@@ -163,6 +163,19 @@ The bot never writes a price, discount, free item, guarantee, Pix key or deliver
 outside the rules. The guard checks every outgoing batch against the catalog and the current
 order; a blocked batch becomes a short hand-off to the owner.
 
+## Per-customer state and restart
+
+Every customer has one row in `leads.json` (state, cart, delivery fields, awaiting message,
+counters) and one `conversations/<id>.jsonl` memory file. Opening or restarting the bot reads
+that state from disk; there is no shared conversation buffer. Two customers can order at the
+same time without seeing each other's items.
+
+`run --recover` is the normal restart flag: it only clears `unconfirmed` rows left by a failed
+send, without resending anything. `human` and `needs-owner` remain untouched until the owner
+uses `resolve`; those are real hand-offs, not transient failures. `opening` avoids the old
+history entirely and `_open_chat` verifies the WhatsApp title before reading or sending, so a
+stale tab cannot write one customer's bubbles into another customer's memory.
+
 ## Model use
 
 The free-first `sales.llm.ModelRouter` is reused. The model has one job: read a free-form
@@ -185,14 +198,18 @@ python3 -m tools.ytbot commercial lanchonete simulate --network whatsapp --at 19
   --text "retirada" --text "Ana" --text "pix" --text "sim"
 python3 -m tools.ytbot commercial lanchonete allow     --network whatsapp \
   --phone "+55 66 90000-0001" --name "Cliente Teste" [--chat "Título no WhatsApp"]
+python3 -m tools.ytbot commercial lanchonete opening   --network whatsapp --customer C...
 python3 -m tools.ytbot commercial lanchonete customers --network whatsapp [--state ordering]
 python3 -m tools.ytbot commercial lanchonete pedidos   --network whatsapp [--today]
 python3 -m tools.ytbot commercial lanchonete ficha     --network whatsapp --order BP-20261118-001
 python3 -m tools.ytbot commercial lanchonete resolve   --network whatsapp --customer C... \
   --state closed
+python3 -m tools.ytbot commercial lanchonete recover   --network whatsapp --customer C...
+python3 -m tools.ytbot commercial lanchonete recover   --network whatsapp --all
 python3 -m tools.ytbot commercial lanchonete block     --network whatsapp --customer C...
 python3 -m tools.ytbot commercial lanchonete run       --network whatsapp --once
-python3 -m tools.ytbot commercial lanchonete run       --network whatsapp --live --interval 10
+python3 -m tools.ytbot commercial lanchonete run       --network whatsapp --live --interval 10 \
+  [--recover]
 ```
 
 - `check` validates the rules and prints the menu/payment/counter summary; `--ping` makes one
@@ -204,11 +221,16 @@ python3 -m tools.ytbot commercial lanchonete run       --network whatsapp --live
   recognized before the first message. `run --only <phone>` restricts the run to those numbers;
   repeat `--only` for more than one. Without `--only` the bot answers any chat that writes
   first, which is the normal dedicated-number mode.
-- `run` scans the chat list, answers ordering customers and confirms orders. It stops on the
-  first send that is not confirmed. A browser page that closed outside a send reconnects up to
-  three times; a failed send still stops the run. `SIGTERM` ends between two steps.
-- `resolve` hands a chat back to the bot after the owner handled it; `block` adds the number to
-  the do-not-contact list.
+- `opening` sends one greeting/menu to a registered customer without replaying the old chat.
+  It skips blocks already recorded as sent, so a failed menu can be completed without repeating
+  the bubbles the customer already received.
+- `run` scans the chat list, answers ordering customers and confirms orders. A send failure
+  fences only that customer (`unconfirmed`) and notifies the owner; the other chats continue.
+  A browser page that closed outside a send reconnects up to three times. `SIGTERM` ends
+  between two steps. `--recover` clears transient unconfirmed states at startup without
+  retrying the uncertain message.
+- `recover` clears `unconfirmed` for one customer or all of them; `resolve` hands a chat back
+  to the bot after the owner handled it; `block` adds the number to the do-not-contact list.
 
 ## Safeguards
 
@@ -216,7 +238,9 @@ python3 -m tools.ytbot commercial lanchonete run       --network whatsapp --live
 - Only chats with a first inbound message are touched. Group-like previews (`João: ...` on a
   non-phone chat) are skipped; there is no group ordering.
 - The journal records each message before typing; an `unconfirmed`, `error` or dangling
-  `started` key is never retried and the run stops.
+  `started` key is never retried. The affected customer is fenced and the run continues with
+  the other chats. A `started`/`error` entry whose error is exactly "the text did not reach the
+  composer; nothing was sent" may be retried, because no bubble was created.
 - Refusal or opt-out goes to the do-not-contact store and the reply rules; no message ever
   again, including after a restart.
 - At most 20 automated replies per customer per day; then the owner takes over.

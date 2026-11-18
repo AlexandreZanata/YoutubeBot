@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 from .. import listener, sender
 from ..sales import dossier
 from ..sales import notify as owner_notify
-from ..sales.agent import WhatsAppChannel, split_pending, _ours
+from ..sales.agent import WhatsAppChannel, split_pending
 from ..sales.pacing import SalesPacing
 from ..sales.rules import normalize
 from . import guard, interpreter, parser
@@ -41,12 +41,36 @@ MEDIA_TEXT = {"image": "[imagem]", "video": "[vídeo]", "document": "[documento]
               "audio": "[áudio]"}
 
 
+def text_plain(value: str) -> str:
+    """Formatting-insensitive text used to recognize the bot's own outgoing bubbles."""
+    return re.sub(r"[^a-z0-9]+", " ", normalize(value)).strip()
+
+
+def is_ours(text: str, sent: list[str]) -> bool:
+    plain = text_plain(text)
+    if not plain:
+        return True
+    for item in sent:
+        if not item:
+            continue
+        if plain == item or plain.startswith(item) or item.startswith(plain):
+            return True
+        if len(plain) >= 24 and (plain[:24] in item or item[:24] in plain):
+            return True
+    return False
+
+
 def stamp_now(now: datetime) -> str:
     return now.isoformat(timespec="seconds")
 
 
 class LanchoneteChannel(WhatsAppChannel):
     """The sales browser channel with this module's private debug folder."""
+
+    def __init__(self, page, pacing, journal_path):
+        super().__init__(page, pacing, journal_path)
+        # The menu is long; a faster but still chunked typing keeps the chat moving.
+        self.typing = sender.Pacing(typing_min_ms=10, typing_max_ms=25)
 
     def send(self, lead: dict, items: list[dict], extra: dict) -> list[dict]:
         return sender.send_sequence(self.page, lead["name"], items, self.typing,
@@ -274,30 +298,54 @@ class LanchoneteAgent:
         title_of = getattr(self.channel, "chat_title", None)
         if status != "ready" or not callable(title_of):
             return status
+        expected = (customer.get("chat") or "").strip()
         title = (title_of() or "").strip()
+        if expected:
+            for _ in range(10):
+                if title and title.casefold() == expected.casefold():
+                    break
+                page = getattr(self.channel, "page", None)
+                if page is not None:
+                    page.wait_for_timeout(500)
+                title = (title_of() or "").strip()
+            if title and title.casefold() != expected.casefold():
+                # A stale/new tab can still show the previous chat just after navigation.
+                self.channel.current = None
+                status = self.channel.open(customer)
+                if status == "ready":
+                    for _ in range(6):
+                        title = (title_of() or "").strip()
+                        if title and title.casefold() == expected.casefold():
+                            break
+                        page = getattr(self.channel, "page", None)
+                        if page is not None:
+                            page.wait_for_timeout(500)
+        if expected and title and title.casefold() != expected.casefold():
+            self.log(f"chat title {title!r} does not match {expected!r}; not sending")
+            return "wrong-chat"
         if title and title != customer.get("chat"):
             owner = self.store.find_lead(title)
-            if owner is None or owner["id"] == customer["id"]:
+            if (owner is None or owner["id"] == customer["id"]) and                     (not expected or expected == customer.get("phone")):
                 self.store.update_lead(customer["id"], chat=title)
                 customer["chat"] = title
         return status
 
     def _owner_typed(self, customer: dict, bubbles: list[dict]) -> list[str]:
         history = self.store.history(customer["id"])
-        ours = [normalize(entry.get("text", "")) for entry in history
+        ours = [text_plain(entry.get("text", "")) for entry in history
                 if entry.get("dir") == "out"]
         anchor = max((index for index, bubble in enumerate(bubbles)
                       if bubble["dir"] == "out" and bubble.get("text")
-                      and _ours(bubble["text"], ours)), default=None)
+                      and is_ours(bubble["text"], ours)), default=None)
         if anchor is None:
             last = bubbles[-1] if bubbles else None
             if last and last["dir"] == "out" and not last.get("media") \
-                    and not _ours(last["text"], ours):
+                    and not is_ours(last["text"], ours):
                 return [last["text"]]
             return []
         return [bubble["text"] for bubble in bubbles[anchor + 1:]
                 if bubble["dir"] == "out" and bubble.get("text")
-                and not _ours(bubble["text"], ours)]
+                and not is_ours(bubble["text"], ours)]
 
     def _from_bubble(self, customer: dict, bubble: dict) -> dict | None:
         now = self.now()
@@ -1077,6 +1125,72 @@ class LanchoneteAgent:
             self._handoff(self.store.lead(customer["id"]) or customer, turn.handoff_reason,
                           turn.priority or "needed", turn.intent, text)
         return {**result, "state": self.store.lead(customer["id"])["state"]}
+
+    @staticmethod
+    def _sent_before(text: str, history: list[dict]) -> bool:
+        """A menu block already recorded as sent is not repeated by an owner opening."""
+        needle = text_plain(text)
+        if not needle:
+            return True
+        for entry in history:
+            if entry.get("dir") != "out" or entry.get("state", "sent") != "sent":
+                continue
+            hay = text_plain(entry.get("text", ""))
+            if hay and (needle[:30] in hay or hay[:30] in needle):
+                return True
+        return False
+
+    def opening(self, customer: dict) -> dict:
+        """Owner action: send the greeting and menu once, then keep the bot in charge.
+
+        It never replays the old conversation; only a new opening is sent. A greeting already
+        in the history is not repeated, so a customer who received the first bubble before a
+        failed send continues from the menu.
+        """
+        result = {"customer": customer["id"], "name": customer.get("name")}
+        customer = self.store.lead(customer["id"]) or customer
+        now = self.now()
+        history = self.store.history(customer["id"])
+        greeting = self._greeting(now)
+        already = any(entry.get("dir") == "out" and entry.get("state", "sent") == "sent"
+                      and (entry.get("text") or "").startswith(greeting[:40])
+                      for entry in history)
+        messages = ([] if already else [greeting]) + list(self.rules.menu_messages()) + [
+            self.rules.texts["menu_question"]]
+        messages = [message for message in messages if not self._sent_before(message, history)]
+        if not messages:
+            self.store.update_lead(customer["id"], state="ordering", awaiting=None,
+                                   awaiting_field="", closing=False, handoff_reason=None)
+            return {**result, "state": "ordering", "messages": []}
+        if not self.live:
+            return {**result, "state": "planned", "messages": messages}
+        self._next_chat(customer)
+        try:
+            status = self._open_chat(customer)
+        except Exception as error:
+            return {**result, "state": "error", "error": str(error)[:300]}
+        if status != "ready":
+            self.store.update_lead(customer["id"], state="unconfirmed", awaiting=None,
+                                   handoff_reason="chat did not open")
+            return {**result, "state": "unconfirmed"}
+        # An owner-started opening is explicit: it does not read the old chat first, so a
+        # message from the previous (sales) bot is never mistaken for the owner typing.
+        delays = self.pacing.plan(messages, None, self.rng)
+        items = [{"key": sender.message_key(customer["id"], f"opening:{text}", None),
+                  "text": text, "delay": delay}
+                 for text, delay in zip(messages, delays)]
+        results = self.channel.send(customer, items, {
+            "kind": "lanchonete-opening", "lead": customer["id"], "intent": "opening"})
+        done, worst = self._remember_sent(customer, items, results, "opening", "opening")
+        if not done:
+            self._fence(customer, worst, "abertura")
+            return {**result, "state": "unconfirmed"}
+        self.store.update_lead(customer["id"], state="ordering", awaiting=None,
+                               awaiting_field="", closing=False, unknown_count=0,
+                               handoff_reason=None,
+                               last_out_at=now.isoformat(timespec="seconds"),
+                               bot_replies=customer.get("bot_replies", 0) + 1)
+        return {**result, "state": "ordering"}
 
     def cycle(self, events: list[dict]) -> dict:
         summary = {"ingested": self.ingest(events), "replies": self.reply_pending()}
