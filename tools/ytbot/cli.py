@@ -58,6 +58,15 @@ def command_community(args) -> None:
         community.ensure_post(context, topics or ["What do you think?"])
 
 
+def command_distribute_shorts(args) -> None:
+    from .shorts_distribute import run_distribution
+    failures = run_distribution(args.count, args.dry_run)
+    print("[ytbot] shorts distribution finished")
+    if failures:
+        print(f"[ytbot] shorts channel failures: {failures}")
+        raise SystemExit(1)
+
+
 def command_faith_shorts(args) -> None:
     from .faith_shorts import run
     start = datetime.strptime(args.start_date, "%Y-%m-%d").date() if args.start_date else None
@@ -158,6 +167,12 @@ def build_parser() -> argparse.ArgumentParser:
     shorts.add_argument("--skip-slots", type=int, default=0,
                         help="skip this many leading schedule slots")
     shorts.set_defaults(func=command_shorts)
+    distribute_shorts = sub.add_parser(
+        "distribute-shorts",
+        help="spread Shorts over the channels that use them")
+    distribute_shorts.add_argument("--count", type=int, default=10)
+    distribute_shorts.add_argument("--dry-run", action="store_true")
+    distribute_shorts.set_defaults(func=command_distribute_shorts)
     faith = sub.add_parser("faith-shorts",
                            help="religious Shorts with one generated background per short")
     faith.add_argument("--channel", choices=("reflection", "whispers-from-heaven", "zanata"),

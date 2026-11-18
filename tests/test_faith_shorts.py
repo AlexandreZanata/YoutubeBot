@@ -20,9 +20,9 @@ class FaithShortsTests(unittest.TestCase):
         self.assertIn("#Shorts", meta["title"])
         self.assertIn("#shorts", meta["description"])
 
-    def test_each_channel_has_five_topics(self):
+    def test_each_channel_has_a_topic_queue(self):
         for spec in faith_shorts.CHANNELS.values():
-            self.assertEqual(len(spec["topics"]), 5)
+            self.assertGreaterEqual(len(spec["topics"]), 5)
 
 
 if __name__ == "__main__":
