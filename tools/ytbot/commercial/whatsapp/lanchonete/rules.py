@@ -327,11 +327,17 @@ def build(raw: dict) -> RestaurantRules:
                             "max_qty", "max_order", "swap_question", "removed_item",
                             "item_not_found", "extra_not_found", "payment_unknown",
                             "change_too_low", "handoff_ack", "correction_notice",
-                            "large_order",
+                            "large_order", "harassment_warn", "harassment_handoff",
+                            "partial_added", "partial_missing_extra",
+                            "partial_missing_item", "keep_only_question",
+                            "clear_cart_question", "keep_which_question",
+                            "value_jump_question", "audio_uncertain_question",
+                            "alive_reply", "handoff_waiting",
                             "owner_reason_unknown", "owner_reason_confirm",
                             "owner_reason_large", "owner_reason_cancel",
                             "owner_reason_status", "owner_reason_complaint",
-                            "owner_reason_human", "owner_reason_media"))
+                            "owner_reason_human", "owner_reason_media",
+                            "owner_reason_harassment", "owner_reason_waiting"))
     _require(raw, "guard", ("forbidden", "human_claims"))
     _require(raw, "context_rules", ("model_only_reads", "never_invent_item",
                                     "never_invent_price", "confirm_before_kitchen",

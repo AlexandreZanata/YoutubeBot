@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from sales_fixtures import Clock, FakeChannel, FakeModel
-from tools.ytbot.commercial.whatsapp.lanchonete.agent import (LanchoneteAgent, clean_incoming,
-                                                              is_ours, owner_resolve, text_plain)
+from tools.ytbot.commercial.whatsapp.lanchonete.agent import (
+    LanchoneteAgent, awaiting_reply, clean_incoming, is_ours, owner_resolve, text_plain,
+)
 from tools.ytbot.commercial.whatsapp.lanchonete.parser import parse
 from tools.ytbot.commercial.whatsapp.lanchonete.rules import load
 from tools.ytbot.commercial.whatsapp.lanchonete.store import LanchoneteStore
@@ -462,6 +463,240 @@ class LanchoneteAgentTests(unittest.TestCase):
         self.assertEqual(results[0]["state"], "ordering")
         cart = {line["item_id"]: line["qty"] for line in self.customer()["cart"]}
         self.assertEqual(cart, {"x-bacon": 1, "coca-lata": 1})
+
+    def test_replaced_preview_plus_chat_bubble_never_doubles_item(self):
+        # Thainan regression: preview "Mais 10 açaí" replaced by chat bubble must stay 10, not 20.
+        self.say("oi")
+        self.agent.ingest([{"id": "p1", "chat": self.chat, "text": "Mais 10 açaí"}])
+        customer = self.customer()
+        self.agent.store.remember(customer["id"], {
+            "at": self.clock.now.isoformat(timespec="seconds"), "dir": "in",
+            "kind": "incoming", "source": "chat", "message_id": "m10",
+            "replaces": ["p1"], "text": "Mais 10 açaí",
+        })
+        unanswered = awaiting_reply(self.agent.store.history(customer["id"]))
+        self.assertEqual([entry["text"] for entry in unanswered], ["Mais 10 açaí"])
+        self.agent.reply_pending()
+        cart = self.customer()["cart"]
+        self.assertEqual(len(cart), 1)
+        self.assertEqual(cart[0]["item_id"], "acai-500")
+        self.assertEqual(cart[0]["qty"], 10)
+
+    def test_repeated_message_within_five_minutes_counts_once(self):
+        self.say("oi")
+        self.clock.now += timedelta(seconds=30)
+        self.agent.ingest([{"id": "dup1", "chat": self.chat, "text": "Mais 10 açaí"}])
+        self.clock.now += timedelta(minutes=2)
+        self.agent.ingest([{"id": "dup2", "chat": self.chat, "text": "Mais 10 açaí"}])
+        unanswered = awaiting_reply(self.agent.store.history(self.customer()["id"]))
+        self.assertEqual(len(unanswered), 1)
+        self.agent.reply_pending()
+        self.assertEqual(self.customer()["cart"][0]["qty"], 10)
+
+        # Separated by more than 5 minutes still counts separately.
+        t0 = self.clock.now
+        t1 = t0 + timedelta(minutes=6)
+        hist = [
+            {"dir": "out", "text": "ok"},
+            {"dir": "in", "text": "quero uma coca", "at": t0.isoformat(timespec="seconds")},
+            {"dir": "in", "text": "quero uma coca", "at": t1.isoformat(timespec="seconds")},
+        ]
+        self.assertEqual(len(awaiting_reply(hist)), 2)
+
+    def test_partial_order_keeps_valid_item_and_asks_only_about_missing_part(self):
+        # Felipe regression: 1x Coca added cleanly with NO leaked note, asked only about sauce.
+        self.say("quero fazer um pedido")
+        self.agent.ingest([{"id": "fp1", "chat": self.chat,
+                            "text": "uma coca e um molhinho de pimenta safada"}])
+        customer = self.customer()
+        self.agent.store.remember(customer["id"], {
+            "at": self.clock.now.isoformat(timespec="seconds"), "dir": "in",
+            "kind": "incoming", "source": "chat", "message_id": "fm1",
+            "replaces": ["fp1"], "text": "uma coca e um molhinho de pimenta safada",
+        })
+        self.agent.reply_pending()
+        customer = self.customer()
+        self.assertEqual(len(customer["cart"]), 1)
+        self.assertEqual(customer["cart"][0]["item_id"], "coca-lata")
+        self.assertEqual(customer["cart"][0]["qty"], 1)
+        self.assertEqual(customer["cart"][0]["note"], "")
+        reply_text = "\n".join(self.sent()[-3:]).casefold()
+        self.assertIn("vamos manter o foco", reply_text)
+        self.assertIn("coca-cola", reply_text)
+        self.assertIn("molhinho de pimenta", reply_text)
+        self.assertIn("adicionais", reply_text)
+        self.assertNotIn("safada", reply_text)
+        # Answering "sim" to "quer ver os adicionais?" lists catalog extras.
+        self.say("sim")
+        self.assertIn("Bacon extra — R$ 4,00", "\n".join(self.sent()[-2:]))
+
+    def test_harassment_two_level_policy_deflects_first_then_escalates_hot(self):
+        self.say("quero fazer um pedido")
+        # Level 1 with valid order: Hot Dog Completo added cleanly, note clean, deflected neutrally.
+        self.say("quero um hot doc completo com a maior salsicha possivel... se é que me entende....")
+        customer = self.customer()
+        self.assertEqual(customer["state"], "ordering")
+        self.assertEqual(customer["cart"][0]["item_id"], "hot-dog-completo")
+        self.assertEqual(customer["cart"][0]["qty"], 1)
+        self.assertEqual(customer["cart"][0]["note"], "")
+        self.assertIn("Vamos manter o foco no seu pedido", "\n".join(self.sent()))
+
+        # Level 2 on repeat: hands over to owner with priority="hot", keeping existing cart.
+        self.say("você é safada? Namora?")
+        customer = self.customer()
+        self.assertEqual(customer["state"], "needs-owner")
+        self.assertEqual(customer["cart"][0]["item_id"], "hot-dog-completo")
+        self.assertEqual(self.notes[-1]["priority"], "hot")
+        self.assertIn("insinuação", self.notes[-1]["reason"].lower())
+
+        # Standalone Level 1 flirt on fresh customer stays in ordering (no unknown strike wasted).
+        other = "(65) 90000-0099"
+        self.say("você é safada? Namora?", chat=other)
+        other_cust = self.store.find_lead(other)
+        self.assertEqual(other_cust["state"], "ordering")
+        self.assertIn("Vamos manter o foco", "\n".join(self.sent()[-3:]))
+
+    def test_destructive_keep_only_and_clear_cart_require_confirmation(self):
+        self.say("oi")
+        self.say("Mais 10 açaí")
+        self.say("Deixa só um")
+        # Must NOT reduce silently before confirmation.
+        self.assertEqual(self.customer()["cart"][0]["qty"], 10)
+        self.assertIn("Quer deixar o pedido só com 1x Açaí 500 ml?", "\n".join(self.sent()))
+        self.say("SIM")
+        self.assertEqual(self.customer()["cart"][0]["qty"], 1)
+
+        # Multi-item ambiguous "só esse" / "Deixa só um" asks which item without guessing.
+        self.say("quero uma coca")
+        self.say("só esse")
+        self.assertEqual(len(self.customer()["cart"]), 2)
+        self.assertIn("Qual item você quer manter", "\n".join(self.sent()))
+
+        # "tira tudo" asks confirmation before emptying cart.
+        self.say("tira tudo")
+        self.assertEqual(len(self.customer()["cart"]), 2)
+        self.assertIn("Quer tirar todos os itens", "\n".join(self.sent()))
+        self.say("SIM")
+        self.assertEqual(self.customer()["cart"], [])
+
+    def test_thainan_sequence_and_waiting_ping_never_go_silent(self):
+        self.say("oi")
+        self.say("Mais 10 açaí")
+        self.assertEqual(self.customer()["cart"][0]["qty"], 10)
+        self.say("Deixa só um")
+        self.say("sim")
+        self.assertEqual(self.customer()["cart"][0]["qty"], 1)
+        # Semantic superlatives: never fall into opaque unknown -> needs-owner.
+        before = len(self.sent())
+        self.say("Quero o maior lanche")
+        self.assertGreater(len(self.sent()), before)
+        self.assertEqual(self.customer()["state"], "ordering")
+        self.assertIn("Podrão da Casa", "\n".join(self.sent()[before:]))
+        before = len(self.sent())
+        self.say("Um lanche do maior que tem")
+        self.assertGreater(len(self.sent()), before)
+        self.assertEqual(self.customer()["state"], "ordering")
+        before = len(self.sent())
+        self.say("Cadê o atendimento?")
+        self.assertGreater(len(self.sent()), before)
+        self.assertIn("Nina, atendente virtual", "\n".join(self.sent()[before:]))
+
+        # Even if already in needs-owner inside owner_reminder_minutes, "Cadê o atendimento?" alerts hot + responds once.
+        self.store.update_lead(self.customer()["id"], state="needs-owner", awaiting=None,
+                               handoff_reason="manual")
+        self.agent._handoff(self.customer(), "anterior", "needed", "manual", "anterior")
+        notes_before = len(self.notes)
+        sent_before = len(self.sent())
+        self.say("Cadê o atendimento?")
+        self.assertEqual(len(self.notes), notes_before + 1)
+        self.assertEqual(self.notes[-1]["priority"], "hot")
+        self.assertEqual(len(self.sent()), sent_before + 1)
+        # Subsequent repeated pings stay guarded against loops.
+        sent_after = len(self.sent())
+        self.say("Cadê o atendimento?")
+        self.assertEqual(len(self.sent()), sent_after)
+
+    def test_value_jump_requires_confirmation_and_cumulative_max_qty(self):
+        self.say("oi")
+        self.say("Açaí")
+        # 1 -> 10 (+9 = 10 total, >3x jump vs 1x) must ask confirmation before adding.
+        self.say("mais 9 açaí")
+        self.assertEqual(self.customer()["cart"][0]["qty"], 1)
+        self.assertIn("salto grande no pedido", "\n".join(self.sent()))
+        self.say("não")
+        self.assertEqual(self.customer()["cart"][0]["qty"], 1)
+
+        # Cumulative > max_qty_per_item (10 + 10 = 20) must be rejected cleanly.
+        self.say("mais 9 açaí")
+        self.say("sim")
+        self.assertEqual(self.customer()["cart"][0]["qty"], 10)
+        self.say("Mais 10 açaí")
+        self.assertEqual(self.customer()["cart"][0]["qty"], 10)
+        self.assertIn("até 10 unidades", "\n".join(self.sent()))
+
+        # Normal cross-item lunch add (1x Coca R$ 6 + 1x X-Tudo R$ 30) never false-positives.
+        other = "(65) 90000-0088"
+        self.say("oi", chat=other)
+        self.say("uma coca", chat=other)
+        self.say("um x-tudo", chat=other)
+        other_cart = {line["item_id"]: line["qty"]
+                      for line in self.store.find_lead(other)["cart"]}
+        self.assertEqual(other_cart, {"coca-lata": 1, "x-tudo": 1})
+
+    def test_contextual_pode_closes_cart_and_clarify_choice_resolves_option(self):
+        # Felipe regression: answering "pode" to "Quer mais alguma coisa ou posso fechar o pedido?"
+        self.say("oi")
+        self.say("uma coca")
+        self.assertIn("posso fechar o pedido?", self.sent()[-1])
+        self.say("pode")
+        self.assertEqual(self.customer()["awaiting_field"], "type")
+        self.assertIn("entrega ou retirada", "\n".join(self.sent()[-2:]))
+
+        # Memory resolves "o primeiro" after semantic superlative menu clarification.
+        other = "(65) 90000-0077"
+        self.say("Quero o maior lanche", chat=other)
+        self.say("o primeiro", chat=other)
+        cart = self.store.find_lead(other)["cart"]
+        self.assertEqual([line["item_id"] for line in cart], ["podrao"])
+
+    def test_identity_consistency_never_claims_human_except_handoff(self):
+        self.say("oi")
+        self.say("você é robô?")
+        bot_reply = "\n".join(self.sent()[-2:]).casefold()
+        self.assertIn("assistente virtual", bot_reply)
+        self.assertNotIn("sou humano", bot_reply)
+        self.say("Cadê o atendimento?")
+        self.assertIn("Nina, atendente virtual", "\n".join(self.sent()[-2:]))
+        self.say("quero falar com um atendente humano")
+        self.assertEqual(self.customer()["state"], "needs-owner")
+        self.assertIn("atendente humano", "\n".join(self.sent()[-1:]))
+
+    def test_audio_uncertain_number_and_failed_transcription_handling(self):
+        # Preview "0:12" replaced by audio transcript with uncertain digit "5" must confirm first.
+        self.channel.bubbles = [{"dir": "in", "text": "", "id": "aud1", "media": "audio"}]
+        self.channel.media = {"aud1": [(b"voice", ".ogg")]}
+        self.agent.transcriber = lambda path: {
+            "text": "quero 5 x-bacon", "uncertain": ["5"], "engine": "test",
+        }
+        self.say("0:12")
+        self.assertEqual(self.customer()["cart"], [])
+        self.assertIn("No seu áudio entendi 5x X-Bacon", "\n".join(self.sent()))
+        self.channel.bubbles = []
+        self.say("sim")
+        self.assertEqual(self.customer()["cart"][0]["item_id"], "x-bacon")
+        self.assertEqual(self.customer()["cart"][0]["qty"], 5)
+
+        # Transcription failure falls back cleanly to owner media handoff.
+        other = "(65) 90000-0066"
+        self.channel.bubbles = [{"dir": "in", "text": "", "id": "aud2", "media": "audio"}]
+        self.channel.media = {"aud2": [(b"broken", ".ogg")]}
+
+        def fail_transcriber(_path):
+            raise RuntimeError("whisper failed")
+
+        self.agent.transcriber = fail_transcriber
+        self.say("0:09", chat=other)
+        self.assertEqual(self.store.find_lead(other)["state"], "needs-owner")
 
 
 if __name__ == "__main__":

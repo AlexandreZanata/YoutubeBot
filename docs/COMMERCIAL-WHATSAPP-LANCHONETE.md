@@ -18,7 +18,8 @@ invented outside that file.
 | `lanchonete/context.md` | Context rules the optional model receives (only catalog ids, never a price) |
 | `lanchonete/rules.py` | Loads and validates the rules; menu rendering and allowed money values |
 | `lanchonete/order.py` | The cart: lines, extras, fees, payment, change, totals, WhatsApp summary, ficha |
-| `lanchonete/parser.py` | Local Portuguese order reading (items, quantities, extras, notes, fields) |
+| `lanchonete/parser.py` | Local Portuguese order reading (items, quantities, extras, notes, fields, unknown fragments) |
+| `lanchonete/semantics.py` | Semantic menu comparisons, category inquiries, destructive-action detection and harassment policy |
 | `lanchonete/interpreter.py` | Optional model reading of free-form text into catalog ids |
 | `lanchonete/guard.py` | Rejects a reply with a price, link or term outside the rules/order |
 | `lanchonete/agent.py` | Conversation state machine, field collection, confirmation, owner hand-off |
@@ -248,7 +249,17 @@ python3 -m tools.ytbot commercial lanchonete run       --network whatsapp --live
 - The Pix key is never written to the rules, the ficha, the journal or the logs.
 - One conversation at a time, human pacing between bubbles and between chats; no paste, no
   broadcast, no detection evasion.
-- A confirmed order is written before the owner is notified; a disk error is an alert, not a
+- `needs-owner` keeps a per-customer cooldown on normal notifications, while waiting complaints
+  (`"cadê o atendimento?"`) raise a `hot` hand-off immediately and send one holding confirmation.
+- Incoming reading runs `effective(history)` so replaced chat-list previews never double-count
+  alongside the opened chat bubble, and identical customer repeats within five minutes collapse
+  into one turn.
+- Partial orders apply valid catalog items, ask only about unrecognized items/sauces (without
+  turning secondary items into notes), deflect first-strike sexual innuendo neutrally (escalating
+  to `needs-owner` with `hot` priority on repetition or explicit content), and require explicit
+  `SIM` confirmation before destructive reductions (`"deixa só um"`, `"tira tudo"`), `>3x` cart
+  jumps, or uncertain numeric quantities in voice transcripts.
+- Confirmed orders are written before the owner is notified; a disk error is an alert, not a
   silent confirmation.
 
 ## Physical test checklist (owner account)

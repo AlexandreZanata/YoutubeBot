@@ -26,10 +26,11 @@ from ..sales import dossier
 from ..sales import notify as owner_notify
 from ..sales.agent import WhatsAppChannel, split_pending
 from ..sales.commands import is_closed
+from ..sales.context import effective
 from ..sales.pacing import SalesPacing
 from ..sales.rules import normalize
-from . import guard, interpreter, parser
-from .order import Order, OrderError
+from . import guard, interpreter, parser, semantics
+from .order import Line, Order, OrderError
 from .rules import RestaurantRules, brl
 from .store import LanchoneteStore, canonical_phone, phone_key
 from ..sales.transcribe import local_transcriber
@@ -129,18 +130,69 @@ def is_ours(text: str, sent: list[str]) -> bool:
     return False
 
 
+def _entry_time(entry: dict) -> datetime | None:
+    for key in ("at", "message_at"):
+        raw = entry.get(key) or ""
+        if not raw:
+            continue
+        try:
+            return datetime.fromisoformat(str(raw))
+        except ValueError:
+            continue
+    return None
+
+
+def _within_window(first: datetime | None, second: datetime | None,
+                   seconds: int = 300) -> bool:
+    if first is None or second is None:
+        return True
+    try:
+        return abs((second - first).total_seconds()) < seconds
+    except TypeError:
+        return abs((second.replace(tzinfo=None) - first.replace(tzinfo=None)).total_seconds()) < seconds
+
+
+def _prefer_entry(old: dict, new: dict) -> dict:
+    old_score = (bool(old.get("transcript")), old.get("source") == "chat", bool(old.get("media")))
+    new_score = (bool(new.get("transcript")), new.get("source") == "chat", bool(new.get("media")))
+    return new if new_score > old_score else old
+
+
 def awaiting_reply(history: list[dict]) -> list[dict]:
     """Customer messages after the last bot answer.
 
+    Uses `effective(history)` so replaced previews never double-count with chat bubbles,
+    and collapses identical normalized customer repeats within 5 minutes.
     The owner typing in the chat (`kind == "owner"`) pauses the automation, but it never
     counts as answering the customer: after the owner hands the chat back, the bot still
     owes an answer to what arrived after its own last reply.
     """
-    cut = len(history)
-    while cut and not (history[cut - 1].get("dir") == "out"
-                       and history[cut - 1].get("kind") != "owner"):
+    entries = effective(history)
+    cut = len(entries)
+    while cut and not (entries[cut - 1].get("dir") == "out"
+                       and entries[cut - 1].get("kind") != "owner"):
         cut -= 1
-    return [entry for entry in history[cut:] if entry.get("dir") == "in"]
+    pending = [entry for entry in entries[cut:] if entry.get("dir") == "in"]
+    deduped: list[dict] = []
+    times: list[datetime | None] = []
+    for entry in pending:
+        norm = normalize(entry.get("text", ""))
+        entry_at = _entry_time(entry)
+        match_at = None
+        if norm:
+            for index, kept in enumerate(deduped):
+                if normalize(kept.get("text", "")) == norm \
+                        and _within_window(times[index], entry_at):
+                    match_at = index
+                    break
+        if match_at is not None:
+            chosen = _prefer_entry(deduped[match_at], entry)
+            deduped[match_at] = chosen
+            times[match_at] = _entry_time(chosen) or times[match_at]
+        else:
+            deduped.append(entry)
+            times.append(entry_at)
+    return deduped
 
 
 def stamp_now(now: datetime) -> str:
@@ -365,6 +417,13 @@ class LanchoneteAgent:
                         priority, reason = "hot", self.rules.texts["owner_reason_status"]
                     else:
                         reason = "Nova mensagem depois do pedido confirmado"
+                elif state == "needs-owner" and semantics.is_waiting_ping(text):
+                    priority = "hot"
+                    intent = "waiting"
+                    reason = self.rules.texts["owner_reason_waiting"]
+                    mem = dict(customer.get("memory") or {})
+                    if not mem.get("needs_owner_pinged"):
+                        changes["awaiting"] = event.get("id")
                 if priority == "hot" or self._remind(customer):
                     self._handoff(customer, reason, priority, intent, text)
             self.store.update_lead(customer["id"], **changes)
@@ -373,8 +432,16 @@ class LanchoneteAgent:
 
     # Reply loop ----------------------------------------------------------------------
     def pending(self) -> list[dict]:
-        return sorted((customer for customer in self.store.leads().values()
-                       if customer.get("awaiting") and customer["state"] in REPLYABLE),
+        def _waiting(customer: dict) -> bool:
+            if not customer.get("awaiting"):
+                return False
+            if customer["state"] in REPLYABLE:
+                return True
+            if customer["state"] == "needs-owner":
+                return not (customer.get("memory") or {}).get("needs_owner_pinged")
+            return False
+
+        return sorted((customer for customer in self.store.leads().values() if _waiting(customer)),
                       key=lambda customer: customer.get("last_in_at") or "")
 
     def reply_pending(self) -> list[dict]:
@@ -614,7 +681,8 @@ class LanchoneteAgent:
             return Turn([self.rules.texts["cancelled_after_kitchen"]], "needs-owner", {},
                         "cancel", self.rules.texts["owner_reason_cancel"], "hot", order=order)
         updates = {"awaiting_field": "", "confirmations": 0, "unknown_count": 0,
-                   "closing": False}
+                   "closing": False, "pending_replace": None,
+                   "memory": {"last_question": "", "harassment_strikes": 0}}
         updates.update(Order().to_lead_fields())
         return Turn([self.rules.texts["cancelled"]], "cancelled", updates, "cancel")
 
@@ -664,7 +732,9 @@ class LanchoneteAgent:
                         if order.remove(self.rules, item.item_id, item.qty):
                             changed = True
                         continue
-                    if item.qty > max_qty:
+                    existing_qty = sum(line.qty for line in order.lines
+                                       if line.item_id == item.item_id)
+                    if item.qty > max_qty or (item.qty > 0 and existing_qty + item.qty > max_qty):
                         notes.append(self.rules.fill(self.rules.texts["max_qty"], max=max_qty))
                         continue
                     existing = next((line for line in order.lines
@@ -794,7 +864,15 @@ class LanchoneteAgent:
 
     def _is_yes(self, text: str) -> bool:
         plain = normalize(text)
-        return any(re.search(pattern, plain) for pattern in self.rules.context["affirmative"])
+        if not any(re.search(pattern, plain) for pattern in self.rules.context["affirmative"]):
+            return False
+        if re.search(r"\b(mas|nao|nem|tira|tirar|remove|remover|retira|retirar|sem|"
+                     r"troca|trocar|maior|menor|outro|outra|melhor|pior)\b", plain):
+            return False
+        if re.match(r"^(quero|manda|bora|vamo|aceito)\s+\S+", plain) and \
+                not re.match(r"^(quero sim|manda ver|bora la|vamo la|aceito sim)[!.\s]*$", plain):
+            return False
+        return len(plain.split()) <= 5
 
     def _is_no(self, text: str) -> bool:
         plain = normalize(text)
@@ -914,11 +992,157 @@ class LanchoneteAgent:
         return Turn(self._with_greeting(customer, messages, now), "ordering", fresh,
                     "swap", order=order)
 
-    def _turn(self, customer: dict, text: str) -> Turn:
+    def _infer_last_question(self, messages: list[str], awaiting_field: str) -> str:
+        if awaiting_field == "confirm":
+            return "summary_question"
+        if awaiting_field in FIELDS:
+            return f"ask_{awaiting_field}"
+        tail = messages[-1] if messages else ""
+        if tail == self.rules.texts["cart_question"]:
+            return "cart_question"
+        if tail == self.rules.texts["menu_question"]:
+            return "menu_question"
+        if tail == self.rules.texts["below_min_question"]:
+            return "below_min_question"
+        return ""
+
+    def _describe_adds(self, adds: list[parser.ParsedItem]) -> str:
+        parts = []
+        for parsed_item in adds:
+            try:
+                item = self.rules.item(parsed_item.item_id)
+            except KeyError:
+                continue
+            parts.append(f"{max(parsed_item.qty or 1, 1)}x {item.name}")
+        return ", ".join(parts)
+
+    def _resolve_pending(self, customer: dict, order: Order, pending: dict, text: str,
+                         parsed, updates: dict, memory: dict, now: datetime) -> Turn | None:
+        action = pending.get("action") or "swap"
+        base_state = "ordering" if customer["state"] in ("new", "closed", "cancelled") else customer["state"]
+        if self._is_yes(text):
+            if action == "swap":
+                return self._apply_swap(customer, order, pending, dict(updates), now)
+            fresh = {**updates, "pending_replace": None}
+            next_mem = {**memory, "last_question": "cart_question"}
+            if action == "clear_cart":
+                order.lines.clear()
+                fresh.update(order.to_lead_fields())
+                fresh["closing"] = False
+                fresh["awaiting_field"] = ""
+                next_mem["last_question"] = "menu_question"
+                fresh["memory"] = next_mem
+                return Turn(self._with_greeting(customer, [self.rules.texts["cart_empty"]], now),
+                            "ordering", fresh, "clear_cart", order=order)
+            if action == "keep_only":
+                order.lines = [Line(
+                    pending["item_id"], max(int(pending.get("qty") or 1), 1),
+                    list(pending.get("extras") or []), pending.get("note") or "",
+                )]
+                fresh.update(order.to_lead_fields())
+                fresh["memory"] = next_mem
+                messages = [order.cart_text(self.rules), self.rules.texts["cart_question"]]
+                return Turn(self._with_greeting(customer, messages, now), "ordering", fresh,
+                            "keep_only", order=order)
+            if action == "add_items":
+                for entry in pending.get("items") or []:
+                    order.add(self.rules, entry["item_id"], max(int(entry.get("qty") or 1), 1),
+                              list(entry.get("extras") or []), entry.get("note") or "")
+                fresh.update(order.to_lead_fields())
+                fresh["memory"] = next_mem
+                if customer.get("closing") and (customer.get("awaiting_field") or "") not in FIELDS:
+                    advance = self._advance(customer, order)
+                    fresh.update(advance.updates)
+                    messages = [order.cart_text(self.rules)] + advance.messages
+                    return Turn(self._with_greeting(customer, messages, now), advance.state,
+                                fresh, advance.intent or "order", advance.handoff_reason,
+                                advance.priority, order=order)
+                messages = [order.cart_text(self.rules), self.rules.texts["cart_question"]]
+                return Turn(self._with_greeting(customer, messages, now), "ordering", fresh,
+                            "order", order=order)
+        if self._is_no(text):
+            fresh = {**updates, **order.to_lead_fields(), "pending_replace": None}
+            if order.is_empty():
+                fresh["memory"] = {**memory, "last_question": "menu_question"}
+                return Turn(self._with_greeting(customer, [self.rules.texts["menu_question"]], now),
+                            base_state, fresh, "keep", order=order)
+            fresh["memory"] = {**memory, "last_question": "cart_question"}
+            messages = [order.cart_text(self.rules), self.rules.texts["cart_question"]]
+            return Turn(self._with_greeting(customer, messages, now), base_state, fresh,
+                        "keep", order=order)
+        if (parsed.changed or parsed.done or parsed.cancel
+                or semantics.detect_destructive(self.rules, order, text, parsed.done)
+                or semantics.detect_semantic(self.rules, text)):
+            updates["pending_replace"] = None
+        return None
+
+    def _add_confirmation_reason(self, before_order: Order, after_order: Order, text: str,
+                                 parsed, audio_uncertain: tuple[str, ...]) -> str:
+        adds = [item for item in parsed.items if item.item_id and not item.remove and item.qty > 0]
+        if not adds:
+            return ""
+        if audio_uncertain:
+            return "audio_uncertain"
+        before_qty = sum(line.qty for line in before_order.lines)
+        before_sub = before_order.totals(self.rules).subtotal_cents
+        if before_sub > 0 and before_qty > 0:
+            after_qty = sum(line.qty for line in after_order.lines)
+            after_sub = after_order.totals(self.rules).subtotal_cents
+            added_qty = sum(item.qty or 1 for item in adds)
+            if (after_sub > 3 * before_sub or after_qty > 3 * before_qty) and added_qty >= 4:
+                return "value_jump"
+            for item in adds:
+                existing = sum(line.qty for line in before_order.lines
+                               if line.item_id == item.item_id)
+                if existing > 0 and item.qty >= 3 and (existing + item.qty) > 3 * existing:
+                    return "value_jump"
+        return ""
+
+    def _format_partial_turn(self, customer: dict, order: Order, adds: list[parser.ParsedItem],
+                             unknown_parts: list[str], wants_extras: bool,
+                             warn_prefix: list[str], updates: dict, memory: dict,
+                             now: datetime, source: str) -> Turn:
+        missing = ", ".join(unknown_parts)
+        template = (self.rules.texts["partial_missing_extra"] if wants_extras
+                    else self.rules.texts["partial_missing_item"])
+        missing_msg = self.rules.fill(template, missing=missing)
+        messages = list(warn_prefix)
+        if adds:
+            added_label = self._describe_adds(adds)
+            first_line = f"{self.rules.fill(self.rules.texts['partial_added'], added=added_label)} {missing_msg}"
+            messages.append(first_line)
+            if not order.is_empty():
+                messages.append(order.cart_text(self.rules))
+        else:
+            messages.append(missing_msg)
+        next_mem = {**memory, "last_question": "partial_unknown",
+                    "unknown_tokens": list(unknown_parts),
+                    "unknown_wants_extras": bool(wants_extras)}
+        fresh = {**updates, **order.to_lead_fields(), "unknown_count": 0, "memory": next_mem}
+        return Turn(self._with_greeting(customer, messages, now), "ordering", fresh,
+                    "partial_order", order=order, source=source)
+
+    def _turn(self, customer: dict, text: str, audio_uncertain: tuple[str, ...] = ()) -> Turn:
+        memory = dict(customer.get("memory") or {})
+        turn = self._turn_body(customer, text, memory, audio_uncertain)
+        if "memory" not in turn.updates:
+            final_state = turn.state or customer.get("state", "ordering")
+            if final_state in ("closed", "cancelled", "confirmed", "do-not-contact"):
+                memory["last_question"] = ""
+                memory["clarify_candidates"] = []
+            elif turn.messages:
+                memory["last_question"] = self._infer_last_question(
+                    turn.messages, turn.updates.get("awaiting_field", ""))
+            turn.updates["memory"] = memory
+        return turn
+
+    def _turn_body(self, customer: dict, text: str, memory: dict,
+                   audio_uncertain: tuple[str, ...] = ()) -> Turn:
         now = self.now()
         state = customer["state"]
         plain = normalize(text)
         order = self._order_from_lead(customer)
+        last_question = memory.get("last_question", "")
         parsed = parser.parse(self.rules, text)
         intent = self._intent(customer, text)
         first = state in ("new", "closed", "cancelled")
@@ -929,6 +1153,9 @@ class LanchoneteAgent:
             order = Order()
             updates.update(order.to_lead_fields())
             updates["order_number"] = ""
+            updates["pending_replace"] = None
+            memory.clear()
+            last_question = ""
 
         if intent == "opt_out":
             return Turn(self._fixed("opt_out"), "do-not-contact", {}, intent, block=True)
@@ -961,22 +1188,75 @@ class LanchoneteAgent:
             return Turn(self._with_greeting(customer, messages, now), "needs-owner", {},
                         intent, self.rules.texts["owner_reason_media"], "needed")
 
+        harassment = semantics.harassment_level(text)
+        prior_strikes = int(memory.get("harassment_strikes", 0))
+        warn_prefix: list[str] = []
+        if harassment >= 2 or (harassment == 1 and prior_strikes >= 1):
+            next_mem = {**memory, "harassment_strikes": prior_strikes + 1, "last_question": ""}
+            return Turn(self._with_greeting(customer, [self.rules.texts["harassment_handoff"]], now),
+                        "needs-owner", {"awaiting_field": "", "memory": next_mem},
+                        "harassment", self.rules.texts["owner_reason_harassment"], "hot",
+                        order=order)
+        if harassment == 1:
+            memory["harassment_strikes"] = prior_strikes + 1
+            warn_prefix = [self.rules.texts["harassment_warn"]]
+
         if intent == "cancel" or parsed.cancel:
             turn = self._cancel_turn(customer, order)
-            turn.messages = self._with_greeting(customer, turn.messages, now)
+            turn.messages = self._with_greeting(customer, warn_prefix + turn.messages, now)
             return turn
 
         pending = customer.get("pending_replace") or {}
         if pending:
+            resolved = self._resolve_pending(customer, order, pending, text, parsed,
+                                             updates, memory, now)
+            if resolved is not None:
+                if warn_prefix:
+                    resolved.messages = warn_prefix + resolved.messages
+                return resolved
+
+        if last_question == "clarify_choice" and not parsed.items and memory.get("clarify_candidates"):
+            choice_id = semantics.resolve_clarify_choice(
+                self.rules, memory["clarify_candidates"], text)
+            if choice_id:
+                parsed.items.append(parser.ParsedItem(
+                    choice_id, max(int(memory.get("clarify_qty") or 1), 1)))
+                memory["clarify_candidates"] = []
+
+        if last_question == "partial_unknown" and not parsed.changed and not parsed.done \
+                and not parsed.cancel and not parsed.unknown_parts:
             if self._is_yes(text):
-                return self._apply_swap(customer, order, pending, dict(updates), now)
-            if self._is_no(text):
-                fresh = {**updates, **order.to_lead_fields(), "pending_replace": None}
-                messages = [order.cart_text(self.rules), self.rules.texts["cart_question"]]
-                return Turn(self._with_greeting(customer, messages, now), base_state, fresh,
+                extra_or_menu = ([semantics.extras_menu(self.rules)]
+                                 if memory.get("unknown_wants_extras")
+                                 else list(self.rules.menu_messages()))
+                messages = warn_prefix + extra_or_menu + [self.rules.texts["cart_question"]]
+                return Turn(self._with_greeting(customer, messages, now), base_state,
+                            {**updates, "memory": {**memory, "last_question": "cart_question"}},
+                            "partial_followup", order=order)
+            if self._is_no(text) and not order.is_empty():
+                messages = warn_prefix + [order.cart_text(self.rules),
+                                          self.rules.texts["cart_question"]]
+                return Turn(self._with_greeting(customer, messages, now), base_state,
+                            {**updates, "memory": {**memory, "last_question": "cart_question"}},
                             "keep", order=order)
-            if parsed.changed or parsed.done or parsed.cancel:
-                updates["pending_replace"] = None  # the new message supersedes the proposal
+
+        if last_question == "cart_question" and not order.is_empty() and not parsed.changed \
+                and not parsed.done and not parsed.cancel and awaiting not in FIELDS \
+                and plain not in ("quero", "aceito") \
+                and intent not in ("opt_out", "bot_question", "human_request", "complaint",
+                                   "status", "hours", "address", "delivery", "payment",
+                                   "price", "item_info", "menu", "no_order", "cancel", "media"):
+            if self._is_yes(text):
+                parsed.done = True
+            elif re.search(
+                r"^(?:nao|nop|n)\s*(?:,\s*)?(?:obrigad[oa]|valeu|mais nada|so isso|"
+                r"pode fechar|por enquanto nao)$", plain):
+                parsed.done = True
+            elif re.search(r"^(?:nao|nop|n)$", plain):
+                msg = "Quer fechar o pedido assim ou adicionar mais algum item?"
+                return Turn(self._with_greeting(customer, warn_prefix + [msg], now), base_state,
+                            {**updates, "memory": {**memory, "last_question": "cart_question"}},
+                            "cart_question", order=order)
 
         if intent == "status":
             if customer.get("order_number") or state == "confirmed":
@@ -986,7 +1266,12 @@ class LanchoneteAgent:
             intent = "delivery"  # no order yet: "quanto tempo demora?" is the delivery fact
 
         if intent in ("thanks", "auto_reply"):
-            return Turn([], state, {}, intent)
+            if warn_prefix:
+                tail = (self.rules.texts["menu_question"] if order.is_empty()
+                        else self.rules.texts["cart_question"])
+                return Turn(warn_prefix + [tail], base_state, updates, "harassment_warn",
+                            order=order)
+            return Turn([], state, updates, intent)
 
         honest = self._fixed("bot_question") if intent == "bot_question" else []
 
@@ -994,8 +1279,8 @@ class LanchoneteAgent:
             updates.update(Order().to_lead_fields())
             updates["awaiting_field"] = ""
             updates["closing"] = False
-            return Turn(self._with_greeting(customer, [self.rules.texts["no_order"]], now),
-                        "closed", updates, intent)
+            return Turn(self._with_greeting(customer, warn_prefix + [self.rules.texts["no_order"]],
+                                            now), "closed", updates, intent)
 
         question_first = bool(re.match(
             r"^(quanto|qual|quais|preco|valor|o que|como|tem|vem|ingredientes)\b", plain))
@@ -1004,7 +1289,7 @@ class LanchoneteAgent:
             items = [self.rules.item(item_id) for item_id in parsed.question_items]
             answers = (self.rules.price_answer(items) if intent == "price"
                        else [self.rules.item_text(item) for item in items])
-            messages = honest + answers
+            messages = warn_prefix + honest + answers
             if first:
                 messages.append(self.rules.texts["menu_question"])
             elif not order.is_empty():
@@ -1013,12 +1298,60 @@ class LanchoneteAgent:
                         intent, order=order)
 
         if intent == "menu" and not parsed.items and not parsed.done:
-            messages = list(self.rules.menu_messages())
+            sem = semantics.detect_semantic(self.rules, text)
+            if sem is not None and sem.intent != "menu":
+                next_mem = {**memory, "last_question": sem.last_question,
+                            "clarify_candidates": list(sem.candidates),
+                            "clarify_qty": sem.qty}
+                return Turn(self._with_greeting(customer, warn_prefix + sem.messages, now),
+                            base_state, {**updates, "memory": next_mem}, sem.intent, order=order)
+            messages = warn_prefix + list(self.rules.menu_messages())
             if not order.is_empty():
                 messages.append(self.rules.texts["cart_question"])
             messages += self._pending_question(order, awaiting)
             return Turn(self._with_greeting(customer, messages, now), base_state, updates,
                         intent, order=order)
+
+        destructive = semantics.detect_destructive(self.rules, order, text, parsed.done)
+        if destructive is not None:
+            if destructive.kind == "clear_cart":
+                next_mem = {**memory, "last_question": "destructive_confirm"}
+                fresh = {**updates, **order.to_lead_fields(),
+                         "pending_replace": {"action": "clear_cart"}, "memory": next_mem}
+                messages = warn_prefix + [order.cart_text(self.rules),
+                                          self.rules.texts["clear_cart_question"]]
+                return Turn(self._with_greeting(customer, messages, now), base_state, fresh,
+                            "destructive_ask", order=order)
+            if destructive.kind == "ambiguous_keep":
+                next_mem = {**memory, "last_question": "keep_which"}
+                fresh = {**updates, **order.to_lead_fields(), "memory": next_mem}
+                messages = warn_prefix + [order.cart_text(self.rules),
+                                          self.rules.texts["keep_which_question"]]
+                return Turn(self._with_greeting(customer, messages, now), base_state, fresh,
+                            "keep_which", order=order)
+            if destructive.kind == "already_single":
+                messages = warn_prefix + [order.cart_text(self.rules),
+                                          self.rules.texts["cart_question"]]
+                return Turn(self._with_greeting(customer, messages, now), base_state, updates,
+                            "order", order=order)
+            if destructive.kind == "keep_only" and destructive.line is not None:
+                line = destructive.line
+                target_qty = max(destructive.qty, 1)
+                item_name = self.rules.item(line.item_id).name
+                next_mem = {**memory, "last_question": "destructive_confirm"}
+                fresh = {**updates, **order.to_lead_fields(),
+                         "pending_replace": {
+                             "action": "keep_only", "item_id": line.item_id,
+                             "qty": target_qty, "extras": list(line.extras),
+                             "note": line.note},
+                         "memory": next_mem}
+                messages = warn_prefix + [
+                    order.cart_text(self.rules),
+                    self.rules.fill(self.rules.texts["keep_only_question"],
+                                    item=f"{target_qty}x {item_name}"),
+                ]
+                return Turn(self._with_greeting(customer, messages, now), base_state, fresh,
+                            "destructive_ask", order=order)
 
         # Free-form order: the local parser first, the model only when it found nothing.
         # A rejection or a comparative never falls through to a blind add: a bare "não o
@@ -1032,10 +1365,12 @@ class LanchoneteAgent:
                     to_item = self.rules.item(proposal[1])
                     fresh = {**updates, **order.to_lead_fields(),
                              "pending_replace": {"from": proposal[0], "to": proposal[1],
-                                                 "qty": proposal[2]}}
-                    messages = [order.cart_text(self.rules),
-                                self.rules.fill(self.rules.texts["swap_question"],
-                                                fro=from_item.name, to=to_item.name)]
+                                                 "qty": proposal[2]},
+                             "memory": {**memory, "last_question": "swap_ask"}}
+                    messages = warn_prefix + [
+                        order.cart_text(self.rules),
+                        self.rules.fill(self.rules.texts["swap_question"],
+                                        fro=from_item.name, to=to_item.name)]
                     return Turn(self._with_greeting(customer, messages, now), base_state, fresh,
                                 "swap_ask", order=order)
             else:
@@ -1045,37 +1380,83 @@ class LanchoneteAgent:
                     order.remove(self.rules, removed_id)
                     fresh = {**updates, **order.to_lead_fields(), "unknown_count": 0}
                     if order.is_empty():
-                        messages = [self.rules.fill(self.rules.texts["removed_item"],
-                                                    item=removed_name),
-                                    self.rules.texts["cart_empty"]]
+                        messages = warn_prefix + [
+                            self.rules.fill(self.rules.texts["removed_item"], item=removed_name),
+                            self.rules.texts["cart_empty"]]
                     else:
-                        messages = [self.rules.fill(self.rules.texts["removed_item"],
-                                                    item=removed_name),
-                                    order.cart_text(self.rules),
-                                    self.rules.texts["cart_question"]]
+                        messages = warn_prefix + [
+                            self.rules.fill(self.rules.texts["removed_item"], item=removed_name),
+                            order.cart_text(self.rules),
+                            self.rules.texts["cart_question"]]
                     return Turn(self._with_greeting(customer, messages, now), base_state, fresh,
                                 "remove", order=order)
+
+        if not parsed.items and not parsed.done and not parsed.remove_extras \
+                and not parsed.unknown_parts and awaiting not in FIELDS:
+            sem = semantics.detect_semantic(self.rules, text)
+            if sem is not None:
+                next_mem = {**memory, "last_question": sem.last_question,
+                            "clarify_candidates": list(sem.candidates),
+                            "clarify_qty": sem.qty}
+                return Turn(self._with_greeting(customer, warn_prefix + sem.messages, now),
+                            base_state, {**updates, "memory": next_mem}, sem.intent, order=order)
+
         cart_before = order.to_lead_fields()["cart"]
-        changed, notes = self._apply_parsed(customer, order, parsed, text)
-        cart_changed = order.to_lead_fields()["cart"] != cart_before
+        trial_order = Order.from_dict(self.rules, order.to_dict())
+        changed, notes = self._apply_parsed(customer, trial_order, parsed, text)
+        cart_changed = trial_order.to_lead_fields()["cart"] != cart_before
         source = "local"
-        if not changed and not parsed.done and intent == "unknown" and self.llm is not None:
+        if not changed and not parsed.done and not parsed.unknown_parts \
+                and intent == "unknown" and harassment == 0 and self.llm is not None:
             model, error = interpreter.interpret(
                 self.rules, order, text, self.llm, now, usage=self.store.log_usage,
                 session_id=f"brasa-pao-{customer['id']}")
             if model is not None:
-                model_changed, model_notes = self._apply_parsed(customer, order, model, text)
+                trial_order = Order.from_dict(self.rules, order.to_dict())
+                model_changed, model_notes = self._apply_parsed(
+                    customer, trial_order, model, text)
                 if model_changed or model.done or model.cancel:
                     parsed, changed, notes, source = model, model_changed, model_notes, "model"
-                    cart_changed = order.to_lead_fields()["cart"] != cart_before
+                    cart_changed = trial_order.to_lead_fields()["cart"] != cart_before
                 if parsed.cancel:
                     return self._cancel_turn(customer, order)
             else:
                 self.log(f"model order read skipped: {error}")
 
+        adds = [item for item in parsed.items if item.item_id and not item.remove and item.qty > 0]
+        if changed and adds and state != "confirming":
+            confirm_reason = self._add_confirmation_reason(
+                order, trial_order, text, parsed, audio_uncertain)
+            if confirm_reason:
+                summary_desc = self._describe_adds(adds)
+                pending_items = [
+                    {"item_id": item.item_id, "qty": max(item.qty or 1, 1),
+                     "extras": list(item.extras), "note": item.note}
+                    for item in adds
+                ]
+                q_key = ("audio_uncertain_question" if confirm_reason == "audio_uncertain"
+                         else "value_jump_question")
+                last_q = "audio_confirm" if confirm_reason == "audio_uncertain" else "jump_confirm"
+                messages = list(warn_prefix)
+                if not order.is_empty():
+                    messages.append(order.cart_text(self.rules))
+                messages.append(self.rules.fill(self.rules.texts[q_key], summary=summary_desc))
+                fresh = {**updates, **order.to_lead_fields(),
+                         "pending_replace": {"action": "add_items", "items": pending_items},
+                         "memory": {**memory, "last_question": last_q}}
+                return Turn(self._with_greeting(customer, messages, now), base_state, fresh,
+                            confirm_reason, order=order, source=source)
+
+        order = trial_order
         updates.update(order.to_lead_fields())
         if changed:
             updates["unknown_count"] = 0
+
+        if parsed.unknown_parts and state != "confirming" and (changed or (not parsed.fields and not parsed.done)):
+            return self._format_partial_turn(
+                customer, order, adds if changed else [], parsed.unknown_parts,
+                bool(getattr(parsed, "unknown_wants_extras", False)), warn_prefix,
+                updates, memory, now, source)
 
         if state == "confirming" or awaiting == "confirm":
             if changed or notes:
@@ -1091,6 +1472,7 @@ class LanchoneteAgent:
                     result = Turn([order.summary_text(self.rules),
                                    self.rules.texts["summary_question"]], "confirming",
                                   {"awaiting_field": "confirm"}, "summary", order=order)
+                result.messages = warn_prefix + result.messages
                 result.updates.update(updates)
                 result.updates["confirmations"] = confirmations
                 result.source = source
@@ -1101,7 +1483,7 @@ class LanchoneteAgent:
                     return Turn([self.rules.texts["handoff_ack"]], "needs-owner", updates,
                                 "summary", self.rules.texts["owner_reason_confirm"], "needed",
                                 order=order)
-                return Turn([self.rules.texts["ask_what_to_adjust"]], "confirming",
+                return Turn(warn_prefix + [self.rules.texts["ask_what_to_adjust"]], "confirming",
                             {**updates, "confirmations": confirmations}, "negative",
                             order=order)
             if intent == "affirmative" or (parsed.done and not changed):
@@ -1112,24 +1494,25 @@ class LanchoneteAgent:
                 return result
             answers = honest + (self._fixed(intent) if intent in FAQ else [])
             if answers:
-                return Turn(answers + [order.summary_text(self.rules),
-                                       self.rules.texts["summary_question"]], "confirming",
-                            {**updates, "awaiting_field": "confirm"}, intent, order=order)
-            return Turn([self.rules.texts["ask_what_to_adjust"]], "confirming",
+                return Turn(warn_prefix + answers + [order.summary_text(self.rules),
+                                                     self.rules.texts["summary_question"]],
+                            "confirming", {**updates, "awaiting_field": "confirm"}, intent,
+                            order=order)
+            return Turn(warn_prefix + [self.rules.texts["ask_what_to_adjust"]], "confirming",
                         {**updates,
                          "confirmations": int(customer.get("confirmations", 0)) + 1},
                         intent, order=order)
 
         if parsed.done:
             result = self._advance(customer, order)
-            messages = honest + notes + result.messages
+            messages = warn_prefix + honest + notes + result.messages
             result.messages = self._with_greeting(customer, messages, now)
             result.updates.update(updates)
             result.source = source
             return result
 
         if changed or notes:
-            messages = list(notes)
+            messages = warn_prefix + list(notes)
             closing = bool(customer.get("closing")) or bool(updates.get("closing"))
             if closing and changed and order.lines and awaiting not in FIELDS:
                 advance = self._advance(customer, order)
@@ -1160,7 +1543,7 @@ class LanchoneteAgent:
                     asked = advance.messages
                     updates.update(advance.updates)
                     if advance.state == "confirming":
-                        messages = list(notes) + asked
+                        messages = warn_prefix + list(notes) + asked
                         messages = [text for text in messages if text]
                         return Turn(self._with_greeting(customer, messages, now),
                                     "confirming", updates, "summary", order=order,
@@ -1177,13 +1560,13 @@ class LanchoneteAgent:
                         "order", order=order, source=source)
 
         if intent in FAQ:
-            answers = honest + self._fixed(intent)
+            answers = warn_prefix + honest + self._fixed(intent)
             answers += self._pending_question(order, awaiting)
             return Turn(self._with_greeting(customer, answers, now), base_state, updates,
                         intent, order=order)
 
         if honest:
-            messages = honest
+            messages = warn_prefix + honest
             if not order.is_empty():
                 messages.append(self.rules.texts["cart_question"])
             elif first:
@@ -1191,10 +1574,26 @@ class LanchoneteAgent:
             return Turn(self._with_greeting(customer, messages, now), base_state, updates,
                         "bot_question", order=order)
 
+        if warn_prefix:
+            follow = (self._pending_question(order, awaiting)
+                      or ([order.cart_text(self.rules), self.rules.texts["cart_question"]]
+                          if not order.is_empty() else [self.rules.texts["menu_question"]]))
+            return Turn(self._with_greeting(customer, warn_prefix + follow, now), base_state,
+                        updates, "harassment_warn", order=order)
+
         if first:
             messages = list(self.rules.menu_messages()) + [self.rules.texts["menu_question"]]
             return Turn(self._with_greeting(customer, messages, now), "ordering", updates,
                         "greeting")
+
+        if semantics.is_alive_ping(text):
+            alive = self.rules.fill(self.rules.texts["alive_reply"],
+                                    agent_name=self.rules.agent_name,
+                                    company=self.rules.company)
+            follow = (self._pending_question(order, awaiting)
+                      or ([order.cart_text(self.rules), self.rules.texts["cart_question"]]
+                          if not order.is_empty() else [self.rules.texts["menu_question"]]))
+            return Turn([alive] + follow, base_state, updates, "alive_check", order=order)
 
         if awaiting:
             result = self._ask(order, awaiting, include_cart=False)
@@ -1321,16 +1720,23 @@ class LanchoneteAgent:
 
         unanswered = awaiting_reply(self.store.history(customer["id"]))
         text = "\n".join(entry.get("text", "") for entry in unanswered).strip()
+        audio_uncertain = tuple(
+            word for entry in unanswered for word in (entry.get("uncertain") or []) if word)
         customer = self.store.lead(customer["id"]) or customer
         if not text:
             self.store.update_lead(customer["id"], awaiting=None)
             return {**result, "state": "nothing-to-answer"}
-        if customer.get("bot_replies", 0) >= int(self.rules.limits["max_bot_replies_before_owner"]) \
+        if customer["state"] == "needs-owner":
+            memory = dict(customer.get("memory") or {})
+            memory["needs_owner_pinged"] = True
+            turn = Turn([self.rules.texts["handoff_waiting"]], "needs-owner",
+                        {"memory": memory}, "waiting")
+        elif customer.get("bot_replies", 0) >= int(self.rules.limits["max_bot_replies_before_owner"]) \
                 and customer["state"] in ("ordering", "confirming"):
             turn = Turn([self.rules.texts["handoff_ack"]], "needs-owner", {},
                         "long_chat", self.rules.texts["owner_reason_unknown"], "needed")
         else:
-            turn = self._turn(customer, text)
+            turn = self._turn(customer, text, audio_uncertain=audio_uncertain)
             if turn.intent == "greeting" and customer["state"] == "new":
                 turn.intent = "greeting"
 
@@ -1496,8 +1902,14 @@ def owner_resolve(store: LanchoneteStore, customer_id: str, state: str) -> dict:
         raise KeyError(customer_id)
     unanswered = awaiting_reply(store.history(customer_id))
     awaiting = f"resume-{len(store.history(customer_id))}" if unanswered else None
+    memory = dict(customer.get("memory") or {})
+    memory["needs_owner_pinged"] = False
+    if state in ("closed", "cancelled", "confirmed"):
+        memory["last_question"] = ""
+        memory["clarify_candidates"] = []
     return store.update_lead(customer_id, state=state, awaiting=awaiting,
-                             handoff_reason=None, unknown_count=0, confirmations=0)
+                             handoff_reason=None, unknown_count=0, confirmations=0,
+                             memory=memory)
 
 
 def owner_block(store: LanchoneteStore, customer_id: str, now: datetime) -> dict:

@@ -31,7 +31,28 @@ ADDRESS_CUE = re.compile(r"\b(rua|avenida|av|travessa|alameda|rodovia|estrada|pa
                          r"apartamento|bloco|condominio|residencial|vila)\b")
 NAME = re.compile(r"^[\wÀ-ÿ' .-]{2,60}$")
 FORBIDDEN_NOTE = re.compile(r"\b(desconto|cupom|promocao|promo|gratis|gratuito|de graca|"
-                            r"brinde|garantia|reembolso|senha|cpf|cnpj)\b")
+                            r"brinde|garantia|reembolso|senha|cpf|cnpj|"
+                            r"safad[oa]s?|gostos[oa]s?|maior salsicha|se e que me entende)\b")
+DISH_FLAVOR_PREFIX = re.compile(
+    r"\b(?:pizza|pastel|esfiha|empada|coxinha|torta|risole|kalzone|calzone)\s+(?:de\s+)?$"
+)
+CONDIMENT_FOOD = re.compile(
+    r"\b(?:molh\w*|creme\w*|tempero\w*|pimenta\w*|ketchup|catchup|mostarda|barbecue|"
+    r"vinagrete|farofa|pate)\b"
+    r"(?:\s+(?:de|da|do|com)\s+[a-z]{2,}(?:\s+[a-z]{2,})?|"
+    r"\s+(?!especial\b|da\s+casa\b)[a-z]{4,})?"
+)
+DISH_FOOD = re.compile(
+    r"\b(?:suco\s+de\s+(?!(?:laranja|maracuja)\b)[a-z]{2,}(?:\s+[a-z]{2,})?|"
+    r"pizza(?:\s+de\s+[a-z]{2,})?|pastel(?:\s+de\s+[a-z]{2,})?|"
+    r"esfiha(?:\s+de\s+[a-z]{2,})?|coxinha(?:\s+de\s+[a-z]{2,})?|"
+    r"empada(?:\s+de\s+[a-z]{2,})?|lasanha|macarrao|temaki|sushi|"
+    r"cerveja|chopp|chop|vinho|energetico|nuggets?|sorvete|torta|brownie|"
+    r"refrigerante\s+de\s+[a-z]{2,})\b"
+)
+INDEPENDENT_ITEM = re.compile(
+    r"^(?:um|uma|dois|duas|tres|quatro|cinco|mais|\d+)\s+[a-z]{3,}"
+)
 PAYMENT_WORDS = ("pix", "cartao", "dinheiro", "debito", "credito", "maquininha", "troco",
                  "transferencia", "especie")
 
@@ -53,6 +74,8 @@ class Parsed:
     done: bool = False
     cancel: bool = False
     question_items: list[str] = field(default_factory=list)
+    unknown_parts: list[str] = field(default_factory=list)
+    unknown_wants_extras: bool = False
 
     @property
     def changed(self) -> bool:
@@ -78,6 +101,9 @@ def item_mentions(rules: RestaurantRules, plain: str) -> list[tuple[int, int, It
     found: list[tuple[int, int, Item]] = []
     for item in rules.items:
         for match in item.pattern.finditer(plain):
+            before = plain[max(0, match.start() - 24):match.start()]
+            if DISH_FLAVOR_PREFIX.search(before):
+                continue
             found.append((match.start(), match.end(), item))
     found.sort(key=lambda entry: (entry[0], -(entry[1] - entry[0])))
     kept: list[tuple[int, int, Item]] = []
@@ -96,6 +122,10 @@ def _extra_matches(rules: RestaurantRules, item: Item, segment: str) -> list[str
             prefix = segment[max(0, match.start() - 12):match.start()]
             if REMOVE_CUE.search(prefix):
                 continue
+            if extra.id == "molho-especial":
+                after = segment[match.end():match.end() + 24]
+                if re.match(r"^\s+(?:de|da|do|sabor)\s+(?!(?:casa|especial)\b)[a-z]{2,}", after):
+                    continue
             # "com cheddar", "mais bacon", "extra de queijo": a bare extra after "e" is
             # still accepted ("x-bacon e bacon"), because the customer named it.
             extras.append(extra.id)
@@ -119,12 +149,18 @@ def _note(segment: str, rules: RestaurantRules, item: Item) -> str:
     """Short customer notes ("sem cebola", "de chocolate", "bem passado")."""
     notes = []
     known = _known_phrases(rules, item)
-    for part in re.split(r"\s+e\s+", segment):
-        for cue in re.findall(r"\bsem\s+([a-z]{3,}(?:\s+(?!com\b)[a-z]{3,}){0,2})", part):
+    for part in re.split(r"\s*(?:,|;|\n|\+|\be\b)\s*", segment):
+        clean_part = normalize(part)
+        if not clean_part:
+            continue
+        if (INDEPENDENT_ITEM.match(clean_part)
+                and not re.search(r"\b(?:sem|bem passado|mal passado|ao ponto)\b", clean_part)):
+            continue
+        for cue in re.findall(r"\bsem\s+([a-z]{3,}(?:\s+(?!com\b)[a-z]{3,}){0,2})", clean_part):
             if not FORBIDDEN_NOTE.search(cue):
                 notes.append(re.sub(r"\br\$?\s*\d+(?:[,.]\d+)?\b", "", cue).strip())
         for cue in re.findall(r"\b(?:de|com|sabor)\s+([a-z]{3,}(?:\s+(?!sem\b|com\b|e\b)"
-                              r"[a-z]{3,}){0,2})", part):
+                              r"[a-z]{3,}){0,2})", clean_part):
             plain = normalize(cue)
             if plain in known or plain.split()[0] in NOTE_STOP or plain in NOTE_STOP:
                 continue
@@ -132,7 +168,7 @@ def _note(segment: str, rules: RestaurantRules, item: Item) -> str:
                 continue
             notes.append(cue.strip())
         for cue in re.findall(r"\b(bem passado|mal passado|ao ponto|pouco molho|"
-                              r"sem molho|pouca cebola)\b", part):
+                              r"sem molho|pouca cebola)\b", clean_part):
             notes.append(cue)
     return "; ".join(dict.fromkeys(notes))[:60]
 
@@ -303,7 +339,90 @@ def parse(rules: RestaurantRules, text: str) -> Parsed:
         result.done = True
     if any(re.search(pattern, plain) for pattern in rules.context.get("cancel", [])):
         result.cancel = True
+    result.unknown_parts, result.unknown_wants_extras = _extract_unknown_parts(
+        rules, plain, mentions, result)
     return result
+
+
+GENERIC_NOUNS = {"lanche", "lanches", "burger", "hamburguer", "item", "itens",
+                 "coisa", "coisas", "pessoa", "pessoas", "unidade", "unidades", "nota"}
+
+
+def _clean_unknown_fragment(fragment: str) -> str:
+    cleaned = re.sub(
+        r"\b(?:safad[oa]s?|gostos[oa]s?|gostosona|se e que me entende.*)\b",
+        " ",
+        fragment,
+    )
+    cleaned = re.sub(r"\br?\$?\s*\d+(?:[,.]\d+)?\b", " ", cleaned)
+    cleaned = FORBIDDEN_NOTE.sub(" ", cleaned)
+    cleaned = re.sub(r"[@%]", " ", cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip(" .,:;-!?")
+
+
+def _extract_unknown_parts(rules: RestaurantRules, plain: str,
+                           mentions: list[tuple[int, int, Item]],
+                           result: Parsed) -> tuple[list[str], bool]:
+    """Capture unrecognized secondary food/condiment requests without inventing items."""
+    if not mentions and result.fields.get("address"):
+        return [], False
+    slices: list[str] = []
+    cursor = 0
+    for start, end, _ in mentions:
+        slices.append(plain[cursor:start])
+        cursor = end
+    slices.append(plain[cursor:])
+    known_notes = {normalize(item.note) for item in result.items if item.note}
+    known_extras = {alias for extra in rules.extras for alias in extra.aliases}
+    parts: list[str] = []
+    wants_extras = False
+    for chunk in slices:
+        for clause in re.split(r"\s*(?:,|;|\n|\+|\be\b)\s*", chunk):
+            raw_clause = normalize(clause)
+            if not raw_clause:
+                continue
+            if any(note and note in raw_clause for note in known_notes):
+                continue
+            if parse_kind(raw_clause) or parse_payment(rules, raw_clause):
+                continue
+            if any(re.search(p, raw_clause) for p in rules.context.get("done", [])):
+                continue
+            if any(re.search(p, raw_clause) for p in rules.context.get("cancel", [])):
+                continue
+            stripped = re.sub(
+                r"^(?:quero|queria|me ve|me manda|manda|adiciona|acrescenta|coloca|poe|"
+                r"mais|com|tambem|tem)\s+",
+                "",
+                raw_clause,
+            ).strip()
+            stripped = _clean_unknown_fragment(stripped)
+            cond = CONDIMENT_FOOD.search(stripped)
+            if cond:
+                phrase = _clean_unknown_fragment(cond.group(0))
+                if phrase and not any(phrase == normalize(a) for a in known_extras):
+                    parts.append(phrase)
+                    wants_extras = True
+                continue
+            dish = DISH_FOOD.search(stripped)
+            if dish:
+                phrase = _clean_unknown_fragment(dish.group(0))
+                if phrase:
+                    parts.append(phrase)
+                continue
+            if mentions:
+                tail_match = re.match(
+                    r"^(?:um|uma|dois|duas|tres|\d+)\s+"
+                    r"([a-z]{3,}(?:\s+(?:de|da|do)\s+[a-z]{2,}){0,2})",
+                    stripped,
+                )
+                if tail_match:
+                    phrase = _clean_unknown_fragment(tail_match.group(1))
+                    words = phrase.split()
+                    if phrase and words[0] not in GENERIC_NOUNS \
+                            and words[0] not in NOTE_STOP \
+                            and not any(re.search(p, phrase) for p in rules.context.get("done", [])):
+                        parts.append(phrase[:40])
+    return list(dict.fromkeys(parts)), wants_extras
 
 
 __all__ = ["Parsed", "ParsedItem", "item_mentions", "numbers", "parse", "parse_address",
