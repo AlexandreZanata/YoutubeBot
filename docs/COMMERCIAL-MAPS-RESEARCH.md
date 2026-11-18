@@ -1,9 +1,8 @@
 # Google Maps lead research
 
-Status: implemented (2026-11-18). The contract below is the
-source of truth; the module is `tools/ytbot/commercial/maps/`. Tests use saved HTML fixtures
-only. A real, owner-requested run is still pending and uses `--limit 10` in
-`Lucas do Rio Verde - MT` first.
+Status: implemented and exercised in a live run in Sinop - MT on 2026-11-18. The contract
+below is the source of truth; the module is `tools/ytbot/commercial/maps/`. Tests use saved
+HTML fixtures only; the live run is summarized at the end.
 
 The research produces an owner-reviewed CSV for the WhatsApp sales agent
 ([WHATSAPP-SALES](COMMERCIAL-WHATSAPP-SALES.md)). It never sends a message, never writes on
@@ -245,14 +244,33 @@ Operational details:
 - `ajuste-maps.csv` carries the found site in `website`, so it is not importable until the
   sales rules have the "Ajuste do Google Maps" opening and price.
 
+## Live run (2026-11-18)
+
+The owner-requested run used Sinop - MT with `--limit 30`: 30 businesses read, 20 from Sinop
+and 10 from Sorriso (excluded by the address city). The 20 Sinop listings produced 11 site
+candidates and one "Ajuste do Google Maps" candidate after confirmation; 6 already had a
+working site and Rident/OrthoDontic were excluded as chains. Nothing was imported.
+
+The live layout differed from the saved fixtures and was corrected in the module:
+`input[role=combobox]` plus the "Pesquisar" button, `jsaction*=category`, the hours aria label,
+the "Ordenar" review menu with "um mês atrás" dates, and photo presence as the 1-9 bucket when
+Maps hides the count. Google also returned dental directories as search results; the owner
+tunes `confirmation.ignore_domains` for them (cadeodentista, magicpin, agendarconsulta,
+dentmap, mechameaqui/mechamenozap, b2bseg, loqal, studioadamas, guiafacil, cylex,
+dentistas.net.br, waze, encontramatogrosso and similar). `bit.ly` and booking hubs count as
+marketplaces, never as an own site.
+
+One confirmation search hit Google's `/sorry` challenge. The module stopped, wrote
+`needs-attention.json` and notified the owner; the owner solved the challenge by hand in the
+visible window and the run resumed. No challenge was automated or bypassed.
+
 ## Verification and limits
 
 Tests use saved HTML fixtures for listings, the results feed and Google result pages; CI never
-touches Google. The live selectors and the reviews sub-panel still need the owner-requested
-physical run (`--limit 10` in `Lucas do Rio Verde - MT` first). The confirmation search proves
-the sites it finds; it cannot prove that a site does not exist, so the owner reviews the list
-before importing. Google's terms restrict automated access; keep the module owner-operated,
-slow and low-volume, and stop at the first challenge. If the volume must grow, use the paid
-Google Places API with the owner's key instead of scaling the browser.
+touches Google. The confirmation search proves the sites it finds; it cannot prove that a site
+does not exist, so the owner reviews the list before importing. Google's terms restrict
+automated access; keep the module owner-operated, slow and low-volume, and stop at the first
+challenge. If the volume must grow, use the paid Google Places API with the owner's key
+instead of scaling the browser.
 
 The research never imports, never messages and never writes on Google.
