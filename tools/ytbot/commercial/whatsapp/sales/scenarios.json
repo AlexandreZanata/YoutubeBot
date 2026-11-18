@@ -1,0 +1,161 @@
+{
+  "A interessado ate orcamento": [
+    "Boa tarde, tudo sim e você?",
+    "Quanto custa um site?",
+    "Sim, quero",
+    "Tenho uma barbearia, queria mostrar os serviços, preços e um botão pra agendar pelo WhatsApp"
+  ],
+  "B objecao de preco": [
+    "Quanto custa?",
+    "Tá caro, faz por 300?"
+  ],
+  "C pronto para fechar": [
+    "Gostei dos sites. Quero fazer, como faço pra pagar a entrada?"
+  ],
+  "D quer humano": [
+    "Quero falar com o Alexandre mesmo, não com robô"
+  ],
+  "E desconfiado": [
+    "Isso é golpe?"
+  ],
+  "F confuso": [
+    "Não entendi",
+    "Como assim?"
+  ],
+  "G so instagram": [
+    "A gente só usa Instagram, precisa mesmo de site?"
+  ],
+  "H ocupado": [
+    "Agora estou ocupado, me chama amanhã"
+  ],
+  "I ja tem quem faca": [
+    "Obrigado, mas já temos quem faça"
+  ],
+  "J irritado": [
+    "Para de me mandar mensagem, que saco"
+  ],
+  "K localizacao": [
+    "Vocês são de onde? Atendem em Sorriso?"
+  ],
+  "L referencia": [
+    "Vocês já fizeram site pra barbearia?"
+  ],
+  "M tecnico": [
+    "Faz com WordPress? Eu consigo editar depois sozinho?"
+  ],
+  "N dominio": [
+    "O domínio está incluso no valor?"
+  ],
+  "O loja virtual": [
+    "Faz loja virtual com pagamento online?"
+  ],
+  "P email": [
+    "Manda o orçamento no meu email"
+  ],
+  "Q pergunta repetida": [
+    "Quanto custa?",
+    "Mas quanto custa?"
+  ],
+  "R reclamacao": [
+    "Que absurdo mandar mensagem assim pra quem nem conhece"
+  ],
+  "S parcelamento": [
+    "Dá pra parcelar no cartão em 10x?"
+  ],
+  "T contrato": [
+    "Vocês fazem contrato? Tem nota fiscal?"
+  ],
+  "U ocupado agora nao": [
+    "Agora não posso, me chama amanhã"
+  ],
+  "V nao quero site quero app": [
+    "Não quero site, quero um aplicativo pra minha loja"
+  ],
+  "W conversa longa": [
+    "Tudo bem e você?",
+    "Quem é você?",
+    "Me mostra exemplos",
+    "Quanto custa?",
+    "E o prazo?",
+    "Tem servidor?",
+    "Como funciona o site?",
+    "Aceita pix?",
+    "E aplicativo?",
+    "Vocês fazem cardápio?"
+  ],
+  "X reclama do bot depois": [
+    "Quanto custa?",
+    "Você é um robô? quero falar com gente"
+  ],
+  "X robo e quer gente": [
+    "Quanto custa?",
+    "Você é um robô? quero falar com gente"
+  ],
+  "Y foto com legenda no orcamento": [
+    "Faz sistema de agendamento?",
+    "Sim",
+    "Photo\nEstúdio de fotos, trabalho segunda, quarta e quinta das 10h às 18h"
+  ],
+  "Z dono ja com a conversa": [
+    "Isso é golpe?",
+    "Oi?",
+    "Alô"
+  ],
+  "AA funcionaria indica o dono": [
+    "Boa tarde, sou funcionária aqui",
+    "Aqui é a Paula",
+    "O número do Carlos é (65) 90000-0009"
+  ],
+  "AB funcionario nao passa o contato": [
+    "O dono não está",
+    "Vou passar pro dono, ele te chama"
+  ],
+  "AC fecha o site institucional": [
+    "Quanto custa um site simples?",
+    "Quero fechar o site, como pago a entrada?",
+    "Paguei, segue o comprovante"
+  ],
+  "AD fecha um aplicativo": [
+    "Vocês fazem aplicativo de delivery?",
+    "Quero fechar"
+  ],
+  "AE desiste depois do interesse": [
+    "Vocês fazem sistema de agendamento?",
+    "Achei que era mais barato, não tenho interesse"
+  ],
+  "AF aplicativo por 500": [
+    "Então um aplicativo sai 500 reais?"
+  ],
+  "AG ficha completa com cores estilo e dominio": [
+    "Quanto custa um site simples?",
+    "Sim, quero fazer o orçamento",
+    "Chama Padaria Pão Quente, fazemos pães artesanais, bolos e encomendas de festa",
+    "Fica na Av. Brasil 500, centro, abrimos todo dia das 6h às 20h, WhatsApp (65) 90000-0011 e Instagram padariapaoquente",
+    "As cores são marrom e creme, quero um visual mais aconchegante e limpo com fundo claro, ainda não tenho logo",
+    "Testei padariapaoquente.com.br e tá livre! Prefiro que vocês comprem pra mim"
+  ],
+  "AH links nao abrem": [
+    "Eu não estou conseguindo abrir o link de exemplos",
+    "Salvei, agora abriu! Quanto custa um site?"
+  ],
+  "AI sistema: entrevista de requisitos": [
+    "Vocês fazem aplicativo de agendamento?",
+    "Sim",
+    "Barbearia Navalha. Os clientes ligam e mandam WhatsApp para marcar, vira uma bagunça",
+    "Só eu e mais dois barbeiros. Hoje anoto tudo num caderno",
+    "Queria que o cliente marcasse pelo celular e recebesse um lembrete. Dá pra cobrar pelo Pix?",
+    "Pode ser no celular e no computador, não uso nenhum outro sistema",
+    "É isso",
+    "Faltou: quero ver no fim do mês quanto cada barbeiro atendeu",
+    "Isso mesmo, está certo"
+  ],
+  "AJ sistema: quer fechar logo": [
+    "Preciso de um sistema de pedidos para minha distribuidora de bebidas",
+    "Quero fechar, como faço?",
+    "Distribuidora Gelada. Os vendedores anotam os pedidos no papel e depois digitam",
+    "Uns cinco vendedores na rua pelo celular e o escritório no computador",
+    "Precisa controlar estoque e emitir nota fiscal",
+    "Só isso",
+    "Certo"
+  ]
+}

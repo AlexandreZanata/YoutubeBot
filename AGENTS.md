@@ -128,9 +128,38 @@ hub, never invent prices, commissions or links, and never commit browser state.
 
 WhatsApp Web in the commercial module is owner-operated: manual QR login in the visible
 browser, hidden sending, one chat at a time, human intervals, a `--live` gate and a journal
-that blocks repeats. It never broadcasts to lists and never feeds the Procurali pipeline. The
+that blocks repeats. It never broadcasts and never feeds the Procurali pipeline. The
 DOM map, state machine and troubleshooting are in
 [WhatsApp Web](docs/COMMERCIAL-WHATSAPP.md).
+
+The Zaflas Inova Simples sales agent is the only list use (owner decision 2026-11-17): it opens
+one-to-one conversations only with businesses from the owner's reviewed Google Maps CSV (never
+scraped), at most 10 first contacts per day in business hours, never repeats an opening and
+sends at most one follow-up. It answers funnel leads by
+`tools/ytbot/commercial/whatsapp/sales/sales_rules.toml`, through OpenCode Go: free models
+first (zero price in the live catalog, rotating, paused on timeout or no credits), then only
+`deepseek-v4.1-flash` and `muse-spark-1.3-contributor` as paid fallback; a price, deadline, link
+or promise outside that file falls back to
+its fixed text or goes to the owner. A refusal is a permanent do-not-contact entry, the robot
+question gets an honest answer, the OpenCode key stays in `.local/`, and `--live` stays
+required. The rules' values are of the static institutional site only; apps and systems are
+always quoted by the owner and the bot must never tie the site price to them. Closing the
+institutional site sends only the Pix keys written in the rules file; closing an app or system,
+a payment message and a refusal after interest go to the owner, but an app or system first gets a
+gentle requirements interview (restating what the client said, then a summary the client
+confirms) so the owner receives the complete ficha. A staff member is asked for the
+decision maker's contact; a number they send becomes a referral lead with its own opening and
+its own daily limit. See [sales agent](docs/COMMERCIAL-WHATSAPP-SALES.md).
+
+Google Maps lead research runs with `python3 -m tools.ytbot commercial maps
+login|status|research|verify|export`: one tab, a person's pace, the owner's manual Google login,
+hidden Chrome after login, a stop at any challenge, read-only on Google, a confirmation search
+before a business counts as having no site, and an owner-reviewed CSV as the only output.
+Selectors, category catalog, exclusions and score are the versioned
+`tools/ytbot/commercial/maps/maps_rules.toml`; runs are resumable under
+`.local/commercial/maps/runs/`; `commercial sales import --source google-maps-manual` adds the
+reviewed rows. Tests use saved HTML only. Its filters, score and the "Ajuste do Google Maps"
+access steps are in [Maps research](docs/COMMERCIAL-MAPS-RESEARCH.md).
 
 When delivering captured products from this workstation to the remote Procurali VPS (database,
 site, Telegram offers group queue, and WhatsApp Web assisted drafts), never copy VPS origin IPs,

@@ -25,7 +25,12 @@ algorithms are preserved; new account/adapter modules compose them.
   report. See [cleanup](CLEANUP.md).
 - `tools/ytbot/commercial/`: private affiliate sessions, starting with Mercado Livre, plus a local
   SQLite reference index (`reference.py`) for sub-millisecond VPS catalog lookups and price-change
-  comparisons. See [commercial](COMMERCIAL.md).
+  comparisons. `maps/` is the owner-operated Google Maps lead research: versioned TOML rules,
+  one-tab resumable runs under `.local/commercial/maps/runs/`, saved-HTML tests and an
+  owner-reviewed CSV. See [commercial](COMMERCIAL.md) and
+  [Maps research](COMMERCIAL-MAPS-RESEARCH.md). `commercial/whatsapp/` holds the WhatsApp Web
+  sender and listener; `commercial/whatsapp/sales/` is the Zaflas sales agent on top of them.
+  See [WhatsApp sales](COMMERCIAL-WHATSAPP-SALES.md).
 - `tools/ytbot/social/`: private per-network promotion profiles, visible login and hidden
   Xvfb operation after login; X starts the module. See [social](SOCIAL.md) and the
   [promotion focus](PROMOTION.md). The agent runbook for research, audit and the 30-day

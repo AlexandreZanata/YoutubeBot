@@ -1,0 +1,762 @@
+# Zaflas Inova Simples WhatsApp sales rules.
+#
+# Contract: docs/COMMERCIAL-WHATSAPP-SALES.md. This file is the only source of prices,
+# deadlines, links and promises. The model (OpenCode Go, deepseek-v4.1-flash) receives it as
+# context and every reply is checked against it: a money value, duration, percentage, link or
+# forbidden term that is not written here makes the reply fall back to the fixed text below or
+# go to the owner. Message texts are Brazilian Portuguese; comments stay in English.
+#
+# Patterns are Python regular expressions matched against the incoming text after lowercasing,
+# removing accents and collapsing spaces ("Não, obrigado!" -> "nao, obrigado!").
+
+version = 1
+company = "Zaflas Inova Simples"
+agent_name = "Alexandre"
+language = "pt-BR"
+timezone = "America/Cuiaba"
+
+[limits]
+daily_openings = 10                 # owner decision 2026-11-17
+max_replies_per_lead_per_day = 12   # stops loops with other bots; the owner takes over
+max_bot_replies_before_owner = 8    # a long chat that has not reached a quote goes to the owner
+owner_reminder_minutes = 30         # new messages in a chat that is with the owner: one reminder
+max_messages_per_reply = 4          # links in their own messages do not count
+max_message_chars = 600
+followup_after_hours = 72           # one follow-up when the opening got no answer
+max_followups = 1
+no_response_after_followup_hours = 96
+
+[hours]
+# Weekday numbers: 0 = Monday ... 6 = Sunday. Times are local (America/Cuiaba).
+opening_days = [0, 1, 2, 3, 4]
+opening_start = "08:30"
+opening_end = "17:30"
+# People who wrote are answered in this window; later messages wait for the next window.
+reply_days = [0, 1, 2, 3, 4, 5, 6]
+reply_start = "07:00"
+reply_end = "21:00"
+
+[pacing]
+# Interval between two messages of a reply = typing time of the message (+ reading time of the
+# received one before the first message), clamped and jittered. The interval includes the
+# typing itself. Calibrated on the owner's opening (8 s for ~150 characters), 2026-11-17.
+typing_chars_per_second = 20.0
+min_seconds = 2.0
+max_seconds = 10.0
+reading_chars_per_second = 40.0
+reading_min_seconds = 1.0
+reading_max_seconds = 4.0
+jitter = 0.15
+link_preview_seconds = 3.0          # minimum wait after typing a link, for the preview card
+between_chats_min_seconds = 10.0
+between_chats_max_seconds = 30.0
+
+[llm]
+# Owner decision 2026-11-17 (evening): OpenCode Go free models first, in rotation, then the
+# paid fallback. A model is free when the live catalog lists it with price 0 (longcat-2.5-free,
+# hy4-flash-free, beam-free, iceman-contributor-free on 2026-11-17; new free models are used
+# automatically). The code accepts no other paid model than the two below.
+base_url = "https://opencode.ai/inference/go/openai/v1"
+models_url = "https://opencode.ai/inference/go/v1/models"
+api_key_env = "OPENCODE_GO_API_KEY"
+fallback = ["deepseek-v4.1-flash", "muse-spark-1.3-contributor"]
+exclude = []                        # free models never to use (e.g. ones that train on prompts)
+temperature = 0.3
+max_output_tokens = 4096            # includes reasoning tokens
+free_timeout_seconds = 20           # a free model that does not answer in time is skipped
+timeout_seconds = 90                # paid fallback
+probe_timeout_seconds = 8           # parallel health check of every free model
+quick_timeout_seconds = 8           # small optional lookups (a name in a message) per model
+quick_attempts = 2                  # models tried for such a lookup before the local fallback
+long_timeout_seconds = 45           # the client ficha (large JSON after reasoning) on free models
+long_max_output_tokens = 8192       # the client ficha: room for reasoning plus the JSON
+long_race = 4                       # free models asked at once for the ficha; the first JSON wins
+long_reasoning_effort = "low"       # the ficha needs little reasoning (40 s -> 11 s on beam-free)
+cooldown_seconds = 120              # pause after a timeout or an error
+no_credit_cooldown_seconds = 1800   # pause after "no credits" / rate limit (402, 429, quota)
+catalog_refresh_seconds = 3600      # re-read the catalog (and probe) every hour
+
+[greetings]
+morning = "Bom dia"        # before 12:00
+afternoon = "Boa tarde"    # 12:00 to 17:59
+evening = "Boa noite"      # from 18:00
+
+[opening]
+# Sent once per number, one message per bubble, in this order. Never repeated.
+# `delays` is the owner's interval in seconds before each message (greeting 4 s, "Tudo bem?"
+# 2 s, introduction 8 s, examples 8 s); each link waits `link_delay` (owner, 2026-11-17).
+delays = [4, 2, 8, 8]
+link_delay = 4
+messages = [
+  "{greeting}",
+  "Tudo bem?",
+  "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e aplicativos. Eu vi que no Google Maps vocês não têm site.",
+  "Nós temos alguns exemplos de sistemas e sites que nós criamos:",
+]
+# Each link goes in its own message so WhatsApp loads the preview card.
+links = [
+  "https://sorrifit.com",
+  "https://zaflas.com.br",
+  "https://musicalizese.com.br",
+  "https://abastevo.com.br",
+]
+
+[followup]
+messages = [
+  "Oi, tudo bem? Só passando para saber se você conseguiu ver os exemplos que te mandei. Se tiver interesse em um site ou sistema, é só me falar.",
+]
+
+[facts]
+empresa = [
+  "Quem fala é o Alexandre, da Zaflas Inova Simples, que cria sistemas, sites e aplicativos.",
+  "O contato da empresa veio do perfil público dela no Google Maps, que não mostra site.",
+  "As mensagens são enviadas com ajuda de um assistente automático do Alexandre; ele acompanha todas as conversas e responde pessoalmente quando precisa.",
+  "Exemplos de trabalhos: https://sorrifit.com, https://zaflas.com.br, https://musicalizese.com.br e https://abastevo.com.br.",
+]
+site_institucional = [
+  "Site institucional é o site de apresentação da empresa: estático, só visual, como uma vitrine na internet com quem são, serviços, fotos, endereço, horário e um botão para chamar no WhatsApp.",
+  "Ele não tem login, cadastro, agendamento nem pagamento online; por isso é mais simples e mais barato.",
+  "Os valores a seguir valem SOMENTE para o site institucional.",
+  "Valor médio do site institucional: R$ 500, com entrada de R$ 250.",
+  "Prazo médio de entrega do site institucional: 15 dias.",
+  "Servidor do site institucional, que o mantém no ar: R$ 39,90 por mês no boleto ou Pix, ou R$ 45 por mês no cartão.",
+  "Para fechar o site institucional, a entrada é paga por Pix nas chaves que o bot envia; a construção começa depois do pagamento da entrada.",
+]
+dominio = [
+  "O domínio é o endereço do site na internet: aquele nome que a pessoa digita para entrar, como suaempresa.com.br (é como a placa e o endereço da empresa na internet). Ele é separado da criação do site.",
+  "No site oficial https://registro.br/ o cliente pode digitar ideias de nomes e testar na hora se estão livres para registro.",
+  "Para ter o domínio, o cliente pode escolher entre 3 opções: 1) comprar manualmente por conta própria no https://registro.br/; 2) comprar manualmente lá e depois nós ajudamos a configurar tudo no site; ou 3) deixar que nós compramos e configuramos o domínio para ele, com um valor adicional de R$ 40 na primeira mensalidade referente ao domínio de 1 ano.",
+]
+sistemas = [
+  "Aplicativos e sistemas NÃO custam R$ 500 e não seguem nenhum valor do site institucional.",
+  "Cada aplicativo ou sistema é feito sob medida: valor e prazo dependem das funções e dos requisitos do cliente (login, cadastro, agendamento, pagamentos, estoque, painel, área do cliente, integrações).",
+  "Por isso aplicativos e sistemas sempre passam por um orçamento, que o Alexandre faz pessoalmente.",
+]
+
+[guard]
+# A sentence with a money value or a number of days may talk about apps or systems only when it
+# also says "institucional": the site prices must never look like an app price (owner,
+# 2026-11-17).
+system_words = [
+  'aplicativo', '\bapps?\b', 'sistema', 'loja (virtual|online)', 'e-?commerce', 'agendamento',
+  '\bcadastro', '\blogin\b', '\bpainel\b', 'area do cliente',
+]
+# Terms the model may never write (checked after removing accents).
+forbidden = [
+  "desconto", "gratis", "gratuito", "de graca", "garantimos", "garantido", "garantia",
+  "promocao", "sem juros", "parcelamos", "parcelado", "chave pix", "pix copia", "senha",
+  "cpf", "cnpj", "cartao de credito numero", "100%",
+]
+# The model may never deny being automated.
+human_claims = [
+  'sou (um |uma )?(humano|pessoa de verdade|pessoa real)',
+  'nao sou (um |uma )?(robo|bot|ia|assistente)',
+]
+# A reply that asks "Você gostaria que eu fizesse um orçamento?" may not also say the quote
+# will be made: that answers its own question (owner review, 2026-11-17).
+quote_promises = [
+  '(faco|farei|vou fazer|faremos|preparo|vou preparar|monto|vou montar|mando|vou mandar|envio|vou enviar|te passo) (o |um |seu )?orcamento',
+  'entao (eu )?faco',
+]
+
+[brief]
+# After the client accepts the quote the bot collects the project details, then writes the
+# client folder (ficha.md, ficha.json, conversa.md, midia/) and hands the quote to the owner.
+# It asks for at most two missing items per message and stops after `max_collect_turns`
+# answers or when the client says it is done.
+max_collect_turns = 6
+required = [
+  "nome da empresa e o que ela faz",
+  "o que o site deve mostrar (principais serviços, produtos ou informações)",
+  "dados de atendimento para o site (endereço ou cidade, dias e horários de funcionamento, WhatsApp do botão e Instagram ou redes sociais)",
+  "cores principais da marca e estilo visual desejado (ex.: mais limpo e moderno, mais sério e tradicional, mais elegante ou mais colorido, fundo claro ou escuro)",
+  "domínio desejado (endereço .com.br) e como prefere fazer (comprar manualmente, comprar manualmente e ajudarmos a configurar, ou deixarmos comprar por +R$ 40 na primeira mensalidade para o domínio de 1 ano)",
+]
+optional = [
+  "logotipo da empresa (se já tiver)",
+  "fotos do local, da equipe ou dos serviços e produtos",
+  "algum site ou página que acha bonito como inspiração",
+]
+domain_messages = [
+  "Agora sobre o domínio! Explicando de um jeito bem simples: o domínio é o endereço do seu site na internet, aquele nome que a pessoa digita para entrar, como suaempresa.com.br (como se fosse o endereço da sua loja na internet). Neste site oficial você consegue digitar ideias de nomes e testar na hora se estão livres:",
+  "https://registro.br/",
+  "Para ter esse endereço, você pode escolher como prefere: 1) comprar manualmente por conta própria lá no site; 2) comprar manualmente lá e depois nós te ajudamos a configurar tudo no site; ou 3) deixar que nós compramos e cuidamos de tudo para você, com um valor adicional de R$ 40 na primeira mensalidade referente ao domínio de 1 ano.",
+  "Você já pensou em algum nome para o endereço do site e qual dessas opções prefere?",
+]
+done_patterns = [
+  '\be isso\b', '\bso isso\b', 'mandei tudo', 'pode (fazer|montar|mandar) o orcamento', 'por enquanto e isso',
+  'acho que e isso', 'ta bom assim', 'era isso', '^pode fazer[.! ]*$',
+  '^(obrigad[oa]|valeu|ok|blz|beleza)[!. ]*$',
+]
+fallback_question = "Anotei! Para completar sua ficha, pode me contar também o endereço e horário de atendimento, as cores principais da sua marca, o estilo que você imagina para o site (mais moderno, tradicional, claro ou escuro) e mandar a logo ou fotos se tiver. Quando terminar, é só me avisar."
+
+[brief_system]
+# Apps and systems (owner, 2026-11-18): the bot does not hand the chat over as soon as the
+# client wants something beyond the institutional site. It interviews the client gently, one
+# or two simple questions at a time, restating what it understood, until the requirements
+# below are clear; then it shows the client a summary to confirm and hands the complete ficha
+# to the owner (quote-requested, or buying when the client already wants to close).
+max_collect_turns = 10
+max_confirmations = 2
+required = [
+  "nome da empresa e o que ela faz",
+  "qual problema do dia a dia o sistema ou aplicativo deve resolver (o objetivo principal)",
+  "quem vai usar (clientes, funcionários ou só o dono) e mais ou menos quantas pessoas",
+  "as principais funções que precisa ter (por exemplo agendamento, cadastro de clientes, pedidos, estoque, pagamentos, relatórios)",
+  "como isso é feito hoje (caderno, planilha, WhatsApp ou outro sistema)",
+  "onde vai usar: aplicativo de celular, sistema no navegador do computador, ou os dois",
+  "se precisa se ligar a algo que já usa (Pix ou pagamento online, nota fiscal, WhatsApp ou outro sistema)",
+]
+optional = [
+  "algum aplicativo ou sistema que usa ou acha bom como exemplo",
+  "se existe uma data importante para começar a usar",
+  "logotipo e cores da marca, se já tiver",
+]
+start = [
+  "Ótimo! Para eu entender direitinho o que você precisa e o orçamento sair certo, vou te fazer algumas perguntas rápidas, uma ou duas por vez. Se preferir, pode responder por áudio.",
+]
+start_buy = [
+  "Que ótimo! Para eu preparar a proposta certinha, preciso entender alguns detalhes do sistema antes. Vou te fazer algumas perguntas rápidas, uma ou duas por vez. Se preferir, pode responder por áudio.",
+]
+first_question = "Para começar: qual é o nome da empresa e qual problema do dia a dia você quer resolver com esse sistema ou aplicativo?"
+fallback_question = "Anotei! Me conta um pouco mais: quem vai usar no dia a dia e quais são as principais coisas que ele precisa fazer?"
+confirm_intro = "Deixa eu confirmar se entendi tudo certinho:"
+confirm_question = "Está certo? Se quiser ajustar ou acrescentar alguma coisa, é só me falar."
+done_messages = ["Perfeito, anotei tudo! Com essas informações eu preparo o orçamento do seu sistema e te mando por aqui."]
+done_messages_buy = ["Perfeito, anotei tudo! Já te respondo pessoalmente com a proposta e os próximos passos."]
+
+[referral]
+# A staff member who does not decide is asked, politely, for the decision maker's contact.
+# Names never take an article ("a Felipe", "da Barbearia" may be the wrong gender): write
+# "da empresa {company}" and people's names alone ("Vou falar com {who}").
+# A number sent in the chat becomes a new lead (same category, next number, vCard) and gets
+# its own opening, mentioning who passed the number. Staff chats then stop (state referred).
+ask_name = "E com quem eu falo, por gentileza?"
+ask_contact_again = "Prazer, {staff}! Você poderia me passar o contato de quem cuida das decisões sobre site e divulgação da empresa?"
+gave_up = "Sem problema! Fico à disposição: se a pessoa responsável quiser conversar, é só me chamar por aqui. Obrigado!"
+thanks = "Muito obrigado, {staff}! Vou falar com {who} agora."
+thanks_unnamed = "Muito obrigado! Vou falar com {who} agora."
+who_unnamed = "a pessoa responsável"
+daily_limit = 10                    # referral openings, apart from the 10 cold ones
+opening = [
+  "{greeting}",
+  "Tudo bem?",
+  "{staff}, da empresa {company}, me passou o seu contato. Sou o Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. Vi que no Google Maps a empresa {company} ainda não tem site.",
+  "Nós temos alguns exemplos de sistemas e sites que nós criamos:",
+]
+opening_unnamed = "A equipe da empresa {company} me passou o seu contato. Sou o Alexandre, da Zaflas Inova Simples: criamos sistemas, sites e aplicativos. Vi que no Google Maps a empresa {company} ainda não tem site."
+contact_card = "Mandou o contato do responsável em cartão: salve o número e chame"
+
+[context]
+# Short answers are read against the last question we asked. After the offer question, an
+# affirmative answer is `quote_accept` and a negative one is `refusal`. While the lead is in
+# `qualifying`, any other text is `quote_details`.
+offer_question = 'orcamento\?'
+affirmative = [
+  '^(sim|s|quero|queremos|pode|pode sim|pode ser|claro|com certeza|gostaria|gostaria sim|bora|vamos|manda|faz|faca|isso|aceito|por favor|pfv|ok,? pode|quero sim)\b',
+]
+negative = ['^(nao|n|nop|negativo)\b']
+
+[handoff]
+# Sent once when the model asks for the owner on an ordinary intent, so the contact is not left
+# waiting. Dedicated hand-off intents below carry their own text, priority and reason.
+messages = ["Certo! Vou verificar direitinho e já te respondo."]
+
+# Intents. `action` decides what happens after the messages:
+#   reply   send the messages and keep the conversation going
+#   qualify send the messages and wait for the project details (state qualifying)
+#   quote   send the messages, then the owner prepares the quote (state quote-requested)
+#   collect gather the project details for the client folder, then hand the quote over
+#   close   send the messages and stop without follow-up (state closed)
+#   block   send the fixed messages, then never contact again (do-not-contact list)
+#   handoff send the messages, then the owner answers (state needs-owner)
+#   ignore  send nothing
+# Hand-off intents (`handoff`, `quote`) also carry `priority` and `reason` for the owner's
+# notification: hot = buying signal, answer within minutes; needed = the bot lacks the
+# information or the authority; alert = something went wrong.
+# `fixed = true` sends the messages verbatim; otherwise the model may reword them using only
+# the facts above. Order matters for the local classifier: the first matching pattern wins.
+
+[[intents]]
+id = "opt_out"
+action = "block"
+fixed = true
+when = "Pede para parar, remover o número, diz que é spam, ameaça denunciar ou bloquear."
+patterns = [
+  'para de (me )?(mandar|enviar)', 'pare de', 'nao (me )?(mande|mandem|envie)', 'remov[ae] (meu|o meu|esse) (numero|contato)',
+  '\bspam\b', 'denunci', '\bbloque(ar|ia|ei|io)\b', 'nao (me )?(chame|chama|procure|incomode) mais',
+  'nao (me )?(chame|chama|procure|incomode)[.! ]*$', 'sai fora',
+]
+messages = ["Desculpe o incômodo! Não vou mais entrar em contato. Obrigado pela atenção."]
+
+[[intents]]
+id = "refusal"
+action = "block"
+fixed = true
+when = "Recusa: 'nesse momento não estou precisando', 'não, obrigado', 'agora não', 'não tenho interesse', 'não preciso', ou 'não' em resposta à oferta de orçamento. 'Agora não posso, me chama amanhã' NÃO é recusa (é callback_later)."
+patterns = [
+  'nao,? obrigad', 'nao (estou|to|estamos|tamo|tamos) precisando', 'nao (preciso|precisamos)( de site| disso| nao)?[,.! ]*(obrigad[oa])?[.!]*$',
+  'nao (tenho|temos) interesse', 'sem interesse', 'nao (quero|queremos)( nao)?[,.! ]*(obrigad[oa])?[.!]*$',
+  '^agora nao[,.! ]*(obrigad[oa]|valeu)?[.!]*$', 'agora nao,? (obrigad|valeu|preciso|quero)',
+  'n(esse|este|o) momento nao (estou |to |estamos )?(precis|quero|tenho interesse|temos interesse)',
+  'nao me interessa', 'dispenso', 'obrigad[oa],? mas nao', 'nao,? valeu', 'nao e (do nosso|o nosso) interesse',
+]
+messages = ["Entendo, obrigado pela atenção! Tenha um ótimo dia."]
+
+[[intents]]
+id = "auto_reply"
+action = "ignore"
+fixed = true
+when = "Resposta automática de WhatsApp Business: saudação de ausência, horário de atendimento, 'em breve retornaremos', menu numérico."
+patterns = [
+  'esta e uma (mensagem|resposta) automatica', 'obrigad[oa] (por|pelo) (entrar em )?contato',
+  'retornaremos', 'em breve (responderemos|retornaremos|entraremos)', 'nosso horario de atendimento',
+  'digite (o numero|1|uma opcao)', 'no momento (nao estamos|estamos fora)', 'agradecemos (o|seu) contato',
+]
+messages = []
+
+[[intents]]
+id = "human_request"
+action = "handoff"
+fixed = true
+priority = "hot"
+reason = "Pediu para falar com você"
+when = "Pede para falar com o Alexandre, com uma pessoa, com o responsável ou recusa falar com robô."
+patterns = [
+  'falar com (o |a |uma |um )?(alexandre|dono|responsavel|pessoa|alguem|humano|atendente|gente)',
+  'nao (quero )?(falar )?com (robo|bot|maquina)', 'quero (uma )?(pessoa|gente|humano)\b', 'atendimento humano',
+  'chama o alexandre',
+]
+messages = ["Claro! Já continuo com você pessoalmente."]
+
+[[intents]]
+id = "bot_question"
+action = "reply"
+fixed = true
+when = "Pergunta se é robô, bot, IA, mensagem automática ou se está falando com uma pessoa."
+patterns = [
+  '\brobo\b', '\bbot\b', '\be (uma )?ia\b', 'inteligencia artificial', '\bchatgpt\b', '\bautomatic[oa]\b',
+  '(e|eh) (uma )?pessoa', 'falando com (uma )?pessoa', 'e gente de verdade', 'e humano',
+]
+messages = [
+  "Essas mensagens são enviadas com ajuda de um assistente automático meu, mas eu acompanho todas as conversas e respondo pessoalmente quando precisa. Se preferir, é só pedir que eu mesmo continuo com você.",
+]
+
+[[intents]]
+id = "how_got_number"
+action = "reply"
+fixed = true
+when = "Pergunta como conseguiu o número, onde achou o contato ou quem passou."
+patterns = [
+  'como (voce |vc |vcs )?(conseguiu|achou|pegou|encontrou|teve)', 'onde (voce |vc )?(pegou|achou|conseguiu|encontrou)',
+  'quem (te )?passou', 'de onde (voce |vc )?(tirou|pegou)',
+]
+messages = [
+  "Encontrei a empresa de vocês no Google Maps; o número está no perfil público de vocês. Se preferir não receber mensagens, é só me avisar que não entro mais em contato.",
+]
+
+[[intents]]
+id = "trust_concern"
+action = "handoff"
+fixed = true
+priority = "needed"
+reason = "Desconfiança: precisa de contato pessoal"
+when = "Acha que é golpe, fraude ou pergunta se é confiável ou seguro."
+patterns = ['golpe', 'fraude', 'e confiavel', 'e seguro', 'desconfi', 'como (eu )?(sei|vou saber) que', 'e verdade isso']
+messages = ["Entendo a desconfiança, é bom ter cuidado! Já te respondo pessoalmente."]
+
+[[intents]]
+id = "links_not_opening"
+action = "reply"
+fixed = true
+when = "Diz que não consegue abrir, ver ou clicar nos links ou exemplos ('não estou conseguindo abrir o link', 'os sites não abrem', 'o link não funciona'). O WhatsApp bloqueia links de números que não estão salvos na agenda."
+patterns = [
+  'nao (estou |to |tou |esta |ta )?(consigo|consegui|conseguindo|da pra|deu pra|abre|abriu|abrem|abrindo|carrega|carregou|carregando|funciona|funcionou|aparece|apareceu)[^.?!]{0,30}(abrir|acessar|entrar|ver|clicar|link|site|exemplo)',
+  '(link|links|site|sites|exemplo|exemplos)[^.?!]{0,40}nao (abre|abrem|abriu|abriram|carrega|carregam|funciona|funcionam|aparece|aparecem|esta abrindo|estao abrindo|clica)',
+  '(link|links)[^.?!]{0,20}(bloquead|desativad|travad)',
+]
+messages = [
+  "Ah, isso é normal! Por segurança, o WhatsApp não deixa abrir links enviados por um número que ainda não está salvo na agenda.",
+  "Se você salvar meu contato (Alexandre, da Zaflas Inova Simples), os links passam a abrir normalmente: é só tocar neles de novo.",
+  "Se preferir, também dá para copiar o endereço, como zaflas.com.br, e colar no navegador do celular.",
+]
+
+[[intents]]
+id = "who_are_you"
+action = "reply"
+fixed = false
+when = "Pergunta quem é, quem fala, de qual empresa, o que a empresa faz."
+patterns = ['quem (e|eh|fala|esta falando)', 'qual (e a )?empresa', 'quem seria', '^quem\??$', 'o que (voces|vcs) fazem']
+messages = [
+  "Sou o Alexandre, da Zaflas Inova Simples. A gente cria sites, sistemas e aplicativos para empresas.",
+]
+
+[[intents]]
+id = "call_request"
+action = "handoff"
+fixed = true
+priority = "hot"
+reason = "Pediu ligação, reunião ou visita"
+when = "Pede ligação, chamada de vídeo, reunião ou visita."
+patterns = [
+  'me liga', 'pode ligar', 'liga pra mim', 'ligar para (mim|nos)', 'prefiro (ligacao|falar por telefone)',
+  'chamada de video', '\breuniao\b', 'pode vir aqui', 'passa aqui', 'visita',
+]
+messages = ["Claro! Qual o melhor horário para você?"]
+
+[[intents]]
+id = "audio"
+action = "handoff"
+fixed = true
+priority = "needed"
+reason = "Mandou áudio"
+when = "Mandou áudio ou mensagem de voz."
+patterns = ['^\[?(audio|voice message|mensagem de voz|ptt)\]?$', '^\W*\d{1,2}:\d{2}$']
+messages = [
+  "Recebi seu áudio! Agora não consigo ouvir, consegue me mandar por escrito? Se não der, eu ouço assim que puder e te respondo.",
+]
+
+[[intents]]
+id = "sticker"
+action = "ignore"
+fixed = true
+when = "Mandou só figurinha, GIF ou reação."
+patterns = ['^(sticker|figurinha|gif)$']
+messages = []
+
+[[intents]]
+id = "media"
+action = "handoff"
+fixed = true
+priority = "needed"
+reason = "Mandou foto, vídeo ou documento"
+when = "Mandou foto, imagem, vídeo, documento, localização ou contato."
+patterns = ['^\[?(photo|foto|image|imagem|video|document|documento|location|localizacao|contact|contato)\]?$']
+messages = ["Recebi, obrigado! Vou dar uma olhada e já te respondo."]
+
+[[intents]]
+id = "ready_to_buy"
+action = "buy"
+fixed = true
+priority = "hot"
+reason = "Quer comprar um sistema ou aplicativo: feche pessoalmente"
+when = "Quer contratar ou começar já: 'quero fechar', 'pode começar', 'fechado', 'como faço para pagar a entrada'. No site institucional o bot manda as chaves Pix (close_site); em sistema ou aplicativo, o Alexandre fecha."
+patterns = [
+  'quero (fechar|contratar|comecar)', 'vamos (fechar|comecar)', 'pode (comecar|fazer)[.! ]*$', '^fechado\b',
+  'como (eu )?(faco|faço) (pra|para) (pagar|contratar|comecar|fechar)', 'pagar a entrada', 'onde (eu )?pago',
+  'manda (o pix|a chave|os dados( para pagamento)?)',
+]
+messages = ["Que ótimo! Já te respondo pessoalmente com os próximos passos."]
+
+[[intents]]
+id = "close_site"
+action = "won"
+fixed = true
+priority = "hot"
+reason = "Fechou o site institucional: chaves Pix enviadas, confirme a entrada"
+when = "Uso interno: quer fechar só o site institucional (a conversa é sobre o site de apresentação, não sobre sistema ou aplicativo)."
+patterns = []
+messages = [
+  "Que ótimo! Para começarmos o seu site institucional, a entrada é de R$ 250. Pode fazer o Pix para uma destas chaves:",
+  "financeiro@zaflas.com.br",
+  "8e725568-04bd-47e9-9615-cf090a1929a7",
+  "Assim que a entrada for paga, começamos a construir o seu site. Se puder, me manda o comprovante por aqui.",
+]
+
+[[intents]]
+id = "payment_sent"
+action = "handoff"
+fixed = true
+priority = "hot"
+reason = "Diz que pagou a entrada: confira o Pix e confirme"
+when = "Diz que pagou, fez o Pix ou manda o comprovante."
+patterns = [
+  '\bpaguei\b', 'fiz o (pix|pagamento)', 'pix (feito|enviado|realizado|pago)', 'comprovante', '\btransferi\b',
+  'ja (paguei|transferi|fiz o pix|mandei o pix)', 'pagamento (feito|realizado|enviado)',
+]
+messages = ["Recebido, obrigado! Vou conferir e já te confirmo por aqui."]
+
+[[intents]]
+id = "referral"
+action = "refer"
+fixed = true
+priority = "hot"
+reason = "Indicou outro número para falar"
+when = "Manda o número de outra pessoa para conversar (o dono, o gerente ou o responsável)."
+patterns = ['(?<!\d)(\+?55[\s.-]*)?\(?\d{2}\)?[\s.-]*9?[\s.-]*\d{4}[\s.-]*\d{4}(?!\d)']
+messages = ["Muito obrigado! Vou falar com a pessoa responsável agora."]
+
+[[intents]]
+id = "gatekeeper"
+action = "reply"
+fixed = true
+when = "Quem responde é funcionário ou atendente e não decide: 'sou funcionária', 'o dono não está', 'quem decide é o gerente', 'vou passar pro responsável', 'ele te chama'."
+patterns = [
+  'sou (funcionari|atendente|recepcionista|secretari|colaborador)', 'nao sou (o |a )?(dono|dona|responsavel|proprietari)',
+  '(o|a) (dono|dona|responsavel|proprietari[oa]|gerente|chefe|patra[oa]) (nao esta|nao ta|nao se encontra|esta ocupad|ta ocupad|que (decide|ve|cuida|resolve))',
+  'quem (decide|resolve|ve isso|cuida (disso|dessa parte))', 'vou (passar|repassar|mostrar|falar) (isso )?(pro|para o|pra|para a) (dono|dona|responsavel|chefe|gerente|patra[oa])',
+  'deixa eu ver com (o|a)', 'preciso ver com (o|a)', 'tenho que ver com (o|a)', 'nao sou eu que (decido|cuido)',
+  'vou (ver|falar|conversar) com (o|a) (dono|dona|responsavel|chefe|gerente|patra[oa])', '(ele|ela) (te )?(chama|retorna|liga|responde)',
+]
+messages = [
+  "Muito obrigado pelo retorno!",
+  "Você poderia me passar o contato de quem cuida das decisões sobre site e divulgação da empresa? Assim eu falo direto com a pessoa e não tomo o seu tempo.",
+]
+
+[[intents]]
+id = "negotiation"
+action = "handoff"
+fixed = true
+priority = "needed"
+reason = "Negociação de preço ou pagamento"
+when = "Negocia valor ou condição: achou caro, pede desconto, oferece outro valor, quer parcelar ou começar sem entrada."
+patterns = [
+  'desconto', 'faz por', 'faria por', 'mais barato', 'abaix', 'baixar o (preco|valor)', '\bcaro\b',
+  'consegue (fazer )?por', 'parcel', '\b\d{1,2} ?x\b', 'sem entrada', 'melhor preco',
+]
+messages = ["Entendi! Condições de valor e pagamento eu vejo pessoalmente e já te respondo."]
+
+[[intents]]
+id = "callback_later"
+action = "handoff"
+fixed = true
+priority = "hot"
+reason = "Pediu para ser chamado depois"
+when = "Está ocupado agora e pede para chamar depois, amanhã ou em outro horário."
+patterns = [
+  '(me )?(chama|chame|fala comigo|procura|manda mensagem) (amanha|depois|mais tarde|outro dia|semana que vem|segunda|a tarde|a noite)',
+  '(estou|to|tô|estamos) (ocupad|na correria|dirigindo|atendendo)', 'agora nao (posso|consigo|da)',
+  'n(esse|este|o) momento nao (posso|consigo|da)',
+]
+messages = ["Sem problema! Te chamo depois então."]
+
+[[intents]]
+id = "confused"
+action = "reply"
+fixed = false
+when = "Não entendeu a mensagem: 'não entendi', 'como assim?', 'o que é isso?'. Explique de novo, mais simples, sem repetir os links. Se a confusão se repetir, o bot passa para o dono."
+patterns = ['nao entendi', '^como assim', 'o que (e|eh) isso', 'do que se trata', '^\?+$']
+messages = [
+  "Desculpa, vou explicar melhor! Eu crio sites para empresas. Vi que vocês não têm site no Google Maps e queria saber se teriam interesse em ter um.",
+]
+
+[[intents]]
+id = "already_has_site"
+action = "close"
+fixed = false
+when = "Diz que já tem site, já tem alguém que faz ou já usa um sistema."
+patterns = [
+  'ja (temos|tenho|tem) (um )?(site|sistema|aplicativo|app)', 'ja (temos|tenho) (alguem|quem faca|programador)',
+  '(meu|nosso) sobrinho faz',
+]
+messages = [
+  "Que bom! Se em algum momento quiserem melhorar o site ou criar um sistema, é só me chamar.",
+  "Obrigado pela atenção!",
+]
+
+[[intents]]
+id = "later"
+action = "close"
+fixed = false
+when = "Adia sem recusar: 'vou pensar', 'mais pra frente', 'depois eu vejo', 'te aviso'."
+patterns = ['vou pensar', 'mais pra frente', 'mais para frente', 'depois (eu )?(vejo|te falo|falo)', 'te aviso', 'futuramente', 'outra hora']
+messages = ["Sem problema! Fico à disposição, é só me chamar quando quiser."]
+
+[[intents]]
+id = "app_at_site_price"
+action = "reply"
+fixed = true
+when = "Acha que aplicativo, sistema ou loja custa os R$ 500 do site institucional ('então um aplicativo sai 500?')."
+patterns = [
+  '(aplicativo|\bapps?\b|sistema|loja)[^.?!]{0,50}(500|quinhentos)',
+  '(500|quinhentos)[^.?!]{0,50}(aplicativo|\bapps?\b|sistema|loja)',
+]
+messages = [
+  "Não, os R$ 500 são só do site institucional, que é o site de apresentação da empresa (só visual).",
+  "Aplicativos e sistemas são feitos sob medida: o valor depende das funções e do que você precisa, e sai em um orçamento específico.",
+  "Você gostaria que eu fizesse um orçamento?",
+]
+
+[[intents]]
+id = "system_price"
+action = "reply"
+fixed = true
+when = "Pergunta quanto custa ou o prazo de um aplicativo, sistema ou loja virtual."
+patterns = [
+  '(quanto|valor|preco|prazo|demora)[^.?!]{0,50}(aplicativo|\bapps?\b|sistema|loja (virtual|online)|e-?commerce)',
+  '(aplicativo|\bapps?\b|sistema|loja (virtual|online)|e-?commerce)[^.?!]{0,50}(quanto|valor|preco|prazo|demora)',
+]
+messages = [
+  "Aplicativos e sistemas são feitos sob medida, então o valor e o prazo dependem das funções e do que você precisa. Não é o mesmo valor do site institucional, que é só o site de apresentação.",
+  "O valor certo sai em um orçamento específico.",
+  "Você gostaria que eu fizesse um orçamento?",
+]
+
+[[intents]]
+id = "system_request"
+action = "reply"
+fixed = true
+when = "Pede um sistema, aplicativo ou site com muitas funcionalidades: login, cadastro, agendamento, loja virtual, pagamento online, estoque, painel, área do cliente, integração."
+patterns = [
+  '\bsistema\b', '\baplicativo\b', '\bapp\b', 'agendamento', 'loja (virtual|online)', 'e-?commerce',
+  'pagamento online', '\bestoque\b', '\bpainel\b', 'area do cliente', 'integracao', '\blogin\b', '\bcadastro\b',
+  'controle de', '\bdelivery\b', '\bcardapio digital\b',
+]
+messages = [
+  "Sim, nós podemos fazer isso.",
+  "Só para deixar claro: aplicativos e sistemas são feitos sob medida, então o valor depende das funções e do que você precisa. É diferente do site institucional, que é só de apresentação.",
+  "Você gostaria que eu fizesse um orçamento?",
+]
+
+[[intents]]
+id = "domain"
+action = "reply"
+fixed = false
+when = "Pergunta o que é domínio, endereço .com.br, registro.br, nome do site na internet, quem compra o domínio, quanto custa o domínio ou se o domínio está incluso."
+patterns = [
+  '\bdomini[oa]s?\b', 'registro\.br', '\.com\.br\b', '\bwww\.',
+  'endereco (do site|na internet|eletronico)', 'nome do site',
+]
+messages = [
+  "O domínio é o endereço do seu site na internet, aquele nome que a pessoa digita para entrar, como suaempresa.com.br (é como o endereço da sua empresa na internet). Ele é à parte da criação do site, e você pode testar ideias de nomes na hora neste site oficial:",
+  "https://registro.br/",
+  "Para ter o domínio, você tem 3 opções simples: pode comprar manualmente por conta própria lá no site, pode comprar manualmente e depois nós te ajudamos a configurar, ou pode deixar que nós compramos e cuidamos de tudo para você (aí fica um valor adicional de R$ 40 na primeira mensalidade pelo domínio de 1 ano).",
+  "Você gostaria que eu fizesse um orçamento?",
+]
+
+[[intents]]
+id = "hosting"
+action = "reply"
+fixed = false
+when = "Pergunta sobre servidor, hospedagem ou mensalidade."
+patterns = ['servidor', 'hospedagem', 'mensalidade', 'por mes']
+messages = [
+  "O servidor é o que mantém o site no ar: fica R$ 39,90 por mês no boleto ou Pix, ou R$ 45 por mês no cartão.",
+]
+
+[[intents]]
+id = "site_institutional"
+action = "reply"
+fixed = false
+when = "Quer um site simples, só para mostrar a empresa, ou pergunta como funciona um site."
+patterns = ['\bsite\b', 'pagina', 'institucional', 'so para (mostrar|divulgar)', 'aparecer no google', 'como funciona']
+messages = [
+  "Um site institucional é a vitrine da sua empresa na internet: mostra quem vocês são, os serviços, fotos, endereço, horário e um botão para chamar no WhatsApp. Ele é só visual, sem login nem cadastro, por isso é mais simples.",
+  "O valor médio do site institucional é R$ 500, com entrada de R$ 250, e ele fica pronto em média em 15 dias. Depois tem o servidor, que mantém o site no ar: R$ 39,90 por mês no boleto ou Pix, ou R$ 45 no cartão.",
+  "Esses valores são só do site institucional. Aplicativos e sistemas são feitos sob medida e têm orçamento à parte.",
+  "Você gostaria que eu fizesse um orçamento?",
+]
+
+[[intents]]
+id = "price"
+action = "reply"
+fixed = false
+when = "Pergunta preço, valor, quanto custa, sem dizer se é site simples ou sistema."
+patterns = ['quanto (custa|fica|sai|e|eh|cobra)', '\bvalor', '\bpreco', 'qual o investimento']
+messages = [
+  "Depende do que você precisa. O site institucional, que é o site de apresentação da empresa (só visual), fica em média R$ 500, com entrada de R$ 250, mais o servidor de R$ 39,90 por mês no boleto ou Pix (ou R$ 45 no cartão).",
+  "Já aplicativos e sistemas são outra coisa: cada um é feito sob medida e o valor depende das funções que você precisa, definido em um orçamento específico.",
+  "Você gostaria que eu fizesse um orçamento?",
+]
+
+[[intents]]
+id = "deadline"
+action = "reply"
+fixed = false
+when = "Pergunta prazo, quanto tempo demora, quando fica pronto."
+patterns = ['\bprazo', 'quanto tempo', 'demora', 'fica pronto', 'quando (fica|entrega)', 'quantos dias']
+messages = [
+  "Um site institucional fica pronto em média em 15 dias. Para sistemas e aplicativos, o prazo depende das funcionalidades e é definido no orçamento.",
+]
+
+[[intents]]
+id = "payment"
+action = "reply"
+fixed = false
+when = "Pergunta forma de pagamento, entrada, parcelamento, cartão, boleto ou Pix do projeto."
+patterns = ['pagamento', 'entrada', '\bboleto\b', '\bpix\b', 'cartao', 'como (eu )?pago']
+messages = [
+  "Para começar o site institucional a entrada é de R$ 250. As demais condições são combinadas no orçamento.",
+]
+
+[[intents]]
+id = "examples"
+action = "reply"
+fixed = false
+when = "Pede exemplos, portfólio ou trabalhos feitos."
+patterns = ['exemplo', 'portfolio', 'trabalhos', 'o que (voces|vcs) ja fizeram', 'clientes']
+messages = [
+  "Claro! Alguns trabalhos nossos:",
+  "https://sorrifit.com",
+  "https://zaflas.com.br",
+  "https://musicalizese.com.br",
+  "https://abastevo.com.br",
+]
+
+[[intents]]
+id = "quote_accept"
+action = "qualify"
+fixed = false
+when = "Aceita o orçamento ('sim', 'pode', 'quero', 'pode fazer') logo depois da pergunta sobre orçamento."
+patterns = []
+messages = [
+  "Ótimo! Vou te fazer umas perguntinhas rápidas e bem simples para montar a ficha completa do seu projeto (se preferir, pode responder por áudio também).",
+  "Para começar: qual é o nome da empresa e quais serviços ou produtos principais você gostaria de mostrar no site?",
+]
+
+[[intents]]
+id = "quote_details"
+action = "collect"
+fixed = true
+when = "Depois de aceitar o orçamento, manda o que precisa: nome, serviços, contato, logo, fotos, áudio ou exemplos."
+patterns = []
+priority = "hot"
+reason = "Orçamento: o cliente descreveu o projeto"
+messages = ["Perfeito, anotei tudo! Vou preparar o orçamento e te mando por aqui."]
+
+[[intents]]
+id = "interested"
+action = "reply"
+fixed = false
+when = "Demonstra interesse sem pedir nada específico: 'tenho interesse', 'quero saber mais', 'gostei'."
+patterns = ['tenho interesse', 'temos interesse', 'quero saber mais', 'me interessa', '\bgostei\b', 'achei (legal|interessante|bonito)']
+messages = ["Que bom que gostou!", "Você gostaria que eu fizesse um orçamento?"]
+
+[[intents]]
+id = "greeting_reply"
+action = "reply"
+fixed = false
+when = "Só responde ao cumprimento: 'tudo bem e você?', 'oi', 'bom dia'."
+patterns = ['^(oi|ola|opa|bom dia|boa tarde|boa noite|tudo (bem|bom|otimo|certo|tranquilo|joia))\b', 'e (voce|vc|com voce)\??$', '^(sim|tudo),? (e )?(voce|vc)']
+messages = [
+  "Tudo ótimo também, obrigado!",
+  "Ficou com alguma dúvida sobre os exemplos? Posso te explicar como funcionaria um site para vocês.",
+]
+
+[[intents]]
+id = "thanks"
+action = "ignore"
+fixed = true
+when = "Só agradece ou se despede, sem pergunta: 'obrigado', 'valeu', 'ok', '👍'."
+patterns = ['^(obrigad[oa]|valeu|vlw|ok|beleza|blz|show|certo|tmj)[!. ]*$', '^\W+$']
+messages = []
+
+[[intents]]
+id = "stuck"
+action = "handoff"
+fixed = true
+priority = "needed"
+reason = "O bot não resolveu: pergunta repetida ou conversa longa"
+when = "Uso interno: a pessoa repetiu a mesma pergunta ou a conversa passou do limite de respostas automáticas."
+patterns = []
+messages = ["Desculpa se não fui claro! Já te respondo pessoalmente."]
+
+[[intents]]
+id = "unknown"
+action = "handoff"
+fixed = true
+priority = "needed"
+reason = "Pergunta ou pedido fora das regras"
+when = "Qualquer pergunta ou pedido cuja resposta não está nos fatos: cidade, contrato, nota fiscal, prazo de sistema, tecnologia, reclamação ou mensagem ambígua."
+patterns = []
+messages = ["Certo! Vou verificar direitinho e já te respondo."]
