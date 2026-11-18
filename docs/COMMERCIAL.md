@@ -6,8 +6,11 @@ Mercado Livre is the first network.
 ## WhatsApp Web
 
 The full structure, state machine, failure matrix and troubleshooting live in
-[WHATSAPP](COMMERCIAL-WHATSAPP.md). The commercial module also carries an owner-operated
-WhatsApp Web session. It follows the
+[WHATSAPP](COMMERCIAL-WHATSAPP.md); the Zaflas sales agent (rules file, conversation states,
+memory, model and safeguards) lives in [WHATSAPP-SALES](COMMERCIAL-WHATSAPP-SALES.md); the
+Google Maps lead research that feeds it (filters, score, "Ajuste do Google Maps") lives in
+[MAPS-RESEARCH](COMMERCIAL-MAPS-RESEARCH.md). The
+commercial module also carries an owner-operated WhatsApp Web session. It follows the
 Telegram commercial rules: one chat at a time, a minimum interval between messages, a live
 gate, an idempotency journal and no bulk automation.
 
@@ -40,6 +43,36 @@ Rules:
 - Images are attached through the native attach menu.
 - This is an operator tool for the owner's own messages. Product delivery to the Procurali
   VPS still goes through ZaturoBot; this module never feeds it automatically.
+
+## Google Maps research
+
+The owner-operated research module reads public listings in one tab and produces a CSV for the
+owner to review; it never imports or messages. Full rules, filters and the "Ajuste do Google
+Maps" steps are in [MAPS-RESEARCH](COMMERCIAL-MAPS-RESEARCH.md).
+
+| Field | Value |
+| --- | --- |
+| Profile | `.local/commercial/maps/profile` |
+| CDP port | 9326 |
+| Hidden display | `:94` |
+| Runs | `.local/commercial/maps/runs/<city-slug>/<date>/` |
+| Attention marker | `.local/commercial/maps/needs-attention.json` |
+
+```bash
+python3 -m tools.ytbot commercial maps login
+python3 -m tools.ytbot commercial maps status
+python3 -m tools.ytbot commercial maps research --city "Lucas do Rio Verde" --state MT \
+  --limit 10
+python3 -m tools.ytbot commercial maps verify --run lucas-do-rio-verde/2026-11-18
+python3 -m tools.ytbot commercial maps export --run lucas-do-rio-verde/2026-11-18
+python3 -m tools.ytbot commercial sales import --network whatsapp --csv <file> \
+  --source google-maps-manual
+```
+
+Login is manual in the visible window. Research and confirmation run hidden in the same private
+profile, with the owner's normal account, IP and user agent. A CAPTCHA, unusual-traffic page,
+sign-in challenge or unknown layout stops the run; the marker and desktop notification tell the
+owner to look. The module never solves a challenge or writes on Google.
 
 ## Mercado Livre
 

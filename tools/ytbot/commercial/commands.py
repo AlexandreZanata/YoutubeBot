@@ -15,6 +15,8 @@ from .mercadolivre import products
 from . import whatsapp
 from .whatsapp import listener as whatsapp_listener
 from .whatsapp import sender as whatsapp_sender
+from .whatsapp.sales import commands as sales_commands
+from .maps import commands as maps_commands
 
 NETWORKS = ("mercadolivre", "whatsapp")
 
@@ -338,6 +340,8 @@ def add_parser(sub) -> None:
                             help="filter by price trend")
     ref_parser.add_argument("--limit", type=int, default=20)
     ref_parser.set_defaults(func=command_reference)
+    sales_commands.add_parser(actions, _store, _whatsapp_page)
+    maps_commands.add_parser(actions, _store)
     stop_parser = actions.add_parser("stop", help="stop the hidden affiliate browser")
     stop_parser.add_argument("--network", choices=NETWORKS, required=True)
     stop_parser.set_defaults(func=command_stop)
