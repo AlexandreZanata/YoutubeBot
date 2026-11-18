@@ -446,6 +446,23 @@ class LanchoneteAgentTests(unittest.TestCase):
         cart = {line["item_id"]: line["qty"] for line in self.customer()["cart"]}
         self.assertEqual(cart, {"x-bacon": 1})
 
+    def test_owner_paste_does_not_swallow_the_pending_question(self):
+        self.say("oi")
+        self.say("quero um x-bacon")
+        # The owner pastes something unrelated in the chat: automation pauses...
+        self.store.remember(self.customer()["id"], {
+            "at": "2026-11-18T15:17:53-04:00", "dir": "out", "kind": "owner",
+            "text": "olha esse link aqui", "state": "sent"})
+        self.store.update_lead(self.customer()["id"], state="human", awaiting=None)
+        self.say("quero uma coca")
+        self.assertEqual(self.customer()["state"], "human")
+        # ...but handing the chat back still owes an answer to the pending question.
+        owner_resolve(self.store, self.customer()["id"], "ordering")
+        results = self.agent.reply_pending()
+        self.assertEqual(results[0]["state"], "ordering")
+        cart = {line["item_id"]: line["qty"] for line in self.customer()["cart"]}
+        self.assertEqual(cart, {"x-bacon": 1, "coca-lata": 1})
+
 
 if __name__ == "__main__":
     unittest.main()

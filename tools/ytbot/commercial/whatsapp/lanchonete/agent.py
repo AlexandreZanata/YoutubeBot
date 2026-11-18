@@ -129,6 +129,20 @@ def is_ours(text: str, sent: list[str]) -> bool:
     return False
 
 
+def awaiting_reply(history: list[dict]) -> list[dict]:
+    """Customer messages after the last bot answer.
+
+    The owner typing in the chat (`kind == "owner"`) pauses the automation, but it never
+    counts as answering the customer: after the owner hands the chat back, the bot still
+    owes an answer to what arrived after its own last reply.
+    """
+    cut = len(history)
+    while cut and not (history[cut - 1].get("dir") == "out"
+                       and history[cut - 1].get("kind") != "owner"):
+        cut -= 1
+    return [entry for entry in history[cut:] if entry.get("dir") == "in"]
+
+
 def stamp_now(now: datetime) -> str:
     return now.isoformat(timespec="seconds")
 
@@ -1305,7 +1319,7 @@ class LanchoneteAgent:
             if typed is not None:
                 return self._owner_took_over(customer, typed, result)
 
-        _, unanswered = split_pending(self.store.history(customer["id"]))
+        unanswered = awaiting_reply(self.store.history(customer["id"]))
         text = "\n".join(entry.get("text", "") for entry in unanswered).strip()
         customer = self.store.lead(customer["id"]) or customer
         if not text:
@@ -1480,7 +1494,7 @@ def owner_resolve(store: LanchoneteStore, customer_id: str, state: str) -> dict:
     customer = store.lead(customer_id)
     if customer is None:
         raise KeyError(customer_id)
-    _, unanswered = split_pending(store.history(customer_id))
+    unanswered = awaiting_reply(store.history(customer_id))
     awaiting = f"resume-{len(store.history(customer_id))}" if unanswered else None
     return store.update_lead(customer_id, state=state, awaiting=awaiting,
                              handoff_reason=None, unknown_count=0, confirmations=0)
