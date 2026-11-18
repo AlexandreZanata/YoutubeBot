@@ -264,6 +264,23 @@ One confirmation search hit Google's `/sorry` challenge. The module stopped, wro
 `needs-attention.json` and notified the owner; the owner solved the challenge by hand in the
 visible window and the run resumed. No challenge was automated or bypassed.
 
+### Live page map (owner tuning reference)
+
+The module already applies these signals; this table is the owner's reference when Google
+changes the page again.
+
+| Area | Real signal seen on 2026-11-18 | Module use |
+| --- | --- | --- |
+| Search | `input[role=combobox]`, `button[aria-label='Pesquisar']`; the query is `<categoria> em <Cidade> - <UF>` | `_search` types and clicks, never sends only the category |
+| Results feed | `div[role='feed']`, `a[href*='/maps/place/']`; sponsored and organic cards, about ten visible and more after scrolling, repeated hrefs | `_collect` scrolls, dedupes and caps at `max_results_per_query` |
+| Nearby city | the feed can include another city; the place address ends `..., Cidade - UF` | city parsed from the address; other cities excluded before confirmation |
+| Detail panel | `h1`; `button[jsaction*=category]`; rating `span/div[role=img][aria-label*='estrelas']`; review count `[aria-label*='avalia']`; `button[data-item-id='address']`, `phone:tel:`, `a[data-item-id='authority']` | `extract.parse_listing` |
+| Hours and photos | hours by `[aria-label*='Horário de funcionamento']`; "Ver fotos" without a count | hours present/absent; photo presence as the 1-9 bucket |
+| Reviews | tab "Avaliações", "Ordenar" menu, `menuitemradio` "Mais recentes"; dates `hoje`, `ontem`, `3 dias atrás`, `um mês atrás` | `_review_age` + `newest_review_age` |
+| Google confirmation | the shell text "Resultados da pesquisa"; AI overview or knowledge panel with no organic `h3`; explicit no-results phrase | `search_page` / `no_search_results`; empty result set is valid |
+| Directories | dental guides, marketplaces, booking hubs and navigation pages in the first page | `ignore_domains`, `marketplace` and `social-only` classes |
+| Stop | `/sorry`, reCAPTCHA frame, sign-in challenge, consent or an unknown layout | `ChallengeError` / `LayoutError`; the run stops and notifies |
+
 ## Verification and limits
 
 Tests use saved HTML fixtures for listings, the results feed and Google result pages; CI never
