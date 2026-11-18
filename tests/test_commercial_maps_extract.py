@@ -79,6 +79,11 @@ class MapsHtmlTests(unittest.TestCase):
         self.assertFalse(extract.detect_challenge(page, "https://www.google.com/search?q=x",
                                                   self.rules))
         self.assertTrue(extract.no_search_results(fixture("search_no_results.html"), self.rules))
+        google = '<h1>Um painel de conhecimento</h1>'
+        self.assertEqual(extract.layout(google, self.rules,
+                                        "https://www.google.com/search?q=x"), "unknown")
+        self.assertEqual(extract.layout(google, self.rules,
+                                        "https://www.google.com/maps/place/X"), "maps")
 
     def test_login_state_uses_the_visible_account_or_login_marker(self):
         logged_in = '<div role="main"><button aria-label="Conta do Google: Ana">A</button></div>'

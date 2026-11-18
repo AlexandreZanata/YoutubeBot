@@ -155,7 +155,8 @@ def inspect(page, rules: MapsRules) -> dict:
         state = "challenge"
     else:
         state = extract.login_state(content, rules)
-    return {"state": state, "layout": extract.layout(content, rules), "url": page.url}
+    return {"state": state, "layout": extract.layout(content, rules, page.url),
+            "url": page.url}
 
 
 def _open_links(page, run: Run, rules: MapsRules, query: str, group: str, links: list[str],
@@ -269,7 +270,7 @@ def verify_run(page, run: Run, rules: MapsRules, log=print,
         content = _check_page(page, rules, "confirmation")
         results = extract.parse_search_results(content, rules)
         if not results and not extract.no_search_results(content, rules) and extract.layout(
-                content, rules) != "google-search":
+                content, rules, page.url) != "google-search":
             raise LayoutError("layout desconhecido na busca de confirmação",
                               {"url": page.url, "stage": "confirmation"})
         check = verify.confirm(listing, results, rules, fetcher=fetcher)

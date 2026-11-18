@@ -247,13 +247,16 @@ def login_state(page_html: str, rules: MapsRules) -> str:
     return "unknown"
 
 
-def layout(page_html: str, rules: MapsRules) -> str:
+def layout(page_html: str, rules: MapsRules, url: str = "") -> str:
     root = html.parse(page_html)
-    if any(root.select(rules.selector(key))
-           for key in ("search_box", "feed", "detail_name")):
+    on_maps = "google.com/maps" in (url or "") or "maps.google." in (url or "")
+    if on_maps and any(root.select(rules.selector(key))
+                       for key in ("search_box", "feed", "detail_name")):
         return "maps"
     if root.select(rules.selector("search_result_title")):
         return "google-search"
+    if any(root.select(rules.selector(key)) for key in ("search_box", "feed")):
+        return "maps"
     return "unknown"
 
 
