@@ -1,0 +1,16 @@
+Write one complete English YouTube Short for the word of reflection channel.
+
+REQUIREMENTS:
+
+- Everything must be 100% in English.
+- Length: 90 to 140 words, about 40 to 60 seconds at the channel's measured pace.
+- One biblical moment, one human feeling, one quiet turn of hope. No second story.
+- Open with a concrete image or line: a name, a place, a silence, a prayer.
+- Stay faithful to the biblical text. Do not invent verses, miracles or facts.
+- A warm, intimate, unhurried voice. Speak to one person, not to a crowd.
+- End on a short, quiet line that lands. No slogan, no altar call, no call to action.
+- No headings, lists, labels, notes, citations or links.
+- Do not use em dashes or en dashes. Use commas, periods, colons or ordinary hyphens.
+- Output only the narration text that will be read aloud.
+
+THEME:
