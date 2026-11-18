@@ -129,6 +129,9 @@ python3 -m tools.ytbot commercial sales rehearse --network whatsapp [--only nego
 python3 -m tools.ytbot commercial sales run      --network whatsapp --once
 python3 -m tools.ytbot commercial sales run      --network whatsapp --live --interval 10
 python3 -m tools.ytbot commercial sales run      --network whatsapp --live --prospect --limit 3
+python3 -m tools.ytbot commercial sales queue list --network whatsapp
+python3 -m tools.ytbot commercial sales queue send --network whatsapp --dry-run
+python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --limit 1
 python3 -m tools.ytbot commercial sales handoffs --network whatsapp
 python3 -m tools.ytbot commercial sales history  --network whatsapp --lead L1a2b3c4d5e
 python3 -m tools.ytbot commercial sales resolve  --network whatsapp --lead L1a2b3c4d5e --state engaged
@@ -166,6 +169,53 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   `import` (`name,phone,city,category,maps_url,website,note`). The folder is private and is
   never read automatically; importing is still the owner's explicit command.
 
+## Opening queue (owner, 2026-11-18)
+
+One number per command, in the order of the owner's CSV, with the business name in the
+opening. There is no second store: the queue is a view of `leads.json`.
+
+```bash
+python3 -m tools.ytbot commercial sales import --network whatsapp \
+  --csv .local/commercial/whatsapp/sales/importar/<city>-<date>.csv --source google-maps-manual
+python3 -m tools.ytbot commercial sales queue list --network whatsapp          # order, status, next
+python3 -m tools.ytbot commercial sales queue send --network whatsapp --dry-run   # exact messages
+python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --limit 1
+```
+
+- **Membership and order.** `import` gives each new lead from a Maps source
+  (`google-maps-reviewed`, `google-maps-manual`) a `queue_position` in CSV row order; earlier
+  imports come first. Referrals (their own opening and limit), other sources, duplicates and
+  do-not-contact numbers never enter the queue, and nothing is sent at import. The order is
+  never re-sorted by score at send time.
+- **Status** comes from the lead, never from a separate file: `pending` (`new`), `sending`
+  (`opening`), `sent` (opened, whatever happened after), `unconfirmed`, `skipped`
+  (do-not-contact, no WhatsApp, or the number wrote first and is already being answered) and
+  `error` (the chat did not open; nothing was typed, so a later manual `send` may try again).
+  `queue list` masks every phone.
+- **Sending.** `queue send` is a dry run unless `--live`; `--limit` defaults to 1 (use 10 for the
+  day's batch, still one conversation at a time). Live, it takes the same run lock as `run`,
+  opens the same hidden WhatsApp browser and goes through `prospect` → `open_lead` →
+  `send_sequence`: the lead becomes `opening` with `opened_at` before the browser acts, the
+  journal fences every bubble, and a lead is `sent` only when `open_lead` returns `opened`. It
+  stops at the first `unconfirmed` or `error` and retries nothing by itself. The opening window
+  (08:30 to 17:30, Monday to Friday), the 10/day limit, pacing, do-not-contact and invalid
+  numbers apply exactly as in `run --prospect`; a blocked run prints the reason.
+- **One sender at a time.** `queue send --live` and `run` share the lock, so one refuses while
+  the other runs. Stop the `run` loop (SIGTERM ends it between two steps), send, then start it
+  again; replies wait for the next `run` cycle meanwhile.
+- **Crash recovery.** A lead left in `opening` (the process died mid-send) is reconciled by the
+  next `queue send --live` or `run --live`: it becomes `unconfirmed`, the owner is notified,
+  and it is never sent again. `queue send` then stops so the owner checks that chat first.
+- **The message.** The third bubble names the business exactly as on Google Maps:
+  "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e
+  aplicativos. Eu vi que no Google Maps a empresa {company} ainda não tem site." `{company}`
+  is the lead `name` (never the label, the saved contact name, a staff name or the note),
+  spaces normalized, trailing punctuation removed ("Vem Sorrir em Sinop." would end the
+  sentence) and cut at a word within `company_max_chars` (120); without a name the
+  previous "vocês não têm site" text (`[opening] unnamed`) is sent. Greeting, order, delays and
+  the four links are unchanged, and the opening never goes through the model. The phone number
+  is never written in a message.
+
 ## Conversation state machine
 
 ```text
@@ -197,7 +247,7 @@ the model using only the facts.
 
 | Case | Intent | Action | Answer |
 | --- | --- | --- | --- |
-| First contact | opening | — | "Bom dia" (Boa tarde/Boa noite by hour) → "Tudo bem?" → introduction → "Nós temos alguns exemplos…" → four links, one per message |
+| First contact | opening | — | "Bom dia" (Boa tarde/Boa noite by hour) → "Tudo bem?" → introduction naming the business ("…a empresa {company} ainda não tem site.") → "Nós temos alguns exemplos…" → four links, one per message |
 | "Nesse momento não estou precisando", "não, obrigado", "agora não", "não" after the quote offer | `refusal` | block | Fixed thanks, then never contact again |
 | "Para de mandar", "spam", "vou denunciar" | `opt_out` | block | Fixed apology, never contact again |
 | Business auto-reply (absence, hours, menu) | `auto_reply` | ignore | Nothing, avoids bot loops |

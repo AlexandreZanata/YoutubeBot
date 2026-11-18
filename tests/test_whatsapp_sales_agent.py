@@ -50,7 +50,8 @@ class SalesAgentTests(unittest.TestCase):
     def test_opening_sends_the_script_in_order_and_records_memory(self):
         lead, _, channel = self.opened_lead()
         texts = [item["text"] for item in channel.sent]
-        self.assertEqual(texts, self.rules.opening_messages(MONDAY))
+        self.assertEqual(texts, self.rules.opening_messages(MONDAY, lead["name"]))
+        self.assertIn(f"a empresa {lead['name']} ainda não tem site", texts[2])
         self.assertEqual(self.store.lead(lead["id"])["state"], "opened")
         history = self.store.history(lead["id"])
         self.assertEqual([entry["kind"] for entry in history], ["opening"] * 8)
@@ -311,7 +312,8 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(len(channel.sent), 8)
 
     def opening_bubbles(self):
-        return [{"dir": "out", "text": text} for text in self.rules.opening_messages(MONDAY)]
+        return [{"dir": "out", "text": text}
+                for text in self.rules.opening_messages(MONDAY, "Empresa 0")]
 
     def test_owner_message_anywhere_after_the_bot_pauses_it(self):
         lead, agent, channel = self.opened_lead()
