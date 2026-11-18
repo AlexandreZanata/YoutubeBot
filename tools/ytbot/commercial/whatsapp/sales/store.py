@@ -58,6 +58,11 @@ def canonical_phone(raw: str) -> str | None:
     return "55" + national
 
 
+def reply_is_active(lead: dict) -> bool:
+    """Imported leads answer replies by default; the owner can pause one or all."""
+    return bool(lead.get("reply_active", True))
+
+
 def phone_key(phone: str) -> str | None:
     """DDD + last eight digits, so numbers with and without the mobile ninth digit match."""
     canonical = canonical_phone(phone)
@@ -223,6 +228,13 @@ class SalesStore:
         self.save_leads(leads)
         return leads[identifier]
 
+    def set_reply_active(self, identifier: str, active: bool) -> dict:
+        """Activate or pause automatic replies for one imported number."""
+        changes = {"reply_active": bool(active)}
+        if not active:
+            changes["awaiting"] = None
+        return self.update_lead(identifier, **changes)
+
     def ensure_labels(self, leads: dict[str, dict] | None = None) -> dict[str, dict]:
         """Give every lead a category number (barbearia-1, barbearia-2, ...), never reused."""
         own = leads is None
@@ -344,7 +356,7 @@ class SalesStore:
                 "id": identifier, "name": row["name"], "phone": phone,
                 "city": row.get("city", ""), "category": row.get("category", ""),
                 "maps_url": row.get("maps_url", ""), "note": row.get("note", ""),
-                "source": source, "state": "new",
+                "source": source, "state": "new", "reply_active": True,
                 "imported_at": stamp(now), "opened_at": None, "followups": 0,
                 "last_out_at": None, "last_in_at": None, "awaiting": None,
                 "replies": {}, "handoff_reason": None, "chat": None, **(extra or {}),
@@ -353,6 +365,7 @@ class SalesStore:
             added.append(leads[identifier])
             report["imported"] += 1
         self.save_leads(leads)
+        report["reply_active"] = len(added)
         report["labels"] = [f"{lead['label']} {lead['name']}" for lead in added]
         report["ids"] = [lead["id"] for lead in added]
         if added:

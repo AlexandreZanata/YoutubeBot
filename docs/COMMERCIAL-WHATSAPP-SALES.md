@@ -119,6 +119,8 @@ commands work offline.
 python3 -m tools.ytbot commercial sales check    --network whatsapp [--ping]
 python3 -m tools.ytbot commercial sales models   --network whatsapp
 python3 -m tools.ytbot commercial sales import   --network whatsapp --csv ~/leads.csv
+python3 -m tools.ytbot commercial sales activate --network whatsapp --all
+python3 -m tools.ytbot commercial sales pause    --network whatsapp --lead L1a2b3c4d5e
 python3 -m tools.ytbot commercial sales leads    --network whatsapp [--state opened]
 python3 -m tools.ytbot commercial sales contacts --network whatsapp
 python3 -m tools.ytbot commercial sales central  --network whatsapp [--json]
@@ -151,6 +153,18 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   hidden browser. A second `SIGTERM` stops at once; `SIGKILL` still leaves the tab open.
 - `resolve` hands a conversation back to the agent after the owner handled it; `block` adds the
   number to the do-not-contact list.
+- Every imported number starts with `reply_active: true`. If it writes before an opening, the
+  agent stores the message and answers it (the lead moves to `engaged`); it never sends an
+  opening to someone already in conversation. `activate --all` re-enables older leads,
+  `pause --lead <id>` stops automatic replies and sends the message to "Precisa de você". `sales leads` and the
+  Central show `reply: ativo` or `pausado`.
+- Openings stay one number at a time, in import order, up to 10/day and only in the opening
+  window. Use `--limit 1` to start exactly one number per invocation or `--limit 10` for the
+  daily batch; the existing pacing, journal and repeat fences apply to both.
+- The owner's selected list may be kept in
+  `.local/commercial/whatsapp/sales/importar/<city>-<date>.csv`, using the same columns as
+  `import` (`name,phone,city,category,maps_url,website,note`). The folder is private and is
+  never read automatically; importing is still the owner's explicit command.
 
 ## Conversation state machine
 

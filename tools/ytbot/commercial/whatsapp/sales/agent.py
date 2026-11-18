@@ -26,7 +26,7 @@ from .context import effective
 from .decide import Decision, _fixed, decide, stuck
 from .pacing import SalesPacing
 from .rules import SalesRules, normalize
-from .store import SalesStore, stamp
+from .store import SalesStore, reply_is_active, stamp
 from .transcribe import local_transcriber
 
 REPLYABLE = ("engaged", "qualifying", "gatekeeper")
@@ -292,6 +292,15 @@ class SalesAgent:
                                              "message_at": event.get("message_at", ""),
                                              "source": "preview"})
             changes = {"last_in_at": now, "chat": event.get("chat") or lead.get("chat")}
+            if not reply_is_active(lead) and lead["state"] not in ("do-not-contact",
+                                                                       "invalid-number"):
+                changes["state"] = "needs-owner"
+                self.store.update_lead(lead["id"], **changes)
+                if self._remind(lead):
+                    self._handoff(lead, "Mensagem de um contato com respostas automáticas "
+                                  "pausadas", event["text"], "needed")
+                touched.append(lead["id"])
+                continue
             if lead["state"] in REOPENS:
                 changes["state"] = "engaged"
                 changes["awaiting"] = event.get("id")
