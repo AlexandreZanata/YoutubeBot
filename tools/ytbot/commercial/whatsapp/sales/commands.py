@@ -18,7 +18,7 @@ from .agent import (SalesAgent, WhatsAppChannel, owner_block, owner_reset, owner
 from .decide import decide
 from .pacing import SalesPacing
 from .rules import RULES_PATH, RulesError, load
-from .store import AUTOMATED_STATES, SOURCES, SalesStore, mask, stamp
+from .store import AUTOMATED_STATES, SOURCES, SalesStore, mask, reply_is_active, stamp
 
 OWNER_STATES = ("needs-owner", "quote-requested", "owner", "unconfirmed")
 
@@ -55,6 +55,7 @@ def _public(lead: dict, show_phone: bool = False) -> dict:
                                            "opened_at", "followups", "last_in_at",
                                            "last_out_at", "handoff_reason")}
     view["phone"] = lead["phone"] if show_phone else mask(lead["phone"])
+    view["reply"] = "ativo" if reply_is_active(lead) else "pausado"
     return view
 
 
@@ -70,6 +71,39 @@ def command_import(args, store_factory) -> None:
     report["daily_openings"] = rules.limits["daily_openings"]
     central.write(store, now)
     _print(report)
+
+
+def _set_reply_active(args, store_factory, active: bool) -> None:
+    _, store, now = _context(args, store_factory)
+    leads = store.ensure_labels()
+    if args.lead and args.all:
+        raise SystemExit("[sales] use --lead <id> or --all, not both")
+    if args.lead:
+        lead = leads.get(args.lead)
+        if lead is None:
+            raise SystemExit(f"[sales] unknown lead {args.lead}")
+        selected = [lead]
+    elif args.all:
+        selected = list(leads.values())
+    else:
+        raise SystemExit("[sales] use --lead <id> or --all")
+    for lead in selected:
+        store.set_reply_active(lead["id"], active)
+    central.write(store, now)
+    _print({("activated" if active else "paused"): len(selected),
+            "leads": [{"id": lead["id"], "label": lead.get("label", ""),
+                       "name": lead.get("name", ""),
+                       "reply": "ativo" if active else "pausado"} for lead in selected]})
+
+
+def command_activate(args, store_factory) -> None:
+    """Keep answering every selected imported number when it writes first."""
+    _set_reply_active(args, store_factory, True)
+
+
+def command_pause(args, store_factory) -> None:
+    """Stop automatic replies for one number or all of them."""
+    _set_reply_active(args, store_factory, False)
 
 
 def command_leads(args, store_factory) -> None:
@@ -408,6 +442,14 @@ def add_parser(actions, store_factory, page_factory) -> None:
     importer.add_argument("--csv", required=True)
     importer.add_argument("--source", choices=SOURCES, default="google-maps-reviewed",
                           help="where the reviewed rows came from (default: google-maps-reviewed)")
+    activate = action("activate", "answer replies from every selected imported number",
+                      partial(command_activate, store_factory=store_factory))
+    activate.add_argument("--lead", default=None)
+    activate.add_argument("--all", action="store_true")
+    pause = action("pause", "pause automatic replies for one number or all",
+                   partial(command_pause, store_factory=store_factory))
+    pause.add_argument("--lead", default=None)
+    pause.add_argument("--all", action="store_true")
     leads = action("leads", "list leads (phones masked)",
                    partial(command_leads, store_factory=store_factory))
     leads.add_argument("--state", default=None)

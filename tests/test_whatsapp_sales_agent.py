@@ -194,6 +194,28 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual([entry["dir"] for entry in history[-2:]], ["in", "out"])
         self.assertIsNone(self.store.lead(lead["id"])["awaiting"])
 
+    def test_new_lead_writes_first_and_is_answered_before_an_opening(self):
+        lead = self.leads(1)[0]
+        agent, channel = self.agent()
+        agent.ingest([self.event("Oi, vi o site de vocês e quero saber mais")])
+        stored = self.store.lead(lead["id"])
+        self.assertEqual(stored["state"], "engaged")
+        self.assertTrue(stored["awaiting"])
+        results = agent.reply_pending()
+        self.assertEqual(results[0]["lead"], lead["id"])
+        self.assertTrue(channel.sent)
+        self.assertNotIn("sales-opening", {entry.get("kind") for entry in self.store.history(lead["id"])})
+
+    def test_paused_lead_gets_a_handoff_not_an_automatic_reply(self):
+        lead = self.leads(1)[0]
+        self.store.set_reply_active(lead["id"], False)
+        agent, channel = self.agent()
+        agent.ingest([self.event("Oi, preciso de um site")])
+        self.assertEqual(agent.reply_pending(), [])
+        self.assertEqual(channel.sent, [])
+        self.assertTrue(self.notes)
+        self.assertEqual(self.store.lead(lead["id"])["state"], "new")
+
     def test_messages_from_other_chats_are_ignored(self):
         _, agent, channel = self.opened_lead()
         agent.ingest([{"id": "x", "chat": "Mãe", "text": "Oi filho"}])

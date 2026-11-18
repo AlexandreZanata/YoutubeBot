@@ -1,8 +1,10 @@
+import argparse
 import tempfile
 import unittest
 from pathlib import Path
 
 from sales_fixtures import MONDAY, PHONES, lead_rows, write_csv
+from tools.ytbot.commercial.whatsapp.sales import commands as sales_commands
 from tools.ytbot.commercial.whatsapp.sales import store as sales_store
 
 
@@ -37,6 +39,9 @@ class SalesStoreTests(unittest.TestCase):
         self.assertEqual([item["line"] for item in report["rejected"]], [4, 5, 6])
         lead = next(iter(self.store.leads().values()))
         self.assertEqual((lead["state"], lead["source"]), ("new", "google-maps-reviewed"))
+        self.assertTrue(lead["reply_active"])
+        self.assertEqual(report["reply_active"], 2)
+        self.assertEqual(sales_store.reply_is_active(lead), True)
         self.assertEqual(self.store.leads_path.stat().st_mode & 0o777, 0o600)
 
     def test_do_not_contact_survives_and_blocks_reimport(self):
@@ -52,6 +57,35 @@ class SalesStoreTests(unittest.TestCase):
         self.assertEqual(self.store.find_lead("+55 65 90000-0001")["name"], "Empresa 0")
         self.assertEqual(self.store.find_lead("Empresa 1")["name"], "Empresa 1")
         self.assertIsNone(self.store.find_lead("Mãe"))
+
+    def test_pausing_replies_clears_the_pending_message(self):
+        self.store.import_csv(write_csv(Path(self.directory.name) / "l.csv", lead_rows(1)),
+                              MONDAY)
+        lead = next(iter(self.store.leads().values()))
+        self.store.update_lead(lead["id"], awaiting="e1")
+        paused = self.store.set_reply_active(lead["id"], False)
+        self.assertFalse(sales_store.reply_is_active(paused))
+        self.assertIsNone(paused["awaiting"])
+        resumed = self.store.set_reply_active(lead["id"], True)
+        self.assertTrue(sales_store.reply_is_active(resumed))
+
+    def test_public_view_and_parser_expose_the_reply_status(self):
+        self.store.import_csv(write_csv(Path(self.directory.name) / "l.csv", lead_rows(1)),
+                              MONDAY)
+        lead = next(iter(self.store.leads().values()))
+        self.assertEqual(sales_commands._public(lead)["reply"], "ativo")
+        self.store.set_reply_active(lead["id"], False)
+        self.assertEqual(sales_commands._public(self.store.lead(lead["id"]))["reply"],
+                         "pausado")
+
+        parser = argparse.ArgumentParser()
+        actions = parser.add_subparsers(dest="action", required=True)
+        sales_commands.add_parser(actions, lambda: None, lambda: None)
+        activate = parser.parse_args(["sales", "activate", "--network", "whatsapp", "--all"])
+        self.assertTrue(activate.all)
+        pause = parser.parse_args(["sales", "pause", "--network", "whatsapp",
+                                   "--lead", "L1"])
+        self.assertEqual(pause.lead, "L1")
 
     def test_memory_appends_in_order(self):
         self.store.remember("L1", {"dir": "out", "text": "Bom dia"})

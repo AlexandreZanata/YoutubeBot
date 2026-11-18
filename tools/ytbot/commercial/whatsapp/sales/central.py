@@ -13,7 +13,7 @@ from pathlib import Path
 from . import dossier
 from .context import effective
 from .notify import format_phone, wa_link
-from .store import SalesStore, _write_json
+from .store import SalesStore, _write_json, reply_is_active
 
 # (state, label, group, needs the owner); the order is the order shown in the Central.
 STATES = (
@@ -88,7 +88,8 @@ def snapshot(store: SalesStore, now: datetime, messages: int = 100) -> dict:
         counts[state] = counts.get(state, 0) + 1
         contact = {"lead": lead["id"], "label": lead.get("label", ""), "name": lead["name"],
                    "contact_name": lead.get("contact_name", ""),
-                   "phone": format_phone(lead["phone"]), "wa_link": wa_link(lead["phone"])}
+                   "phone": format_phone(lead["phone"]), "wa_link": wa_link(lead["phone"]),
+                   "reply": "ativo" if reply_is_active(lead) else "pausado"}
         rows.append({**contact, "state": state, "state_label": LABELS.get(state, state),
                      "category": lead.get("category", ""), "city": lead.get("city", ""),
                      "last_in_at": lead.get("last_in_at"), "last_out_at": lead.get("last_out_at"),

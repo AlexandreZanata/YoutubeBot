@@ -50,6 +50,7 @@ python3 -m tools.ytbot commercial maps research --city "Lucas do Rio Verde" --st
 python3 -m tools.ytbot commercial maps verify --run lucas-do-rio-verde
 python3 -m tools.ytbot commercial maps export --run lucas-do-rio-verde
 python3 -m tools.ytbot commercial sales check --network whatsapp
+python3 -m tools.ytbot commercial sales activate --network whatsapp --all
 python3 -m tools.ytbot commercial sales simulate --network whatsapp --text "Quanto custa?"
 python3 -m tools.ytbot commercial sales run --network whatsapp --live --prospect --limit 3
 python3 -m tools.ytbot social open --network x
