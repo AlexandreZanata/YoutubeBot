@@ -193,9 +193,10 @@ domain_messages = [
   "Você já pensou em algum nome para o endereço do site e qual dessas opções prefere?",
 ]
 done_patterns = [
-  '\be isso\b', '\bso isso\b', 'mandei tudo', 'pode (fazer|montar|mandar) o orcamento', 'por enquanto e isso',
+  '\be isso\b', '\bso isso\b', '\bisso a[ie]\b', '\biss[ao]e\b', 'mandei tudo',
+  'pode (fazer|montar|mandar) o orcamento', 'por enquanto e isso',
   'acho que e isso', 'ta bom assim', 'era isso', '^pode fazer[.! ]*$',
-  '^(obrigad[oa]|valeu|ok|blz|beleza)[!. ]*$',
+  '^(obrigad[oa]|valeu|ok|blz|beleza|fechou|show|top|joia|positivo|afirmativo|confirmado|confirmo|combinado|perfeito|tudo certo|ta certo|esta certo|tudo ok|ta ok|pode seguir|manda ver)[!. ]*$',
 ]
 fallback_question = "Anotei! Para completar sua ficha, pode me contar também o endereço e horário de atendimento, as cores principais da sua marca, o estilo que você imagina para o site (mais moderno, tradicional, claro ou escuro) e mandar a logo ou fotos se tiver. Quando terminar, é só me avisar."
 
@@ -266,7 +267,7 @@ contact_card = "Mandou o contato do responsável em cartão: salve o número e c
 # `qualifying`, any other text is `quote_details`.
 offer_question = 'orcamento\?'
 affirmative = [
-  '^(sim|s|quero|queremos|pode|pode sim|pode ser|claro|com certeza|gostaria|gostaria sim|bora|vamos|manda|faz|faca|isso|aceito|por favor|pfv|ok,? pode|quero sim)\b',
+  '^(sim+|ss+|s|quero|queremos|pode|pode sim|pode ser|pode fazer|pode mandar|claro|com certeza|com ctz|ctz|gostaria|gostaria sim|bora|vamos|vamos sim|vamos la|manda|manda ver|manda ai|faz|faz sim|faca|isso|isso a[ie]|iss[ao]e|e isso|aceito|por favor|pfv|ok,? pode|ok,? quero|quero sim|fechou|beleza|blz|show|top|positivo|opa,? (pode|quero|sim|bora))\b',
 ]
 negative = ['^(nao|n|nop|negativo)\b']
 
@@ -757,8 +758,11 @@ messages = ["Que bom que gostou!", "Você gostaria que eu fizesse um orçamento?
 id = "greeting_reply"
 action = "reply"
 fixed = false
-when = "Só responde ao cumprimento: 'tudo bem e você?', 'oi', 'bom dia'."
-patterns = ['^(oi|ola|opa|bom dia|boa tarde|boa noite|tudo (bem|bom|otimo|certo|tranquilo|joia))\b', 'e (voce|vc|com voce)\??$', '^(sim|tudo),? (e )?(voce|vc)']
+when = "Só responde ao cumprimento: 'tudo bem e você?', 'oi', 'bom dia', 'pois não', 'pode falar'."
+patterns = [
+  '^(oi|ola|opa|bom dia|boa tarde|boa noite|tudo (bem|bom|otimo|certo|tranquilo|joia)|pois nao|pode falar|diga|alo|estou aqui|to aqui)\b',
+  'e (voce|vc|com voce)\??$', '^(sim|tudo),? (e )?(voce|vc)',
+]
 messages = [
   "Tudo ótimo também, obrigado!",
   "Ficou com alguma dúvida sobre os exemplos? Posso te explicar como funcionaria um site para vocês.",
@@ -768,8 +772,11 @@ messages = [
 id = "thanks"
 action = "ignore"
 fixed = true
-when = "Só agradece ou se despede, sem pergunta: 'obrigado', 'valeu', 'ok', '👍'."
-patterns = ['^(obrigad[oa]|valeu|vlw|ok|beleza|blz|show|certo|tmj)[!. ]*$', '^\W+$']
+when = "Só agradece, acusa recebimento ou se despede, sem pergunta: 'obrigado', 'obg', 'valeu', 'ok', 'entendi', '👍'."
+patterns = [
+  '^(obrigad[oa]|obg|obgd|agradeco|valeu|vlw|ok|oks|beleza|blz|show|certo|tmj|entendi|entendido|anotado|ta bom|ta certo|bom trabalho|sucesso|igualmente|deus abencoe|kk+|haha+|rs+)[!. ]*$',
+  '^\W+$',
+]
 messages = []
 
 [[intents]]

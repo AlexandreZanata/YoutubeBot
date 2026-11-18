@@ -36,6 +36,26 @@ READ_ROW = """(row) => {
     unread: Boolean(pick('icon-unread-count')),
   };
 }"""
+READ_ROWS = """(limit) => {
+  const rows = Array.from(document.querySelectorAll('[data-testid="cell-frame-container"]')).slice(0, limit);
+  const unreadSel = '[aria-label*="unread"],[aria-label*="não lida"],[aria-label*="não lidas"]';
+  return rows.map((row) => {
+    const pick = (id) => row.querySelector(`[data-testid="${id}"]`);
+    const clean = (node) => node ? node.innerText.replace(/\\u00a0/g, ' ').trim() : '';
+    const titleNode = pick('cell-frame-title');
+    const named = titleNode ? titleNode.querySelector('span[title]') : null;
+    const icons = Array.from(row.querySelectorAll('svg title, [data-icon]'))
+      .map((node) => node.textContent || node.getAttribute('data-icon') || '');
+    return {
+      title: named && named.getAttribute('title') ? named.getAttribute('title').trim() : clean(titleNode),
+      stamp: clean(pick('chat-list-timestamp')),
+      preview: clean(pick('last-msg-status')),
+      outgoing: icons.some((name) => /(delivered|-read$|-sent$|pending|msg-time|dblcheck|-check$)/.test(name)),
+      unread: Boolean(pick('icon-unread-count') || row.querySelector(unreadSel)),
+      fallbackText: clean(row),
+    };
+  });
+}"""
 UNREAD = ('[aria-label*="unread"]', '[aria-label*="não lida"]', '[aria-label*="não lidas"]')
 OUTGOING_PREFIXES = ("you:", "you :", "você:", "você :", "voce:")
 DEFAULT_RULES = {"mode": "allow", "contacts": []}
@@ -178,15 +198,62 @@ def stamped(value: str) -> bool:
     return bool(value)
 
 
-def scan_once(page, seen: set[str], rules: dict, limit: int = 30) -> list[dict]:
-    page.goto(LOGIN_URL, timeout=90000)
-    page.wait_for_selector(CHAT_LIST, timeout=90000)
-    page.wait_for_timeout(2500)
-    events: list[dict] = []
+def _chat_list_ready(page) -> bool:
+    url = getattr(page, "url", "") or ""
+    if "web.whatsapp.com" not in url:
+        return False
+    try:
+        return bool(page.locator(CHAT_LIST).count() and page.locator(ROW).count())
+    except Exception:
+        return False
+
+
+def _parsed_rows(page, limit: int) -> list[dict]:
+    try:
+        items = page.evaluate(READ_ROWS, limit)
+    except Exception:
+        items = None
+    if isinstance(items, list):
+        parsed_rows = []
+        for data in items:
+            if not isinstance(data, dict):
+                continue
+            if data.get("title") and data.get("stamp"):
+                lines = [line.strip() for line in str(data.get("preview", "")).splitlines()
+                         if line.strip()]
+                parsed_rows.append({
+                    "title": data["title"], "stamp": data["stamp"],
+                    "preview": _preview(lines), "outgoing": bool(data.get("outgoing")),
+                    "unread": bool(data.get("unread")),
+                })
+            elif data.get("fallbackText"):
+                parsed = parse_row(data["fallbackText"])
+                if parsed:
+                    parsed["outgoing"] = False
+                    parsed["unread"] = bool(data.get("unread"))
+                    parsed_rows.append(parsed)
+        return parsed_rows
     rows = page.locator(ROW)
+    parsed_rows = []
     for index in range(min(rows.count(), limit)):
         row = rows.nth(index)
         parsed = read_row(row)
+        if parsed:
+            parsed["unread"] = bool(parsed.get("unread") or unread(page, row))
+            parsed_rows.append(parsed)
+    return parsed_rows
+
+
+def scan_once(page, seen: set[str], rules: dict, limit: int = 30) -> list[dict]:
+    if not _chat_list_ready(page):
+        page.goto(LOGIN_URL, timeout=90000)
+        page.wait_for_selector(CHAT_LIST, timeout=90000)
+        try:
+            page.wait_for_selector(ROW, timeout=10000)
+        except Exception:
+            page.wait_for_timeout(1500)
+    events: list[dict] = []
+    for parsed in _parsed_rows(page, limit):
         if not parsed.get("title") or not parsed.get("preview"):
             continue
         if parsed.get("outgoing") or parsed["preview"].casefold().startswith(OUTGOING_PREFIXES):
@@ -201,7 +268,7 @@ def scan_once(page, seen: set[str], rules: dict, limit: int = 30) -> list[dict]:
             "message_at": parsed["stamp"],
             "chat": parsed["title"],
             "text": parsed["preview"][:1000],
-            "unread": parsed.get("unread") or unread(page, row),
+            "unread": bool(parsed.get("unread")),
             "allowed": contact_allowed(parsed["title"], rules),
         })
     return events
@@ -210,6 +277,7 @@ def scan_once(page, seen: set[str], rules: dict, limit: int = 30) -> list[dict]:
 def listen(page, base: Path, once: bool = False, interval: int = 30,
            limit: int = 30, max_events: int = 500) -> list[dict]:
     seen_path = base / "seen.json"
+    seen_exists = seen_path.is_file()
     seen = set(read_json(seen_path, []))
     rules = load_rules(base / "rules.json")
     collected: list[dict] = []
@@ -219,7 +287,9 @@ def listen(page, base: Path, once: bool = False, interval: int = 30,
             append_event(base / "events.jsonl", event)
             log(f"{event['chat']}: {event['text'][:60]}")
         collected.extend(batch)
-        write_json(seen_path, sorted(seen)[-5000:])
+        if batch or not seen_exists:
+            write_json(seen_path, sorted(seen)[-5000:])
+            seen_exists = True
         if once or len(collected) >= max_events:
             break
         page.wait_for_timeout(interval * 1000)

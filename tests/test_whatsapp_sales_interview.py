@@ -231,6 +231,53 @@ class InterviewTests(unittest.TestCase):
         self.assertTrue(self.lead_now()["buy_intent"])
         self.assertNotIn("financeiro@zaflas.com.br", self.sent())
 
+    def test_informal_confirmation_slang_finishes_on_first_reply_and_keeps_corrections(self):
+        self.say("Fazem site de cassino?",
+                 {"intent": "custom_platform", "messages": []}, brief())
+        ready = brief(
+            empresa={"nome": "Zaflas Restaurantes", "segmento": "Restaurante", "cidade": "Cuiabá",
+                     "sobre_e_diferenciais": None},
+            projeto={"tipo": "site de cassino",
+                     "objetivo": "criar um site de cassino com sistema de tigrinho",
+                     "como_faz_hoje": "Projeto novo",
+                     "usuarios": ["jogadores", "equipe de gerenciamento"],
+                     "quantidade_de_usuarios": "1000 pessoas",
+                     "funcionalidades": ["sistema de tigrinho", "100% self service"],
+                     "plataformas": ["navegador do computador"],
+                     "integracoes": ["Pix", "cartão", "boleto"]},
+            duvidas_do_cliente=["Se fazem site de cassino"],
+            faltando=[],
+            proxima_pergunta="",
+            confirmacao=("Entendi que você precisa de um site de cassino com sistema de tigrinho, "
+                         "totalmente self service, rodando no navegador e ligado a Pix, cartão e boleto."),
+        )
+        self.say("tigrinho self service, mil pessoas no navegador, jogadores e equipe, Pix cartão boleto",
+                 ready)
+        self.assertEqual(self.lead_now()["collect_stage"], "confirming")
+        # A correction with slang ("Beleza, mas faltou...") must update, not confirm prematurely.
+        self.say("Beleza, mas faltou relatório diário", ready)
+        self.assertEqual(self.lead_now()["collect_stage"], "confirming")
+        self.assertEqual(self.lead_now()["state"], "qualifying")
+        # Informal PT-BR confirmation ("Issae chefia") must confirm immediately without repeating.
+        self.say("Issae chefia", ready)
+        lead = self.lead_now()
+        self.assertEqual(lead["state"], "quote-requested")
+        self.assertEqual(self.notes[-1]["priority"], "hot")
+        ficha = Path(lead["ficha"]).read_text(encoding="utf-8")
+        self.assertIn("1000 pessoas", ficha)
+        self.assertIn("Se fazem site de cassino", ficha)
+        self.assertIn("Pix; cartão; boleto", ficha)
+
+    def test_ready_to_buy_at_confirmation_stage_finishes_as_buying(self):
+        self.offered()
+        self.say("Sim", {"intent": "quote_accept", "messages": []}, brief())
+        done = brief(faltando=[], proxima_pergunta="", confirmacao=SUMMARY)
+        self.say("Tudo certo, só isso", done)
+        self.assertEqual(self.lead_now()["collect_stage"], "confirming")
+        self.say("Quero fechar, pode começar", {"intent": "ready_to_buy", "messages": []}, done)
+        self.assertEqual(self.lead_now()["state"], "buying")
+        self.assertEqual(self.sent()[-1], self.rules.brief_system["done_messages_buy"][0])
+
 
 if __name__ == "__main__":
     unittest.main()
