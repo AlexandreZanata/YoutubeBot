@@ -108,7 +108,7 @@ ignore_domains = [
   "serasaexperian.com.br", "wikipedia.org", "gov.br", "cadeodentista.com.br",
   "magicpin.com", "agendarconsulta.com", "dentmap.com.br", "mechameaqui.com.br",
   "boaconsulta.com", "mechamenozap.com.br", "b2bseg.com.br", "loqal.com.br",
-  "studioadamas.com.br",
+  "studioadamas.com.br", "guiafacil.com",
 ]
 parking_markers = [
   "dominio a venda", "dominio esta a venda", "this domain is for sale",
