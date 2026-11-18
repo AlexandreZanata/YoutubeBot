@@ -107,7 +107,9 @@ python3 -m tools.ytbot commercial products --network mercadolivre \
 
 The command runs in the hidden profile, searches the affiliate hub and opens each product's
 share dialog. Results are saved privately in
-`.local/commercial/mercadolivre/products.json`.
+`.local/commercial/mercadolivre/products.json`. `captured_at` carries the local UTC offset
+(for example `-04:00`): the Hub uses it for the 30-minute Telegram freshness window, so a
+naive timestamp would make every offer look hours old and silently skip the queue.
 
 ### Page map
 
