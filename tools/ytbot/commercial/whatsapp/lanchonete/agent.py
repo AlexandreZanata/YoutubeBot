@@ -16,6 +16,7 @@ from __future__ import annotations
 import random
 import re
 import time
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, time as clock_time, timedelta
 from zoneinfo import ZoneInfo
@@ -24,6 +25,7 @@ from .. import listener, sender
 from ..sales import dossier
 from ..sales import notify as owner_notify
 from ..sales.agent import WhatsAppChannel, split_pending
+from ..sales.commands import is_closed
 from ..sales.pacing import SalesPacing
 from ..sales.rules import normalize
 from . import guard, interpreter, parser
@@ -39,6 +41,73 @@ FIELDS = ("type", "address", "name", "payment", "change")
 GROUP_PREFIX = re.compile(r"^\s*[^:\n]{2,40}:\s")
 MEDIA_TEXT = {"image": "[imagem]", "video": "[vídeo]", "document": "[documento]",
               "audio": "[áudio]"}
+# A comparative ("mais barato", "o menor", "troca ... por") or an explicit rejection
+# ("não o de 500") never adds blindly: the cart decides between swap proposal and removal.
+REPLACE_CUE = re.compile(r"\b(mais barat\w*|mais em conta|menor|menores|o pequeno|a pequena|"
+                         r"troca|trocar|substitu\w*|ao inves|em vez de|no lugar de|"
+                         r"nao (o|a|esse|essa|esses|essas)\b)")
+NEG_REF = re.compile(r"\bnao(?: quero)? (o|a|esse|essa|esses|essas)"
+                     r"(\s+(de|da|do|das|dos))?\s*"
+                     r"(\d{2,4}\s?(?:ml|g)?|[a-zà-ÿ]{3,})")
+
+
+TOKEN = re.compile(r"[A-Za-zÀ-ÿ0-9]+")
+
+
+def _tokens(value: str) -> list[tuple[str, int, int]]:
+    result = []
+    for match in TOKEN.finditer(value or ""):
+        plain = unicodedata.normalize("NFKD", match.group(0))
+        plain = "".join(char for char in plain if not unicodedata.combining(char)).casefold()
+        result.append((plain, match.start(), match.end()))
+    return result
+
+
+def clean_incoming(text: str, outgoing: list[str]) -> str:
+    """Drop a quoted bot bubble from the text WhatsApp gives us for an incoming message.
+
+    A reply quotes the old bubble above the new text. WhatsApp flattens both into one
+    string, so a quote of the cart used to be read as a second order and doubled every item.
+    The longest shared token run at the start identifies the quote; the actual reply remains.
+    """
+    if not text:
+        return text
+    result = text
+    out_tokens = [_tokens(item) for item in outgoing if item]
+    for _ in range(3):
+        incoming = _tokens(result)
+        if not incoming or not out_tokens:
+            break
+        best = 0
+        for tokens in out_tokens:
+            for start in range(len(tokens)):
+                if tokens[start][0] != incoming[0][0]:
+                    continue
+                length = 0
+                while (start + length < len(tokens) and length < len(incoming)
+                       and tokens[start + length][0] == incoming[length][0]):
+                    length += 1
+                best = max(best, length)
+        if best < 6:
+            break
+        result = result[incoming[best - 1][2]:].strip(" \n\t:-—•*?.,;!")
+    lines = result.splitlines()
+    while lines:
+        line = lines[0].strip()
+        if not line:
+            lines.pop(0)
+            continue
+        plain = normalize(line)
+        if (plain == "seu pedido ate agora"
+                or re.match(r"^(subtotal|total|entrega|pedido|nome|endereco|itens|"
+                            r"pagamento|troco|observacao)\s*:", plain)
+                or plain.startswith(("confere seu pedido", "quer mais alguma coisa",
+                                     "esta tudo certo", "me diga o que voce quer"))
+                or re.match(r"^[*•\-]?\s*\d+x\s+.+r\$", line, re.IGNORECASE)):
+            lines.pop(0)
+            continue
+        break
+    return "\n".join(lines).strip()
 
 
 def text_plain(value: str) -> str:
@@ -245,6 +314,10 @@ class LanchoneteAgent:
                 self.log(f"contact blocked by rules.json: {chat}")
                 continue
             history = self.store.history(customer["id"])
+            outgoing = [entry.get("text", "") for entry in history if entry.get("dir") == "out"]
+            text = clean_incoming(text, outgoing)
+            if not text:
+                continue
             if any(entry.get("event") == event.get("id") for entry in history):
                 continue
             sent = [normalize(entry.get("text", "")) for entry in history[-40:]
@@ -291,7 +364,22 @@ class LanchoneteAgent:
                       key=lambda customer: customer.get("last_in_at") or "")
 
     def reply_pending(self) -> list[dict]:
-        return [self.reply(customer) for customer in self.pending()]
+        """Answer every waiting customer; one customer's failure never blocks the others.
+
+        A lost browser page (`is_closed`) still aborts the cycle so the run loop can
+        reconnect; any other error fences only that customer and the rest continue.
+        """
+        results = []
+        for customer in self.pending():
+            try:
+                results.append(self.reply(customer))
+            except Exception as error:
+                if is_closed(error):
+                    raise
+                self.log(f"customer {customer.get('id')} failed ({error}); others continue")
+                results.append({"customer": customer["id"], "name": customer.get("name"),
+                                "state": "error", "error": str(error)[:300]})
+        return results
 
     def _open_chat(self, customer: dict) -> str:
         status = self.channel.open(customer)
@@ -408,13 +496,16 @@ class LanchoneteAgent:
         seen = {entry.get("message_id") for entry in history if entry.get("message_id")}
         previews = [entry["event"] for entry in unanswered
                     if entry.get("source") == "preview" and entry.get("event")]
+        outgoing = [entry.get("text", "") for entry in history if entry.get("dir") == "out"]
         entries = []
         for bubble in bubbles[last_out + 1:]:
             if bubble["dir"] != "in" or (bubble.get("id") and bubble["id"] in seen):
                 continue
             entry = self._from_bubble(customer, bubble)
             if entry is not None:
-                entries.append(entry)
+                entry["text"] = clean_incoming(entry.get("text", ""), outgoing)
+                if entry["text"]:
+                    entries.append(entry)
         if entries and previews:
             entries[0]["replaces"] = previews
         for entry in entries:
@@ -687,6 +778,128 @@ class LanchoneteAgent:
                      self.rules.texts["ask_change"]], "ordering",
                     {"awaiting_field": "change"}, "change_low", order=order)
 
+    def _is_yes(self, text: str) -> bool:
+        plain = normalize(text)
+        return any(re.search(pattern, plain) for pattern in self.rules.context["affirmative"])
+
+    def _is_no(self, text: str) -> bool:
+        plain = normalize(text)
+        return any(re.search(pattern, plain) for pattern in self.rules.context["negative"])
+
+    @staticmethod
+    def _base_name(name: str) -> str:
+        parts = (name or "").split()
+        return parts[0].casefold() if parts else ""
+
+    def _same_variant(self, first, second) -> bool:
+        """Same category and same base name: Açaí 300 ml ~ Açaí 500 ml, but never ~ Milk-Shake."""
+        return (first.category == second.category
+                and self._base_name(first.name) == self._base_name(second.name))
+
+    @staticmethod
+    def _name_matches(token: str, name: str) -> bool:
+        """A rejection token ("500", "500ml", "calabresa") names a cart item."""
+        token = normalize(token or "")
+        if not token:
+            return False
+        flat = normalize(name).replace(" ", "")
+        if token.replace(" ", "") in flat:
+            return True
+        digits = re.sub(r"\D", "", token)
+        return bool(digits) and digits in re.sub(r"\D", "", name or "")
+
+    def _swap_proposal(self, customer: dict, order: Order, parsed, text: str
+                       ) -> tuple[str, str, int] | None:
+        """(from_id, to_id, qty) when the text exchanges a cart item, else None.
+
+        "Quero o açaí mais barato" with Açaí 500 in the cart proposes Açaí 500 → Açaí 300.
+        The cart is never touched here; the customer confirms first (see `_apply_swap`).
+        A bare rejection without an addition ("não o de 500") is a removal, not a swap.
+        """
+        if order.is_empty():
+            return None
+        plain = normalize(text)
+        if not REPLACE_CUE.search(plain):
+            return None
+        mentioned = [item.item_id for item in parsed.items
+                     if item.item_id and not item.remove]
+        if not mentioned:
+            return None
+        neg = NEG_REF.search(plain)
+        token = neg.group(4) if neg else ""
+        scored: dict[str, int] = {}
+        for line in order.lines:
+            try:
+                item = self.rules.item(line.item_id)
+            except KeyError:
+                continue
+            score = 0
+            if line.item_id in mentioned:
+                score = 2
+            else:
+                for mid in mentioned:
+                    try:
+                        other = self.rules.item(mid)
+                    except KeyError:
+                        continue
+                    if self._same_variant(item, other):
+                        score = max(score, 1)
+            if token and self._name_matches(token, item.name):
+                score = max(score, 2)
+            if score:
+                scored[line.item_id] = max(scored.get(line.item_id, 0), score)
+        if not scored:
+            return None
+        best = max(scored.values())
+        affected = [line_id for line_id, score in scored.items() if score == best]
+        if len(affected) != 1:
+            return None
+        current = self.rules.item(affected[0])
+        candidates = [candidate for candidate in self.rules.items
+                      if candidate.category == current.category
+                      and candidate.id != current.id
+                      and self._base_name(candidate.name) == self._base_name(current.name)]
+        if not candidates:
+            return None
+        if re.search(r"\b(maior|maiores|grande|grandes)\b", plain):
+            target = max(candidates, key=lambda candidate: candidate.price_cents)
+        else:
+            target = min(candidates, key=lambda candidate: candidate.price_cents)
+        qty = next(line.qty for line in order.lines if line.item_id == current.id)
+        return (current.id, target.id, qty)
+
+    def _direct_remove(self, order: Order, text: str) -> str | None:
+        """The cart item a bare rejection names ("não o de 500"), when it is unique."""
+        neg = NEG_REF.search(normalize(text))
+        if not neg or not neg.group(4):
+            return None
+        hits = []
+        for line in order.lines:
+            try:
+                name = self.rules.item(line.item_id).name
+            except KeyError:
+                continue
+            if self._name_matches(neg.group(4), name):
+                hits.append(line.item_id)
+        return hits[0] if len(hits) == 1 else None
+
+    def _apply_swap(self, customer: dict, order: Order, pending: dict, updates: dict,
+                    now: datetime) -> Turn:
+        """The customer confirmed the swap: exchange the items 1:1 and show the cart."""
+        try:
+            from_item = self.rules.item(pending["from"])
+            to_item = self.rules.item(pending["to"])
+        except KeyError:
+            fresh = {**updates, **order.to_lead_fields(), "pending_replace": None}
+            return Turn([order.cart_text(self.rules)], "ordering", fresh, "order", order=order)
+        qty = max(int(pending.get("qty") or 1), 1)
+        order.remove(self.rules, from_item.id)
+        order.add(self.rules, to_item.id, qty)
+        fresh = {**updates, **order.to_lead_fields(), "pending_replace": None}
+        messages = [order.cart_text(self.rules), self.rules.texts["cart_question"]]
+        return Turn(self._with_greeting(customer, messages, now), "ordering", fresh,
+                    "swap", order=order)
+
     def _turn(self, customer: dict, text: str) -> Turn:
         now = self.now()
         state = customer["state"]
@@ -705,6 +918,12 @@ class LanchoneteAgent:
 
         if intent == "opt_out":
             return Turn(self._fixed("opt_out"), "do-not-contact", {}, intent, block=True)
+
+        if re.search(r"\b(tudo|todos os itens|cardapio inteiro|o cardapio todo)\b", plain) and \
+                "cardapio" in plain:
+            return Turn([self.rules.texts["large_order"]], "needs-owner",
+                        {"awaiting_field": ""}, "large_order",
+                        self.rules.texts["owner_reason_large"], "needed", order=order)
 
         if not self._service_window(customer, order, now):
             last = self._parse_date(customer.get("closed_notice_at"))
@@ -732,6 +951,18 @@ class LanchoneteAgent:
             turn = self._cancel_turn(customer, order)
             turn.messages = self._with_greeting(customer, turn.messages, now)
             return turn
+
+        pending = customer.get("pending_replace") or {}
+        if pending:
+            if self._is_yes(text):
+                return self._apply_swap(customer, order, pending, dict(updates), now)
+            if self._is_no(text):
+                fresh = {**updates, **order.to_lead_fields(), "pending_replace": None}
+                messages = [order.cart_text(self.rules), self.rules.texts["cart_question"]]
+                return Turn(self._with_greeting(customer, messages, now), base_state, fresh,
+                            "keep", order=order)
+            if parsed.changed or parsed.done or parsed.cancel:
+                updates["pending_replace"] = None  # the new message supersedes the proposal
 
         if intent == "status":
             if customer.get("order_number") or state == "confirmed":
@@ -776,6 +1007,40 @@ class LanchoneteAgent:
                         intent, order=order)
 
         # Free-form order: the local parser first, the model only when it found nothing.
+        # A rejection or a comparative never falls through to a blind add: a bare "não o
+        # de 500" removes that cart item, and "o açaí mais barato" proposes the swap first.
+        if not parsed.done:
+            adds = [item for item in parsed.items if item.item_id and not item.remove]
+            if adds:
+                proposal = self._swap_proposal(customer, order, parsed, text)
+                if proposal is not None:
+                    from_item = self.rules.item(proposal[0])
+                    to_item = self.rules.item(proposal[1])
+                    fresh = {**updates, **order.to_lead_fields(),
+                             "pending_replace": {"from": proposal[0], "to": proposal[1],
+                                                 "qty": proposal[2]}}
+                    messages = [order.cart_text(self.rules),
+                                self.rules.fill(self.rules.texts["swap_question"],
+                                                fro=from_item.name, to=to_item.name)]
+                    return Turn(self._with_greeting(customer, messages, now), base_state, fresh,
+                                "swap_ask", order=order)
+            else:
+                removed_id = self._direct_remove(order, text)
+                if removed_id is not None:
+                    removed_name = self.rules.item(removed_id).name
+                    order.remove(self.rules, removed_id)
+                    fresh = {**updates, **order.to_lead_fields(), "unknown_count": 0}
+                    if order.is_empty():
+                        messages = [self.rules.fill(self.rules.texts["removed_item"],
+                                                    item=removed_name),
+                                    self.rules.texts["cart_empty"]]
+                    else:
+                        messages = [self.rules.fill(self.rules.texts["removed_item"],
+                                                    item=removed_name),
+                                    order.cart_text(self.rules),
+                                    self.rules.texts["cart_question"]]
+                    return Turn(self._with_greeting(customer, messages, now), base_state, fresh,
+                                "remove", order=order)
         cart_before = order.to_lead_fields()["cart"]
         changed, notes = self._apply_parsed(customer, order, parsed, text)
         cart_changed = order.to_lead_fields()["cart"] != cart_before
@@ -970,10 +1235,19 @@ class LanchoneteAgent:
     # Sending -------------------------------------------------------------------------
     def _items(self, customer: dict, tag: str, messages: list[str],
                incoming: str | None) -> list[dict]:
+        """Journal keys bind the reply to its cause AND its content.
+
+        `tag` is the turn (reply/opening), the cause is the incoming event that triggered
+        it, and the content is the normalized text. The same text for the same incoming
+        message is a duplicate; a new text (or a new incoming message) is a new key, so a
+        skipped greeting block never shifts the following keys.
+        """
         delays = self.pacing.plan(messages, incoming, self.rng)
-        return [{"key": sender.message_key(customer["id"], f"{tag}#{index}", None),
+        cause = str(customer.get("awaiting") or "manual")
+        return [{"key": sender.message_key(customer["id"],
+                                           f"{tag}:{cause}:{text_plain(text)}", None),
                  "text": text, "delay": delay}
-                for index, (text, delay) in enumerate(zip(messages, delays))]
+                for text, delay in zip(messages, delays)]
 
     def _remember_sent(self, customer: dict, items: list[dict], results: list[dict],
                        kind: str, intent: str) -> tuple[bool, str]:

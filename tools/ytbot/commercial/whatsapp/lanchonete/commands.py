@@ -249,6 +249,25 @@ def command_resolve(args, store_factory) -> None:
         raise SystemExit(f"[lanchonete] {error}")
 
 
+def command_correct(args, store_factory) -> None:
+    """Owner: drop a corrupted cart and start the order clean, without resending it.
+
+    The neutral `correction_notice` from the rules is printed for the owner to paste in
+    WhatsApp; the bot never replays the old summary by itself. History is kept as audit.
+    """
+    from .order import Order
+    rules, store, _ = _context(args, store_factory)
+    customer = store.lead(args.customer)
+    if customer is None:
+        raise SystemExit(f"[lanchonete] unknown customer {args.customer}")
+    reset = Order().to_lead_fields()
+    store.update_lead(args.customer, state="ordering", awaiting=None, awaiting_field="",
+                       closing=False, unknown_count=0, confirmations=0, pending_replace=None,
+                       handoff_reason=None, order_number="", ficha="", **reset)
+    _print({**_public(store.lead(args.customer)),
+            "notice_to_paste": rules.texts["correction_notice"]})
+
+
 def command_recover(args, store_factory) -> None:
     """Clear a transient unconfirmed state without retrying the uncertain message."""
     rules, store, now = _context(args, store_factory)
@@ -429,6 +448,9 @@ def add_parser(actions, store_factory, page_factory) -> None:
     resolve.add_argument("--state", required=True,
                          choices=("ordering", "confirming", "confirmed", "closed", "cancelled",
                                   "human"))
+    correct = action("correct", "owner: drop a corrupted cart and print the neutral notice",
+                     lambda args: command_correct(args, store_factory))
+    correct.add_argument("--customer", required=True)
     recover = action("recover", "clear a transient unconfirmed state without retrying it",
                      lambda args: command_recover(args, store_factory))
     recover.add_argument("--customer", default=None)

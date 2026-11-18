@@ -51,7 +51,7 @@ class LanchoneteStore(SalesStore):
             "followups": 0, "last_out_at": None, "last_in_at": None, "awaiting": None,
             "replies": {}, "handoff_reason": None, "bot_replies": 0, "unknown_count": 0,
             "confirmations": 0, "awaiting_field": "", "closing": False, "cart": [],
-            "order_kind": "",
+            "order_kind": "", "pending_replace": None,
             "order_name": "", "order_address": "", "order_payment": "",
             "order_change_for_cents": None, "order_change_exact": False, "order_note": "",
             "order_number": "", "ficha": "", "closed_notice_at": None,

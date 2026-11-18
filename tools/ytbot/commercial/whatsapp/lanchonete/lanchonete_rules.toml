@@ -187,6 +187,8 @@ cancelled = "Pedido cancelado. Se quiser começar de novo, é só me chamar. �
 cancelled_after_kitchen = "Seu pedido já foi enviado para a cozinha. Vou chamar o atendente para ajustar com você."
 not_understood = "Desculpa, não entendi. Pode me dizer qual item do cardápio você quer e a quantidade? 😊"
 ask_what_to_adjust = "O que você quer ajustar? Pode dizer, por exemplo: \"tira a coca\" ou \"troca para retirada\"."
+swap_question = "Troco {fro} por {to}? Responde SIM para confirmar ou me diz o que prefere."
+removed_item = "Tirei {item} do pedido."
 below_min = "O pedido mínimo para entrega é R$ 15,00. Faltam {missing}. Você pode pedir mais alguma coisa ou escolher retirada, que não tem pedido mínimo."
 below_min_question = "Quer adicionar mais alguma coisa ou prefere retirar no balcão?"
 max_qty = "Consigo anotar até {max} unidades de cada item por pedido. Para uma quantidade maior, chamo o atendente."
@@ -196,6 +198,7 @@ extra_not_found = "Esse adicional não está no cardápio. Os adicionais dispon�
 payment_unknown = "Não entendi a forma de pagamento. Pode escolher Pix, dinheiro ou cartão?"
 change_too_low = "O total do pedido é {total}. Preciso de um valor maior para o troco, ou você pode pagar o valor exato."
 handoff_ack = "Vou confirmar com o atendente e já te respondo por aqui."
+correction_notice = "Olá! Para não restar dúvida, desconsidere o resumo anterior. Me diga como está seu pedido agora, com os itens e as quantidades, que eu anoto tudo certinho. 😊"
 large_order = "Vou chamar o atendente para confirmar esse pedido maior com você."
 owner_reason_unknown = "O cliente pediu algo que o bot não entendeu"
 owner_reason_confirm = "O cliente não confirmou o resumo do pedido"
@@ -472,7 +475,8 @@ id = "acai-300"
 name = "Açaí 300 ml"
 category = "desserts"
 price_cents = 1600
-aliases = ["acai 300", "açaí 300", "acai pequeno", "acai 300 ml"]
+aliases = ["acai 300", "açaí 300", "acai pequeno", "acai 300 ml", "acai mais barato",
+           "açaí mais barato", "o acai mais barato"]
 description = "Açaí 300 ml com banana e granola."
 
 [[menu.items]]
@@ -656,7 +660,7 @@ patterns = [
   'chama (o )?(atendente|responsavel|gerente)',
   'quero falar com alguem', 'me passa para (um |o )?(atendente|responsavel)',
 ]
-messages = ["Claro! Já chamo o atendente e ele continua com você por aqui. 😊"]
+messages = ["Claro! Vou passar sua conversa para um atendente humano agora e ele já te responde por aqui. Obrigado por aguardar! 😊"]
 
 [[intents]]
 id = "complaint"

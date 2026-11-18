@@ -87,6 +87,31 @@ class LanchoneteRulesTests(unittest.TestCase):
         self.assertIn("cartão", text)
         self.assertIn("troco", text)
 
+    def test_private_test_mirror_matches_the_production_catalog(self):
+        """The 24h test file may differ only in hours and pacing, never in menu or texts."""
+        from pathlib import Path
+
+        mirror = lanchonete_rules.load(
+            Path(__file__).parent.parent
+            / ".local/commercial/whatsapp/lanchonete/test_rules.toml")
+        self.assertEqual([(item.id, item.price_cents) for item in mirror.items],
+                         [(item.id, item.price_cents) for item in self.rules.items])
+        self.assertEqual([(extra.id, extra.price_cents) for extra in mirror.extras],
+                         [(extra.id, extra.price_cents) for extra in self.rules.extras])
+        self.assertEqual({intent.id for intent in mirror.intents},
+                         {intent.id for intent in self.rules.intents})
+        self.assertEqual(set(mirror.texts), set(self.rules.texts))
+        self.assertEqual(mirror.texts["closed"], self.rules.texts["closed"])
+
+    def test_neutral_texts_have_no_robot_blame_and_no_money(self):
+        for key in ("correction_notice", "swap_question", "removed_item"):
+            self.assertIn(key, self.rules.texts)
+        notice = self.rules.texts["correction_notice"].casefold()
+        self.assertNotIn("robô", notice)
+        self.assertNotIn("errei", notice)
+        self.assertNotIn("desculpa", notice)
+        self.assertIn("SIM", self.rules.texts["swap_question"])
+
 
 if __name__ == "__main__":
     unittest.main()

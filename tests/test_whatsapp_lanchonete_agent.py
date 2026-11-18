@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from sales_fixtures import Clock, FakeChannel, FakeModel
-from tools.ytbot.commercial.whatsapp.lanchonete.agent import (LanchoneteAgent, is_ours,
-                                                              owner_resolve, text_plain)
+from tools.ytbot.commercial.whatsapp.lanchonete.agent import (LanchoneteAgent, clean_incoming,
+                                                              is_ours, owner_resolve, text_plain)
+from tools.ytbot.commercial.whatsapp.lanchonete.parser import parse
 from tools.ytbot.commercial.whatsapp.lanchonete.rules import load
 from tools.ytbot.commercial.whatsapp.lanchonete.store import LanchoneteStore
 
@@ -190,6 +191,26 @@ class LanchoneteAgentTests(unittest.TestCase):
         agent.reply_pending()
         self.assertEqual(store.find_lead("(65) 90000-0003")["cart"], [])
 
+    def test_a_quoted_cart_is_not_read_as_a_second_order(self):
+        cart = ("Seu pedido até agora:\n• 1x Calabresa Acebolada — R$ 24,00\n"
+                "• 1x Milk-Shake 400 ml — R$ 14,00\n• 1x Açaí 500 ml — R$ 22,00\n"
+                "Subtotal: R$ 60,00")
+        quoted = cart.replace("• ", "") + "\nQuero a açaí mais barato"
+        self.assertEqual(clean_incoming(quoted, [cart]), "Quero a açaí mais barato")
+        self.assertEqual(clean_incoming("Quer mais alguma coisa ou posso fechar o pedido?\n"
+                                        "Milk-shake",
+                                        ["Quer mais alguma coisa ou posso fechar o pedido?"]),
+                         "Milk-shake")
+        parsed = parse(self.rules, "Quero a açaí mais barato")
+        self.assertEqual([item.item_id for item in parsed.items], ["acai-300"])
+
+    def test_everything_on_the_menu_goes_to_the_owner(self):
+        self.say("oi")
+        self.say("Coloca tudo do cardápio")
+        self.assertEqual(self.customer()["state"], "needs-owner")
+        self.assertEqual(self.customer()["cart"], [])
+        self.assertIn("Pedido acima do limite", self.notes[0]["reason"])
+
     def test_two_customers_keep_separate_carts_and_states(self):
         self.say("oi")
         self.say("quero um x-tudo")
@@ -313,6 +334,106 @@ class LanchoneteAgentTests(unittest.TestCase):
         self.say("e aí?")
         self.assertEqual(self.customer()["state"], "human")
         self.assertEqual(len(self.sent()), 7)
+
+    def test_cheaper_acai_proposes_a_swap_instead_of_adding(self):
+        self.say("oi")
+        self.say("Adicione calabresa bem grossa")
+        self.say("Milk-shake")
+        self.say("Açaí")
+        cart = {line["item_id"]: line["qty"] for line in self.customer()["cart"]}
+        self.assertEqual(cart, {"calabresa-acebolada": 1, "milk-shake": 1, "acai-500": 1})
+        self.say("Quero a açaí mais barato")
+        # Nothing was added: the bot asks before exchanging.
+        cart = {line["item_id"]: line["qty"] for line in self.customer()["cart"]}
+        self.assertEqual(cart, {"calabresa-acebolada": 1, "milk-shake": 1, "acai-500": 1})
+        self.assertEqual(self.customer().get("pending_replace"),
+                         {"from": "acai-500", "to": "acai-300", "qty": 1})
+        self.assertIn("Troco Açaí 500 ml por Açaí 300 ml?", "\n".join(self.sent()))
+        self.say("sim")
+        cart = {line["item_id"]: line["qty"] for line in self.customer()["cart"]}
+        self.assertEqual(cart, {"calabresa-acebolada": 1, "milk-shake": 1, "acai-300": 1})
+        self.assertFalse(self.customer().get("pending_replace"))
+
+    def test_no_measures_proposal_when_the_customer_refuses_it(self):
+        self.say("oi")
+        self.say("Açaí")
+        self.say("Quero a açaí mais barato")
+        self.assertTrue(self.customer().get("pending_replace"))
+        self.say("não")
+        cart = {line["item_id"]: line["qty"] for line in self.customer()["cart"]}
+        self.assertEqual(cart, {"acai-500": 1})
+        self.assertFalse(self.customer().get("pending_replace"))
+
+    def test_bare_rejection_removes_the_named_cart_item(self):
+        self.say("oi")
+        self.say("Adicione calabresa bem grossa")
+        self.say("Açaí")
+        self.say("não o de 500")
+        cart = {line["item_id"]: line["qty"] for line in self.customer()["cart"]}
+        self.assertEqual(cart, {"calabresa-acebolada": 1})
+        self.assertIn("Tirei Açaí 500 ml do pedido.", "\n".join(self.sent()))
+
+    def test_replace_request_with_quote_never_duplicates_the_cart(self):
+        self.say("oi")
+        self.say("Adicione calabresa bem grossa")
+        self.say("Milk-shake")
+        self.say("Açaí")
+        quoted = ("Seu pedido até agora:\n1x Calabresa Acebolada — R$ 24,00\n"
+                  "1x Milk-Shake 400 ml — R$ 14,00\n1x Açaí 500 ml — R$ 22,00\n"
+                  "Subtotal: R$ 60,00\nQuero a açaí mais barato")
+        self.say(quoted)
+        cart = {line["item_id"]: line["qty"] for line in self.customer()["cart"]}
+        self.assertEqual(cart, {"calabresa-acebolada": 1, "milk-shake": 1, "acai-500": 1})
+        self.assertTrue(self.customer().get("pending_replace"))
+
+    def test_journal_keys_bind_cause_and_content(self):
+        customer = {"id": "C1", "awaiting": "event-9"}
+        first = self.agent._items(customer, "reply", ["Oi, tudo bem?"], "oi")
+        same = self.agent._items(customer, "reply", ["Oi, tudo bem?"], "oi")
+        other_text = self.agent._items(customer, "reply", ["Outra coisa"], "oi")
+        other_cause = self.agent._items({"id": "C1", "awaiting": "event-10"}, "reply",
+                                        ["Oi, tudo bem?"], "oi")
+        self.assertEqual(first[0]["key"], same[0]["key"])
+        self.assertNotEqual(first[0]["key"], other_text[0]["key"])
+        self.assertNotEqual(first[0]["key"], other_cause[0]["key"])
+
+    def test_one_failing_customer_does_not_block_the_other(self):
+        class FlakyChannel(type(self.channel)):
+            def send(self, lead, items, extra):
+                if lead["id"] != self.fail_id:
+                    return super().send(lead, items, extra)
+                raise RuntimeError("browser hiccup")
+
+        self.say("oi")
+        first_id = self.customer()["id"]
+        other_chat = "(65) 90000-0002"
+        self.say("oi", chat=other_chat)
+        self.channel.__class__ = FlakyChannel
+        self.channel.fail_id = first_id
+        self.count += 1
+        self.clock.now += timedelta(minutes=1)
+        self.agent.ingest([{"id": "eX", "chat": self.chat, "text": "quero uma coca"}])
+        self.agent.ingest([{"id": "eY", "chat": other_chat, "text": "quero uma coca"}])
+        results = self.agent.reply_pending()
+        by_customer = {item["customer"]: item for item in results}
+        self.assertEqual(by_customer[first_id]["state"], "error")
+        second_id = self.store.find_lead(other_chat)["id"]
+        self.assertEqual(by_customer[second_id]["state"], "ordering")
+        cart = {line["item_id"]: line["qty"]
+                for line in self.store.lead(second_id)["cart"]}
+        self.assertEqual(cart, {"coca-lata": 1})
+
+    def test_closed_hours_answer_with_the_closed_message(self):
+        self.clock.now = self.clock.now.replace(hour=15, minute=0)
+        self.say("oi")
+        self.assertEqual(self.customer()["state"], "closed")
+        self.assertIn("estamos fechados", "\n".join(self.sent()).casefold())
+
+    def test_attendant_request_warns_and_hands_over_politely(self):
+        self.say("quero pedir a atendente")
+        texts = "\n".join(self.sent())
+        self.assertIn("atendente humano", texts)
+        self.assertEqual(self.customer()["state"], "needs-owner")
 
 
 if __name__ == "__main__":
