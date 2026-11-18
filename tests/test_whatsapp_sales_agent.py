@@ -255,6 +255,19 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(agent.reply_pending()[0]["state"], "engaged")
         self.assertGreater(len(channel.sent), 8)
 
+    def test_archived_cycle_owner_messages_before_new_opening_do_not_pause(self):
+        from tools.ytbot.commercial.whatsapp.sales.agent import owner_reset
+        lead, agent, channel = self.opened_lead()
+        owner_reset(self.store, lead["id"])
+        self.clock.now = MONDAY + timedelta(days=1)
+        agent.prospect()
+        channel.bubbles = (self.opening_bubbles()
+                           + [{"dir": "out", "text": "É o bot"}, {"dir": "out", "text": "Só ignora"}]
+                           + self.opening_bubbles()
+                           + [{"dir": "in", "text": "Quanto custa?"}])
+        agent.ingest([self.event("Quanto custa?", event_id="e2")])
+        self.assertEqual(agent.reply_pending()[0]["state"], "engaged")
+
     def test_no_follow_up_after_the_owner_wrote(self):
         lead, agent, channel = self.opened_lead()
         channel.bubbles = self.opening_bubbles() + [{"dir": "out", "text": "Só ignora"}]

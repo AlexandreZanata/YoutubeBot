@@ -55,11 +55,15 @@ def _intents(rules: SalesRules) -> str:
 
 def system_prompt(rules: SalesRules) -> str:
     template = Template(TEMPLATE_PATH.read_text(encoding="utf-8"))
+    links = list(rules.raw["opening"]["links"])
+    for item in rules.raw["brief"].get("domain_messages", []):
+        if item.startswith("https://") and item not in links:
+            links.append(item)
     return template.safe_substitute(
         agent_name=rules.raw.get("agent_name", "Alexandre"), company=rules.company,
         max_messages=rules.limits["max_messages_per_reply"],
         max_chars=rules.limits["max_message_chars"], facts=rules.facts_text(),
-        links="\n".join(f"- {link}" for link in rules.raw["opening"]["links"]),
+        links="\n".join(f"- {link}" for link in links),
         intents=_intents(rules))
 
 

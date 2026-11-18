@@ -183,6 +183,7 @@ the model using only the facts.
 | "Quanto custa?" | `price` | reply | Site values from the facts; systems need a quote; offer a quote |
 | "Qual o prazo?" | `deadline` | reply | About 15 days for a site; systems in the quote |
 | Server, hosting, monthly fee | `hosting` | reply | Server values |
+| Domain, `.com.br`, `registro.br` | `domain` | reply | Layperson explanation (`suaempresa.com.br`), `https://registro.br/` to test names, 3 options: buy manually, buy manually + we help configure, or we buy (+R$ 40 on 1st monthly fee for 1 year) |
 | Payment, down payment, Pix, card | `payment` | reply | R$ 250 down; the rest in the quote |
 | Asks for examples | `examples` | reply | The four links, one per message |
 | "Tenho interesse", "gostei" | `interested` | reply | Offer a quote |
@@ -203,9 +204,9 @@ the model using only the facts.
 | "Vou pensar", "mais pra frente" | `later` | close | Available whenever they want |
 | "Tudo bem e você?" | `greeting_reply` | reply | Short answer and an open question |
 | "Obrigado", "ok" | `thanks` | ignore | Nothing |
-| Anything not in the facts: city, invoice, contract, domain, technology, e-mail, ambiguous text | `unknown` | handoff | Fixed: "Certo! Vou verificar direitinho e já te respondo."; owner notified |
+| Anything not in the facts: city, invoice, contract, technology, e-mail, ambiguous text | `unknown` | handoff | Fixed: "Certo! Vou verificar direitinho e já te respondo."; owner notified |
 | Message outside 07:00–21:00 | — | — | Stored; answered at the start of the next reply window |
-| The owner typed in the chat | — | — | Any message the bot did not send, after the bot's first message in that chat (older personal messages do not count), found when the chat opens to answer or to follow up; state `owner`, automation pauses |
+| The owner typed in the chat | — | — | Any message the bot did not send, after the bot's latest message in that chat (older personal or archived-cycle messages do not count), found when the chat opens to answer or to follow up; state `owner`, automation pauses |
 | A refused contact writes again | — | — | No automated answer; owner notified |
 
 ## Staff, referral, closing and end states (owner, 2026-11-17)
@@ -270,20 +271,27 @@ app, system, store or scheduling without also saying "institucional".
 ## Client folder (ficha) and quote collection
 
 After the contact accepts the quote (`quote_accept` → `qualifying`), every message is project
-material (`quote_details`, action `collect`): text, photos (logo, place, work) and voice
-messages. Each round the model extracts the brief from the client's own words
-(`sales/dossier.md`; empty fields stay empty) and asks for at most two missing items
-(`[brief] required`, then `optional` once), checked by the guard. The collection ends when the
-client says it is done ("é isso", "só isso", "pode fazer o orçamento"), when nothing required
-is missing, or after `max_collect_turns` (4). The bot then sends "Perfeito, anotei tudo! Vou
-preparar o orçamento e te mando por aqui.", the lead becomes `quote-requested` and the owner
-gets a 🔥 notification with the ficha path.
+material (`quote_details`, action `collect`): text, photos (logo, place, work), phone numbers to
+display on the site, and voice messages. Each round the model extracts the complete brief from
+the client's own words (`sales/dossier.md`; empty fields stay empty, and "I don't have one yet"
+or "you choose" is recorded instead of re-asked) and asks for at most two missing topics in plain
+layperson Portuguese (`[brief] required`: business & services, contact/hours/social media for the
+site, main brand colors & visual style, and domain choice; then `optional` once: logo, photos,
+references), checked by the guard. When the collection reaches the domain step (and `registro.br`
+was not sent yet), the bot sends `[brief] domain_messages`: a layperson explanation of what a
+domain is (`suaempresa.com.br`), `https://registro.br/` in its own bubble to test available
+names, and the three options (buy manually, buy manually and we help configure, or let us buy and
+configure with an additional R$ 40 on the first monthly fee for the 1-year domain). The
+collection ends when the client says it is done ("é isso", "só isso", "pode fazer o orçamento"),
+when nothing required is missing, or after `max_collect_turns` (6). The bot then sends "Perfeito,
+anotei tudo! Vou preparar o orçamento e te mando por aqui.", the lead becomes `quote-requested`
+and the owner gets a 🔥 notification with the ficha path.
 
 `.local/commercial/whatsapp/sales/clientes/<empresa>-<lead>/` (0700, files 0600):
 
 | File | Content |
 | --- | --- |
-| `ficha.md` | Status, contact, summary, company, the site (type, name/domain, pages, features, services, style, references), contact for the site, received materials with links, open items |
+| `ficha.md` | Status, contact, summary, company, project, visual identity (main brand colors, visual style, background, logo, photos, references), domain (`registro.br` name & purchase/config option), contact & social media for the site, received materials with links, open items |
 | `ficha.json` | The same brief as data, plus the lead and the file list |
 | `conversa.md` | Whole conversation; audio shows its transcript, media its file |
 | `midia/` | Images and voice messages the client sent (`20261117-155800-image.jpg`) |
@@ -340,7 +348,7 @@ conversations on the real model (2026-11-17).
 | Priority | When | Intents and triggers |
 | --- | --- | --- |
 | 🔥 hot — answer within minutes | Buying signal | `quote_details` (project collected, ficha ready), `ready_to_buy` ("quero fechar", "como pago a entrada"), `human_request` ("quero falar com o Alexandre/com gente"), `call_request`, `callback_later` ("me chama amanhã") |
-| ⚠️ needed — the bot lacks information or authority | The answer is not in the rules or needs a person | `negotiation` (caro, desconto, "faz por 300", parcelar), `trust_concern` ("é golpe?"), `unknown` (cidade, contrato, nota fiscal, domínio, tecnologia, e-mail), `audio`, `media`, the model's own `handoff`, `stuck` |
+| ⚠️ needed — the bot lacks information or authority | The answer is not in the rules or needs a person | `negotiation` (caro, desconto, "faz por 300", parcelar), `trust_concern` ("é golpe?"), `unknown` (cidade, contrato, nota fiscal, tecnologia, e-mail), `audio`, `media`, the model's own `handoff`, `stuck` |
 | 🛑 alert — something went wrong | Operational | send not confirmed, refused contact wrote again, outside `rules.json`, daily reply limit |
 
 `stuck` is detected by the agent, not by words: the contact asked the same thing again (the

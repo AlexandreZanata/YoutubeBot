@@ -25,15 +25,24 @@ from .notify import format_phone
 from .rules import SalesRules, normalize
 
 PROMPT_PATH = Path(__file__).with_name("dossier.md")
-EMPTY_BRIEF = {
-    "empresa": {"nome": None, "segmento": None, "cidade": None},
-    "pedido": {"tipo": None, "nome_do_site_ou_dominio": None, "objetivo": None, "paginas": [],
-               "funcionalidades": [], "servicos_ou_produtos": [], "estilo_e_cores": None,
-               "referencias": []},
+PROMPT_SCHEMA = {
+    "empresa": {"nome": None, "segmento": None, "cidade": None,
+                "sobre_e_diferenciais": None, "publico_alvo": None},
+    "pedido": {"tipo": None, "objetivo": None, "servicos_ou_produtos": [],
+               "mostrar_precos": None, "paginas": [], "funcionalidades": []},
+    "identidade_visual": {"cores_principais": None, "estilo_visual": None,
+                          "preferencia_fundo": None, "possui_logo": None,
+                          "fotos_e_videos": None, "referencias": []},
+    "dominio": {"ja_possui": None, "nome_desejado": None, "opcao_compra": None},
     "contato_no_site": {"whatsapp": None, "telefone": None, "email": None, "endereco": None,
                         "horario": None, "redes_sociais": []},
     "materiais_citados": [], "observacoes": [], "resumo": "", "faltando": [],
-    "cliente_terminou": False, "proxima_pergunta": "",
+    "pedir_dominio": False, "cliente_terminou": False, "proxima_pergunta": "",
+}
+EMPTY_BRIEF = {
+    **PROMPT_SCHEMA,
+    "pedido": {**PROMPT_SCHEMA["pedido"], "nome_do_site_ou_dominio": None,
+               "estilo_e_cores": None, "referencias": []},
 }
 
 
@@ -113,7 +122,7 @@ def extract(rules: SalesRules, lead: dict, history: list[dict], llm, now: dateti
     system = template.safe_substitute(
         company=rules.company, required="\n".join(f"- {item}" for item in rules.brief["required"]),
         optional="\n".join(f"- {item}" for item in rules.brief["optional"]),
-        schema=json.dumps(EMPTY_BRIEF, ensure_ascii=False, indent=1))
+        schema=json.dumps(PROMPT_SCHEMA, ensure_ascii=False, indent=1))
     agent_name = rules.raw.get("agent_name", "Alexandre")
     user = "\n".join([f"EMPRESA NO GOOGLE MAPS: {lead.get('name', '')} — {lead.get('category', '')}"
                       f" — {lead.get('city', '')}", "", "CONVERSA:",
@@ -134,8 +143,8 @@ def extract(rules: SalesRules, lead: dict, history: list[dict], llm, now: dateti
     except ValueError:
         return dict(EMPTY_BRIEF), "invalid brief output"
     brief = approximate_brief(_merge(EMPTY_BRIEF, data))
-    question = brief.get("proxima_pergunta") or ""
-    if question and guard.violations(rules, [question]):
+    question = (brief.get("proxima_pergunta") or "").strip()
+    if question and guard.violations(rules, guard.split_links([question])):
         brief["proxima_pergunta"] = ""
     return brief, ""
 
@@ -189,7 +198,14 @@ def _value(value) -> str:
 
 
 def render(lead: dict, brief: dict, files: list[dict], status: str, now: datetime) -> str:
-    company, order, contact = brief["empresa"], brief["pedido"], brief["contato_no_site"]
+    company = brief.get("empresa") or {}
+    order = brief.get("pedido") or {}
+    visual = brief.get("identidade_visual") or {}
+    domain = brief.get("dominio") or {}
+    contact = brief.get("contato_no_site") or {}
+    domain_name = domain.get("nome_desejado") or order.get("nome_do_site_ou_dominio")
+    colors = visual.get("cores_principais") or order.get("estilo_e_cores")
+    refs = visual.get("referencias") or order.get("referencias")
     lines = [
         f"# Ficha do cliente — {company.get('nome') or lead.get('name', '')}",
         "",
@@ -206,20 +222,35 @@ def render(lead: dict, brief: dict, files: list[dict], status: str, now: datetim
         "",
         f"- Nome: {_value(company.get('nome') or lead.get('name'))}",
         f"- Segmento: {_value(company.get('segmento') or lead.get('category'))}",
-        f"- Cidade: {_value(company.get('cidade') or lead.get('city'))}",
+        f"- Cidade / região: {_value(company.get('cidade') or lead.get('city'))}",
+        f"- Sobre / diferenciais: {_value(company.get('sobre_e_diferenciais'))}",
+        f"- Público-alvo: {_value(company.get('publico_alvo'))}",
         "",
-        "## O site",
+        "## O site / projeto",
         "",
         f"- Tipo: {_value(order.get('tipo'))}",
-        f"- Nome do site / domínio: {_value(order.get('nome_do_site_ou_dominio'))}",
         f"- Objetivo: {_value(order.get('objetivo'))}",
-        f"- Páginas: {_value(order.get('paginas'))}",
-        f"- Funcionalidades: {_value(order.get('funcionalidades'))}",
         f"- Serviços ou produtos: {_value(order.get('servicos_ou_produtos'))}",
-        f"- Estilo e cores: {_value(order.get('estilo_e_cores'))}",
-        f"- Referências: {_value(order.get('referencias'))}",
+        f"- Mostrar preços no site: {_value(order.get('mostrar_precos'))}",
+        f"- Páginas / seções: {_value(order.get('paginas'))}",
+        f"- Funcionalidades: {_value(order.get('funcionalidades'))}",
         "",
-        "## Contato que vai no site",
+        "## Identidade visual e marca",
+        "",
+        f"- Cores principais da marca: {_value(colors)}",
+        f"- Estilo visual desejado: {_value(visual.get('estilo_visual'))}",
+        f"- Preferência de fundo (claro/escuro): {_value(visual.get('preferencia_fundo'))}",
+        f"- Possui logotipo: {_value(visual.get('possui_logo'))}",
+        f"- Fotos e vídeos: {_value(visual.get('fotos_e_videos'))}",
+        f"- Referências / inspirações: {_value(refs)}",
+        "",
+        "## Domínio (endereço na internet)",
+        "",
+        f"- Já possui domínio: {_value(domain.get('ja_possui'))}",
+        f"- Nome desejado (registro.br): {_value(domain_name)}",
+        f"- Opção de compra / configuração: {_value(domain.get('opcao_compra'))}",
+        "",
+        "## Contato e redes que vão no site",
         "",
         f"- WhatsApp: {_value(contact.get('whatsapp'))}",
         f"- Telefone: {_value(contact.get('telefone'))}",

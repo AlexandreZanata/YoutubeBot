@@ -197,6 +197,52 @@ class ClientDossierTests(unittest.TestCase):
         self.assertEqual(agent.prospect()[0]["state"], "opened")
         self.assertEqual(len(channel.sent), 16)
 
+    def test_complete_ficha_collects_colors_visual_style_and_explains_domain(self):
+        channel = FakeChannel(self.store.journal_path)
+        model = FakeModel()
+        agent = self.qualifying(channel, model)
+        model.answers = [{
+            "empresa": {"nome": "Padaria Pão Quente", "segmento": "Padaria"},
+            "pedido": {"tipo": "site institucional", "servicos_ou_produtos": ["pães", "bolos"]},
+            "contato_no_site": {"endereco": "Av. Brasil, 500", "horario": "6h às 20h",
+                                "whatsapp": "(65) 90000-0011"},
+            "identidade_visual": {"cores_principais": "marrom e creme",
+                                  "estilo_visual": "aconchegante e limpo",
+                                  "preferencia_fundo": "claro"},
+            "faltando": ["domínio desejado"],
+            "pedir_dominio": True,
+            "cliente_terminou": False,
+            "proxima_pergunta": "E sobre o domínio do site, qual nome você pensou?",
+        }]
+        agent.ingest([self.event("Padaria Pão Quente, marrom e creme, visual limpo", "e3")])
+        agent.reply_pending()
+        recent_sent = [item["text"] for item in channel.sent[-4:]]
+        self.assertIn("https://registro.br/", recent_sent)
+        self.assertTrue(any("R$ 40" in msg and "1 ano" in msg for msg in recent_sent))
+        model.answers = [{
+            "empresa": {"nome": "Padaria Pão Quente", "segmento": "Padaria"},
+            "pedido": {"tipo": "site institucional", "servicos_ou_produtos": ["pães", "bolos"]},
+            "contato_no_site": {"endereco": "Av. Brasil, 500", "horario": "6h às 20h",
+                                "whatsapp": "(65) 90000-0011"},
+            "identidade_visual": {"cores_principais": "marrom e creme",
+                                  "estilo_visual": "aconchegante e limpo",
+                                  "preferencia_fundo": "claro"},
+            "dominio": {"ja_possui": "Não", "nome_desejado": "padariapaoquente.com.br",
+                        "opcao_compra": "Zaflas compra (+R$ 40 na 1ª mensalidade por 1 ano)"},
+            "resumo": "Site institucional limpo em marrom e creme; Zaflas compra o domínio.",
+            "faltando": [], "pedir_dominio": False, "cliente_terminou": False,
+            "proxima_pergunta": "",
+        }]
+        agent.ingest([self.event("Quero padariapaoquente.com.br e vocês compram", "e4")])
+        agent.reply_pending()
+        lead = self.store.lead(self.lead["id"])
+        self.assertEqual(lead["state"], "quote-requested")
+        ficha = (dossier.client_dir(self.store.root, lead) / "ficha.md").read_text("utf-8")
+        self.assertIn("marrom e creme", ficha)
+        self.assertIn("aconchegante e limpo", ficha)
+        self.assertIn("padariapaoquente.com.br", ficha)
+        self.assertIn("Zaflas compra", ficha)
+
     def test_refused_number_cannot_be_reset(self):
         self.store.add_dnc(self.lead["phone"], "refusal", MONDAY)
         with self.assertRaises(ValueError):

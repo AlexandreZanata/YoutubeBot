@@ -37,6 +37,10 @@ class SalesClassifierTests(unittest.TestCase):
             "Quanto custa?": "price",
             "qual o prazo?": "deadline",
             "aceita pix?": "payment",
+            "O que é domínio?": "domain",
+            "O domínio está incluso no valor?": "domain",
+            "Como funciona o registro.br?": "domain",
+            "quanto custa o servidor por mês?": "hosting",
             "tem mais exemplos?": "examples",
             "tenho interesse": "interested",
             "Tudo bem e você?": "greeting_reply",
@@ -91,6 +95,13 @@ class SalesClassifierTests(unittest.TestCase):
         self.check("Photo\nEstúdio de fotos, atendo segunda a sexta", "quote_details",
                    state="qualifying")
         self.check("Photo", "quote_details", state="qualifying")
+        self.check("No site coloca o WhatsApp (66) 99999-1234", "quote_details",
+                   state="qualifying")
+        self.check("Agora não", "quote_details", state="qualifying")
+        self.check("Não, obrigado, é só isso", "quote_details", state="qualifying")
+        self.check("Pode fazer!", "quote_details", state="qualifying")
+        self.check("Desisti, não tenho interesse", "refusal", state="qualifying")
+        self.check("Para de me mandar mensagem", "opt_out", state="qualifying")
         self.check("[imagem]", "media", state="engaged")
         self.check("é robô?", "bot_question", state="qualifying")
 

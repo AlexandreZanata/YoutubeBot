@@ -15,9 +15,16 @@ SAFETY = ("opt_out", "refusal", "auto_reply")
 # more about the conversation than any word they contain ("vou falar com o dono").
 FIRST = ("referral", "payment_sent", "ready_to_buy", "gatekeeper")
 # While qualifying, these still win over "the text is the project description".
-# Media and short thanks while qualifying are part of the project details (logo, photos, "ok").
+# Media, phone numbers for the site, and short "agora não / não tenho" answers to optional
+# material questions stay part of the project details (`quote_details`).
 QUALIFYING_OVERRIDES = ("human_request", "bot_question", "how_got_number", "trust_concern",
-                        "call_request", "callback_later", "sticker", "ready_to_buy")
+                        "call_request", "callback_later", "sticker", "payment_sent",
+                        "ready_to_buy")
+QUALIFYING_REFUSAL = re.compile(
+    r"nao (tenho|temos) (mais )?interesse|sem interesse|\bdesisti\b|"
+    r"nao (quero|queremos) mais\b|cancela(r)? (tudo|o orcamento|isso)"
+)
+QUALIFYING_DONE_FOR_QUOTE = re.compile(r"^pode fazer[.! ]*$")
 # Intents the local classifier decides alone for short messages (no model call).
 DECISIVE = ("opt_out", "refusal", "auto_reply", "bot_question", "sticker", "thanks",
             "audio", "media", "human_request", "trust_concern", "callback_later", "referral",
@@ -52,6 +59,18 @@ def classify(rules: SalesRules, text: str, history: list[dict] | None = None,
     plain = MEDIA_LABEL.sub("", normalize(text))
     if not plain:
         return "unknown"
+    if state == "qualifying":
+        for intent_id in ("opt_out", "auto_reply"):
+            if rules.intent(intent_id).matches(plain):
+                return intent_id
+        if QUALIFYING_REFUSAL.search(plain):
+            return "refusal"
+        if QUALIFYING_DONE_FOR_QUOTE.search(plain):
+            return "quote_details"
+        for intent_id in QUALIFYING_OVERRIDES:
+            if rules.has_intent(intent_id) and rules.intent(intent_id).matches(plain):
+                return intent_id
+        return "quote_details"
     for intent_id in SAFETY:
         if rules.intent(intent_id).matches(plain):
             return intent_id
@@ -64,11 +83,6 @@ def classify(rules: SalesRules, text: str, history: list[dict] | None = None,
             return "quote_accept"
         if _any(context["negative"], plain):
             return "refusal"
-    if state == "qualifying":
-        for intent_id in QUALIFYING_OVERRIDES:
-            if rules.has_intent(intent_id) and rules.intent(intent_id).matches(plain):
-                return intent_id
-        return "quote_details"
     for intent in rules.intents:
         if intent.id not in SAFETY + FIRST and intent.matches(plain):
             return intent.id

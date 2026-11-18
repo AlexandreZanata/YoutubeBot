@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from .. import listener, sender
-from . import central, dossier, referral
+from . import central, dossier, guard, referral
 from . import notify as owner_notify
 from .context import effective
 from .decide import Decision, _fixed, decide, stuck
@@ -283,19 +283,19 @@ class SalesAgent:
             return []
         return [self.reply(lead) for lead in self.pending()]
 
-    def _merge_chat(self, lead: dict, bubbles: list[dict]) -> str | None:
+    def _merge_chat(self, lead: dict, bubbles: list[dict]) -> list[str] | None:
         """Store what the contact sent since our last message, as read in the open chat.
 
         Texts replace the chat-list previews, images and voice messages are downloaded into
-        the client folder and audio is transcribed. Returns the text the owner typed when the
-        last bubble is an outgoing message the bot did not send.
+        the client folder and audio is transcribed. Returns the texts the owner typed when an
+        outgoing message after our latest message was not sent by the bot.
         """
         history = self.store.history(lead["id"])
         ours = [normalize(entry.get("text", "")) for entry in history if entry.get("dir") == "out"]
         last_out = max((index for index, bubble in enumerate(bubbles) if bubble["dir"] == "out"),
                        default=-1)
         typed = self._owner_typed(bubbles, ours)
-        if typed is not None:
+        if typed:
             return typed
         _, unanswered = split_pending(history)
         seen = {entry.get("message_id") for entry in history if entry.get("message_id")}
@@ -315,29 +315,31 @@ class SalesAgent:
         return None
 
     @staticmethod
-    def _owner_typed(bubbles: list[dict], ours: list[str]) -> str | None:
-        """Text the owner typed in the chat after the bot's first message, if any.
+    def _owner_typed(bubbles: list[dict], ours: list[str]) -> list[str]:
+        """Texts the owner typed in the chat after our latest message, if any.
 
-        Older personal messages (before the bot ever wrote in this chat) do not count. Without
-        a bot message in view, only a last outgoing bubble the bot did not send counts.
+        Older personal messages (before the bot's latest turn, or from an archived test cycle)
+        do not count. Without a bot message in view, only a last outgoing bubble the bot did not
+        send counts.
         """
-        anchor = next((index for index, bubble in enumerate(bubbles)
-                       if bubble["dir"] == "out" and bubble.get("text")
-                       and _ours(bubble["text"], ours)), None)
+        anchor = max((index for index, bubble in enumerate(bubbles)
+                      if bubble["dir"] == "out" and bubble.get("text")
+                      and _ours(bubble["text"], ours)), default=None)
         if anchor is None:
             last = bubbles[-1] if bubbles else None
             if last and last["dir"] == "out" and not last.get("media") and \
                     not _ours(last["text"], ours):
-                return last["text"]
-            return None
-        typed = [bubble["text"] for bubble in bubbles[anchor + 1:]
-                 if bubble["dir"] == "out" and bubble.get("text")
-                 and not _ours(bubble["text"], ours)]
-        return typed[-1] if typed else None
+                return [last["text"]]
+            return []
+        return [bubble["text"] for bubble in bubbles[anchor + 1:]
+                if bubble["dir"] == "out" and bubble.get("text")
+                and not _ours(bubble["text"], ours)]
 
-    def _owner_took_over(self, lead: dict, text: str, result: dict) -> dict:
-        self.store.remember(lead["id"], {"at": stamp(self.now()), "dir": "out", "text": text,
-                                         "kind": "owner", "state": "sent"})
+    def _owner_took_over(self, lead: dict, texts: list[str], result: dict) -> dict:
+        now = stamp(self.now())
+        for text in texts:
+            self.store.remember(lead["id"], {"at": now, "dir": "out", "text": text,
+                                             "kind": "owner", "state": "sent"})
         self.store.update_lead(lead["id"], state="owner", awaiting=None)
         self.log(f"{lead['name']}: the owner wrote in the chat; automation paused")
         return {**result, "state": "owner"}
@@ -408,11 +410,21 @@ class SalesAgent:
                                        usage=self.store.log_usage)
         turns = lead.get("collect_turns", 0) + 1
         model_ready = self.llm is not None and not error
+        question = (brief.get("proxima_pergunta") or "").strip()
+        asks_domain = (bool(brief.get("pedir_dominio"))
+                       or bool(re.search(r"\bdomini|registro\.br|\.com\.br", normalize(question)))
+                       or (bool(re.search(r"\bdomini|registro\.br", normalize(text)))
+                           and "?" in text))
+        kind = normalize(str((brief.get("pedido") or {}).get("tipo") or ""))
+        only_mobile_app = bool(re.search(r"\baplicativo|\bapp\b", kind)) and "site" not in kind
+        domain_sent = any("registro.br" in (entry.get("text") or "").lower()
+                          for entry in effective(history)
+                          if entry.get("dir") == "out" and entry.get("state", "sent") == "sent")
         done = (dossier.client_said_done(self.rules, text) or brief.get("cliente_terminou")
                 or turns >= int(self.rules.brief["max_collect_turns"])
                 or (not model_ready and turns >= 2)
-                or (model_ready and not brief.get("faltando")
-                    and not brief.get("proxima_pergunta")))
+                or (model_ready and not brief.get("faltando") and not question
+                    and not brief.get("pedir_dominio")))
         decision.brief = brief
         decision.collect_turns = turns
         if done:
@@ -420,10 +432,18 @@ class SalesAgent:
             decision.action, decision.source = "quote", "fixed"
             decision.messages = list(intent.messages)
             decision.priority, decision.owner_reason = intent.priority, intent.reason
+        elif asks_domain and not only_mobile_app and not domain_sent:
+            decision.messages = guard.split_links(list(self.rules.brief["domain_messages"]))
+            decision.source = "fixed"
+        elif asks_domain and not question:
+            decision.messages = [self.rules.brief["domain_messages"][-1]]
+            decision.source = "fixed"
+        elif question:
+            decision.messages = guard.split_links([question])
+            decision.source = "model"
         else:
-            question = brief.get("proxima_pergunta") or ""
-            decision.messages = [question or self.rules.brief["fallback_question"]]
-            decision.source = "model" if question else "fixed"
+            decision.messages = [self.rules.brief["fallback_question"]]
+            decision.source = "fixed"
         return decision
 
     def reply(self, lead: dict) -> dict:
@@ -600,7 +620,7 @@ class SalesAgent:
         interest = interest_of(text) or lead.get("interest", "")
         if decision.intent in ("system_request", "system_price", "app_at_site_price"):
             interest = "system"
-        elif decision.intent in ("site_institutional", "hosting", "close_site") and \
+        elif decision.intent in ("site_institutional", "hosting", "domain", "close_site") and \
                 interest != "system":
             interest = "site"
         if interest:

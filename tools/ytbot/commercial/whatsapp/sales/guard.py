@@ -55,7 +55,11 @@ def violations(rules: SalesRules, messages: list[str]) -> list[str]:
                  for sentence in re.findall(r"[^.!?]+[.!?]*", normalize(message))]
     systems = [re.compile(pattern) for pattern in rules.raw["guard"]["system_words"]]
     for sentence in sentences:
-        priced = money_values(sentence) or re.search(r"\d+\s*dias?", sentence)
+        money = money_values(sentence)
+        days = bool(re.search(r"\d+\s*dias?", sentence))
+        priced = bool(money or days)
+        if "dominio" in sentence and money == {"40.00"} and not days:
+            priced = False
         if (priced and "institucional" not in sentence
                 and any(pattern.search(sentence) for pattern in systems)):
             problems.append("site price next to an app or system")

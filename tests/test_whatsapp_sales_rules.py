@@ -51,9 +51,12 @@ class SalesRulesTests(unittest.TestCase):
         self.assertEqual(self.rules.greeting(MONDAY.replace(hour=19)), "Boa noite")
 
     def test_owner_prices_and_deadline_are_the_only_allowed_values(self):
-        self.assertTrue({"500.00", "250.00", "39.90", "45.00"} <= self.rules.allowed_money)
+        self.assertTrue({"500.00", "250.00", "39.90", "45.00", "40.00"} <= self.rules.allowed_money)
         self.assertIn("15", self.rules.allowed_numbers)
+        self.assertIn("1", self.rules.allowed_numbers)
         self.assertNotIn("300.00", self.rules.allowed_money)
+        self.assertIn("registro.br", self.rules.allowed_links)
+        self.assertNotIn("https://registro.br/", self.rules.opening_messages(MONDAY))
 
     def test_system_request_answer_is_the_owner_text(self):
         intent = self.rules.intent("system_request")

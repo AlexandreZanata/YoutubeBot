@@ -63,6 +63,19 @@ class SalesDecisionTests(unittest.TestCase):
                 continue  # sent verbatim, never through the model (e.g. the Pix keys)
             self.assertEqual(guard.violations(self.rules, list(intent.messages) or ["ok"]), [],
                              intent.id)
+        self.assertEqual(
+            guard.violations(self.rules, guard.split_links(list(self.rules.brief["domain_messages"]))),
+            [],
+        )
+
+    def test_domain_reply_sends_registro_br_link_and_forty_reais_option(self):
+        decision, _ = self.run_model("O que é domínio e quanto custa?", {
+            "intent": "domain",
+            "messages": list(self.rules.intent("domain").messages),
+        })
+        self.assertEqual((decision.intent, decision.source), ("domain", "model"))
+        self.assertIn("https://registro.br/", decision.messages)
+        self.assertTrue(any("R$ 40" in msg and "1 ano" in msg for msg in decision.messages))
 
     def test_site_prices_never_describe_an_app(self):
         decision, _ = self.run_model("E pra minha loja de roupas, quanto ficaria?", {

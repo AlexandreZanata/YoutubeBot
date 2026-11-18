@@ -116,6 +116,11 @@ site_institucional = [
   "Servidor do site institucional, que o mantém no ar: R$ 39,90 por mês no boleto ou Pix, ou R$ 45 por mês no cartão.",
   "Para fechar o site institucional, a entrada é paga por Pix nas chaves que o bot envia; a construção começa depois do pagamento da entrada.",
 ]
+dominio = [
+  "O domínio é o endereço do site na internet: aquele nome que a pessoa digita para entrar, como suaempresa.com.br (é como a placa e o endereço da empresa na internet). Ele é separado da criação do site.",
+  "No site oficial https://registro.br/ o cliente pode digitar ideias de nomes e testar na hora se estão livres para registro.",
+  "Para ter o domínio, o cliente pode escolher entre 3 opções: 1) comprar manualmente por conta própria no https://registro.br/; 2) comprar manualmente lá e depois nós ajudamos a configurar tudo no site; ou 3) deixar que nós compramos e configuramos o domínio para ele, com um valor adicional de R$ 40 na primeira mensalidade referente ao domínio de 1 ano.",
+]
 sistemas = [
   "Aplicativos e sistemas NÃO custam R$ 500 e não seguem nenhum valor do site institucional.",
   "Cada aplicativo ou sistema é feito sob medida: valor e prazo dependem das funções e dos requisitos do cliente (login, cadastro, agendamento, pagamentos, estoque, painel, área do cliente, integrações).",
@@ -153,18 +158,31 @@ quote_promises = [
 # client folder (ficha.md, ficha.json, conversa.md, midia/) and hands the quote to the owner.
 # It asks for at most two missing items per message and stops after `max_collect_turns`
 # answers or when the client says it is done.
-max_collect_turns = 4
+max_collect_turns = 6
 required = [
-  "nome da empresa",
-  "o que o site deve mostrar (serviços ou produtos)",
-  "contato para o site (WhatsApp, endereço ou horário de atendimento)",
+  "nome da empresa e o que ela faz",
+  "o que o site deve mostrar (principais serviços, produtos ou informações)",
+  "dados de atendimento para o site (endereço ou cidade, dias e horários de funcionamento, WhatsApp do botão e Instagram ou redes sociais)",
+  "cores principais da marca e estilo visual desejado (ex.: mais limpo e moderno, mais sério e tradicional, mais elegante ou mais colorido, fundo claro ou escuro)",
+  "domínio desejado (endereço .com.br) e como prefere fazer (comprar manualmente, comprar manualmente e ajudarmos a configurar, ou deixarmos comprar por +R$ 40 na primeira mensalidade para o domínio de 1 ano)",
 ]
-optional = ["logo", "fotos", "nome do site ou domínio desejado", "cores ou estilo"]
+optional = [
+  "logotipo da empresa (se já tiver)",
+  "fotos do local, da equipe ou dos serviços e produtos",
+  "algum site ou página que acha bonito como inspiração",
+]
+domain_messages = [
+  "Agora sobre o domínio! Explicando de um jeito bem simples: o domínio é o endereço do seu site na internet, aquele nome que a pessoa digita para entrar, como suaempresa.com.br (como se fosse o endereço da sua loja na internet). Neste site oficial você consegue digitar ideias de nomes e testar na hora se estão livres:",
+  "https://registro.br/",
+  "Para ter esse endereço, você pode escolher como prefere: 1) comprar manualmente por conta própria lá no site; 2) comprar manualmente lá e depois nós te ajudamos a configurar tudo no site; ou 3) deixar que nós compramos e cuidamos de tudo para você, com um valor adicional de R$ 40 na primeira mensalidade referente ao domínio de 1 ano.",
+  "Você já pensou em algum nome para o endereço do site e qual dessas opções prefere?",
+]
 done_patterns = [
   '\be isso\b', '\bso isso\b', 'mandei tudo', 'pode (fazer|montar|mandar) o orcamento', 'por enquanto e isso',
-  'acho que e isso', 'ta bom assim', 'era isso', '^(obrigad[oa]|valeu|ok|blz|beleza)[!. ]*$',
+  'acho que e isso', 'ta bom assim', 'era isso', '^pode fazer[.! ]*$',
+  '^(obrigad[oa]|valeu|ok|blz|beleza)[!. ]*$',
 ]
-fallback_question = "Anotei! Se tiver mais alguma informação, como nome do site, logo, fotos, endereço ou horário, pode mandar por aqui. Quando terminar, é só me falar."
+fallback_question = "Anotei! Para completar sua ficha, pode me contar também o endereço e horário de atendimento, as cores principais da sua marca, o estilo que você imagina para o site (mais moderno, tradicional, claro ou escuro) e mandar a logo ou fotos se tiver. Quando terminar, é só me avisar."
 
 [referral]
 # A staff member who does not decide is asked, politely, for the decision maker's contact.
@@ -534,11 +552,27 @@ messages = [
 ]
 
 [[intents]]
+id = "domain"
+action = "reply"
+fixed = false
+when = "Pergunta o que é domínio, endereço .com.br, registro.br, nome do site na internet, quem compra o domínio, quanto custa o domínio ou se o domínio está incluso."
+patterns = [
+  '\bdomini[oa]s?\b', 'registro\.br', '\.com\.br\b', '\bwww\.',
+  'endereco (do site|na internet|eletronico)', 'nome do site',
+]
+messages = [
+  "O domínio é o endereço do seu site na internet, aquele nome que a pessoa digita para entrar, como suaempresa.com.br (é como o endereço da sua empresa na internet). Ele é à parte da criação do site, e você pode testar ideias de nomes na hora neste site oficial:",
+  "https://registro.br/",
+  "Para ter o domínio, você tem 3 opções simples: pode comprar manualmente por conta própria lá no site, pode comprar manualmente e depois nós te ajudamos a configurar, ou pode deixar que nós compramos e cuidamos de tudo para você (aí fica um valor adicional de R$ 40 na primeira mensalidade pelo domínio de 1 ano).",
+  "Você gostaria que eu fizesse um orçamento?",
+]
+
+[[intents]]
 id = "hosting"
 action = "reply"
 fixed = false
-when = "Pergunta sobre servidor, hospedagem, mensalidade ou domínio."
-patterns = ['servidor', 'hospedagem', 'mensalidade', 'por mes', 'dominio']
+when = "Pergunta sobre servidor, hospedagem ou mensalidade."
+patterns = ['servidor', 'hospedagem', 'mensalidade', 'por mes']
 messages = [
   "O servidor é o que mantém o site no ar: fica R$ 39,90 por mês no boleto ou Pix, ou R$ 45 por mês no cartão.",
 ]
@@ -609,7 +643,8 @@ fixed = false
 when = "Aceita o orçamento ('sim', 'pode', 'quero', 'pode fazer') logo depois da pergunta sobre orçamento."
 patterns = []
 messages = [
-  "Ótimo! Para montar o orçamento, me conta: qual o nome da empresa e o que você gostaria que o site mostrasse? Se tiver logo e fotos, pode mandar por aqui também.",
+  "Ótimo! Vou te fazer umas perguntinhas rápidas e bem simples para montar a ficha completa do seu projeto (se preferir, pode responder por áudio também).",
+  "Para começar: qual é o nome da empresa e quais serviços ou produtos principais você gostaria de mostrar no site?",
 ]
 
 [[intents]]

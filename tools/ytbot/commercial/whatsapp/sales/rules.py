@@ -17,8 +17,8 @@ ACTIONS = ("reply", "qualify", "quote", "collect", "close", "block", "handoff", 
            "buy", "refer")
 REQUIRED_INTENTS = ("opt_out", "refusal", "auto_reply", "bot_question", "unknown",
                     "quote_accept", "quote_details", "system_request", "site_institutional",
-                    "human_request", "stuck", "ready_to_buy", "close_site", "payment_sent",
-                    "referral", "gatekeeper")
+                    "domain", "human_request", "stuck", "ready_to_buy", "close_site",
+                    "payment_sent", "referral", "gatekeeper")
 HANDOFF_ACTIONS = ("handoff", "quote", "collect", "won", "buy", "refer")
 PRIORITIES = ("hot", "needed", "alert")
 MONEY = re.compile(r"r\$\s*(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?")
@@ -182,6 +182,9 @@ def _texts(raw: dict) -> list[str]:
     """Every text the owner wrote: the source of the values the model may repeat."""
     texts = list(raw["opening"]["messages"]) + list(raw["opening"]["links"])
     texts += list(raw["followup"]["messages"]) + list(raw["handoff"]["messages"])
+    texts += list(raw["brief"].get("domain_messages", []))
+    if raw["brief"].get("fallback_question"):
+        texts.append(raw["brief"]["fallback_question"])
     for items in raw["facts"].values():
         texts.extend(items)
     for intent in raw["intents"]:
@@ -227,8 +230,10 @@ def build(raw: dict) -> SalesRules:
                                "daily_limit", "opening", "opening_unnamed", "contact_card"))
     if len(raw["referral"]["opening"]) != len(raw["opening"]["delays"]):
         raise RulesError("referral.opening needs one message per opening delay")
-    _require(raw, "brief", ("max_collect_turns", "required", "optional", "done_patterns",
-                            "fallback_question"))
+    _require(raw, "brief", ("max_collect_turns", "required", "optional", "domain_messages",
+                            "done_patterns", "fallback_question"))
+    if not raw["brief"]["domain_messages"]:
+        raise RulesError("brief.domain_messages must not be empty")
     for pattern in raw["brief"]["done_patterns"]:
         try:
             re.compile(pattern)
@@ -294,11 +299,13 @@ def build(raw: dict) -> SalesRules:
     texts = _texts(raw)
     money = set()
     numbers = set()
+    links = {link_key(link) for link in raw["opening"]["links"]}
     for text in texts:
         money |= money_values(text)
         numbers |= set(NUMBER.findall(normalize(text)))
-    links = frozenset(link_key(link) for link in raw["opening"]["links"])
-    return SalesRules(raw, tuple(intents), frozenset(money), frozenset(numbers), links)
+        for link in links_in(text):
+            links.add(link_key(link))
+    return SalesRules(raw, tuple(intents), frozenset(money), frozenset(numbers), frozenset(links))
 
 
 def load(path: Path | None = None) -> SalesRules:
