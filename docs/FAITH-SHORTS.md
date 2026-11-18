@@ -31,6 +31,7 @@ Shorts use hours different from the channel's long videos, two per day:
 | the word of reflection | 05:00 and 17:00 | 08:00 and 20:00 |
 | Whispers From Heaven | 00:00 and 12:00 | 09:00 and 21:00 |
 | zanata | 16:00 | 09:00 |
+| Zaflas (farm) | 12:00 | 09:00 and 18:00 |
 
 America/Cuiaba. One short is never scheduled within 60 minutes of now.
 
@@ -51,6 +52,8 @@ The queue lives in `tools/ytbot/faith_shorts.py` (`CHANNELS`): five premises per
 - reflection: Hannah, Elijah in the cave, Peter's nets, the widow's oil, Joseph in prison.
 - Whispers: the long night, the shepherd and the ninety-nine, the whispered prayer, the peace
   in the storm, the weary gathered one by one.
+- Zaflas (farm): palhada and soil cover, lime reaction, grain moisture and price, calf
+  weaning, spray efficiency; Portuguese script and photoreal farm background.
 - zanata: Goffman and performance, Karen Horney's ideal self, Girard and the scapegoat,
   Arendt and the banality of evil, Becker and the denial of death.
 

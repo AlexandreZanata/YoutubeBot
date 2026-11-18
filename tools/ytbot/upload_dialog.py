@@ -103,7 +103,7 @@ def schedule_in_dialog(page, slot) -> None:
     if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
         raise RuntimeError("the schedule dialog did not open")
     log("waiting for checks")
-    deadline = time.time() + 300
+    deadline = time.time() + 900
     while time.time() < deadline:
         body = page.locator("body").inner_text()
         state = page.evaluate(
