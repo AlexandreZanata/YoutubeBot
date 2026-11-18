@@ -85,6 +85,15 @@ class SalesRulesTests(unittest.TestCase):
         self.assertIn("aplicativos e sistemas são feitos sob medida", intent.messages[1])
         self.assertEqual(intent.messages[-1], "Você gostaria que eu fizesse um orçamento?")
 
+    def test_custom_platform_intent_passes_guard_and_starts_qualifying(self):
+        from tools.ytbot.commercial.whatsapp.sales import guard
+        intent = self.rules.intent("custom_platform")
+        self.assertEqual((intent.action, intent.fixed), ("qualify", True))
+        self.assertEqual(guard.violations(self.rules, list(intent.messages)), [])
+        self.assertEqual(guard.violations(self.rules, self.rules.brief_system["start_custom"]), [])
+        self.assertEqual(
+            guard.violations(self.rules, [self.rules.brief_system["first_question_custom"]]), [])
+
     def test_site_prices_are_stated_as_site_only(self):
         facts = " ".join(self.rules.raw["facts"]["sistemas"])
         self.assertIn("NÃO custam R$ 500", facts)

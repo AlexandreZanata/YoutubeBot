@@ -52,8 +52,15 @@ CORRECTION = re.compile(r"\b(mas|porem|faltou|falta|so que|corrig\w*|acrescent\w
                         r"alem disso|errad\w*|nao)\b")
 CONFIRMED = re.compile(r"\b(certo|correto|exato|isso mesmo|perfeito|esta certo|ta certo|"
                        r"tudo certo|pode seguir|isso ai)\b")
-SYSTEM_WORDS = re.compile(r"sistema|aplicativo|\bapps?\b|loja (virtual|online)|e-?commerce|"
-                          r"agendamento|cadastro|\blogin\b|painel|delivery")
+SYSTEM_WORDS = re.compile(
+    r"sistema|aplicativo|\bapps?\b|loja (virtual|online)|e-?commerce|"
+    r"agendamento|cadastro|\blogin\b|painel|delivery|"
+    r"cassino|tigrinho|jogo do bicho|jogo de (aposta|azar|cassino)|"
+    r"\bbets?\b|aposta|roleta|caca[- ]?niquel|\bslots?\b|\bpoker\b|\bbingo\b|"
+    r"\brifas?\b|sorteio|\bbolao\b|loteria|plataforma|marketplace|rede social|"
+    r"\bleilao\b|\bsaas\b|streaming|area de membros|clube de assinatura|"
+    r"portal (de|do|da|para|com)|cripto|exchange|\berp\b|\bcrm\b|\bpdv\b"
+)
 SITE_WORDS = re.compile(r"\bsite\b|institucional|pagina")
 
 
@@ -502,12 +509,14 @@ class SalesAgent:
             decision.source = "model"
             return decision
         question = (brief.get("proxima_pergunta") or "").strip()
-        done = ((not starting and (dossier.client_said_done(self.rules, text)
-                                   or brief.get("cliente_terminou")))
+        done = (not starting and (
+                    dossier.client_said_done(self.rules, text)
+                    or brief.get("cliente_terminou")
+                    or (model_ready and not brief.get("faltando") and not question))
                 or turns >= int(texts["max_collect_turns"])
-                or (not model_ready and turns >= 2)
-                or (model_ready and not brief.get("faltando") and not question))
-        intro = list(texts["start_buy" if decision.start == "buy" else "start"]) if starting else []
+                or (not model_ready and turns >= 2))
+        start_key = {"buy": "start_buy", "custom": "start_custom"}.get(decision.start, "start")
+        intro = list(texts[start_key]) if starting else []
         if done:
             summary = self._summary(brief) if model_ready else ""
             if not summary:
@@ -520,7 +529,8 @@ class SalesAgent:
         if question:
             decision.messages, decision.source = intro + [question], "model"
         else:
-            fallback = texts["first_question"] if starting else texts["fallback_question"]
+            first_key = "first_question_custom" if decision.start == "custom" else "first_question"
+            fallback = texts[first_key] if starting else texts["fallback_question"]
             decision.messages, decision.source = intro + [fallback], "fixed"
         return decision
 
@@ -664,6 +674,9 @@ class SalesAgent:
                                 updates={"buy_intent": True})
         elif decision.intent == "ready_to_buy" and interest == "system":
             decision = self._start_interview(decision, "buy")
+        elif decision.intent == "custom_platform" and lead["state"] == "engaged":
+            # Unusual or custom platform request: start the requirements interview directly.
+            decision = self._start_interview(decision, "custom")
         elif interest == "system" and lead["state"] == "engaged" and (
                 decision.intent in ("quote_accept", "unknown")
                 or (decision.intent in SYSTEM_OFFERS
@@ -806,7 +819,8 @@ class SalesAgent:
         if decision.action in OWNER_ACTIONS:
             changes["handoff_reason"] = decision.intent
         interest = interest_of(text) or lead.get("interest", "")
-        if decision.intent in ("system_request", "system_price", "app_at_site_price"):
+        if decision.intent in ("system_request", "system_price", "app_at_site_price",
+                               "custom_platform"):
             interest = "system"
         elif decision.intent in ("site_institutional", "hosting", "domain", "close_site") and \
                 interest != "system":

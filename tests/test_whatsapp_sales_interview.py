@@ -177,6 +177,60 @@ class InterviewTests(unittest.TestCase):
         [ficha] = central.snapshot(self.store, self.clock())["fichas"]
         self.assertEqual((ficha["lead"], ficha["label"]), (self.lead["id"], "barbearia-1"))
 
+    def test_unusual_platform_request_starts_interview_directly_with_questions(self):
+        question = brief(
+            empresa={"nome": None, "segmento": "Entretenimento", "cidade": None,
+                     "sobre_e_diferenciais": None},
+            projeto={"tipo": "plataforma web", "objetivo": "site de cassino",
+                     "como_faz_hoje": "Projeto novo", "funcionalidades": []},
+            duvidas_do_cliente=["Fazem site de cassino?"],
+            faltando=["como o sistema deve funcionar", "quais jogos e pagamentos precisa ter"],
+            proxima_pergunta=("Entendi que você pensa em um site de cassino. Como exatamente "
+                              "você imagina esse sistema funcionando na prática e quais jogos "
+                              "ou funções principais ele precisa ter?"),
+        )
+        self.say("Fazem site de cassino?",
+                 {"intent": "unknown", "messages": [], "handoff": True}, question)
+        lead = self.lead_now()
+        self.assertEqual((lead["state"], lead["brief_kind"], lead["interest"]),
+                         ("qualifying", "system", "system"))
+        self.assertEqual(self.notes, [], "unusual request must interview before calling the owner")
+        self.assertEqual(self.sent()[-2:], self.rules.brief_system["start_custom"]
+                         + [question["proxima_pergunta"]])
+
+        done = brief(
+            faltando=[], proxima_pergunta="",
+            confirmacao=("Você precisa de uma plataforma web com jogos estilo tigrinho e roleta, "
+                         "cadastro de jogadores, depósitos por Pix e painel para acompanhar tudo."),
+        )
+        self.say("Quero jogos tipo tigrinho e roleta, cadastro de usuários, Pix e painel admin",
+                 done)
+        self.assertEqual(self.lead_now()["state"], "qualifying")
+        self.say("Isso mesmo, está certo", done)
+        self.assertEqual(self.lead_now()["state"], "quote-requested")
+        self.assertEqual(self.notes[-1]["priority"], "hot")
+
+    def test_unusual_platform_without_model_uses_custom_fallback_questions(self):
+        offline = SalesAgent(self.rules, self.store, self.channel, None, live=True,
+                             clock=self.clock, sleep=lambda seconds: None,
+                             notify=self.notes.append, log=lambda message: None)
+        self.count += 1
+        offline.ingest([{"id": f"e{self.count}", "chat": "+55 65 90000-0001",
+                         "text": "Fazem site de tigrinho?"}])
+        offline.reply_pending()
+        lead = self.lead_now()
+        self.assertEqual((lead["state"], lead["brief_kind"], lead["interest"]),
+                         ("qualifying", "system", "system"))
+        self.assertEqual(self.sent()[-2:], self.rules.brief_system["start_custom"]
+                         + [self.rules.brief_system["first_question_custom"]])
+
+    def test_closing_a_custom_platform_never_sends_site_pix_keys(self):
+        self.say("Quero fechar um site de cassino",
+                 {"intent": "ready_to_buy", "messages": []}, brief())
+        self.assertEqual(self.lead_now()["state"], "qualifying")
+        self.assertTrue(self.lead_now()["buy_intent"])
+        self.assertNotIn("financeiro@zaflas.com.br", self.sent())
+
 
 if __name__ == "__main__":
     unittest.main()
