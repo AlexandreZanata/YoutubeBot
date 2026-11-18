@@ -87,6 +87,10 @@ class MapsScoreTests(unittest.TestCase):
                          "fora da cidade: Sorriso")
         self.assertFalse(score.city_matches(value, "Sinop"))
         self.assertTrue(score.city_matches(value, "Sorriso"))
+        stale = listing(city="Sinop", target_city="Sinop",
+                        address="R. Central, 10 - Centro, Sorriso - MT")
+        self.assertEqual(score.exclusion_reason(stale, self.rules, set(), set()),
+                         "fora da cidade: Sorriso")
 
     def test_already_a_lead_and_do_not_contact(self):
         value = listing()

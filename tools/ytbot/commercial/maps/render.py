@@ -10,6 +10,7 @@ from pathlib import Path
 
 from ...accounts_store import private_directory
 from ..whatsapp.sales.store import CSV_FIELDS
+from .extract import city_from_address
 from . import score
 from .record import Run
 from .rules import MapsRules
@@ -125,7 +126,8 @@ def export_run(run: Run, rules: MapsRules, now: datetime, lead_keys: set[str],
     exported = set()
     pending = 0
     for listing in listings:
-        listing["city"] = listing.get("city") or run.city
+        listing["city"] = (city_from_address(listing.get("address", ""))
+                            or listing.get("city") or run.city)
         listing["target_city"] = run.city
         if not score.city_matches(listing, run.city):
             excluded.append({"name": listing.get("name", ""),

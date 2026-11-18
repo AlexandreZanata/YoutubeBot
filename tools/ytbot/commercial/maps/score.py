@@ -51,17 +51,18 @@ def _excluded_terms(text: str, terms: tuple[str, ...]) -> str:
 
 def city_matches(listing: dict, target: str) -> bool:
     """The listing belongs to the researched city, not a nearby one Google also returned."""
-    actual = listing.get("city") or city_from_address(listing.get("address", ""))
+    address = listing.get("address", "")
+    actual = city_from_address(address) or listing.get("city") or ""
     if actual:
         return normalize(actual) == normalize(target)
-    return normalize(target) in normalize(listing.get("address", ""))
+    return normalize(target) in normalize(address)
 
 
 def exclusion_reason(listing: dict, rules: MapsRules, lead_keys: set[str],
                      dnc_keys: set[str]) -> str | None:
     """First hard filter that drops the business, in the contract's order."""
     target = listing.get("target_city")
-    actual = listing.get("city") or city_from_address(listing.get("address", ""))
+    actual = city_from_address(listing.get("address", "")) or listing.get("city") or ""
     if target and not city_matches(listing, target):
         return f"fora da cidade: {actual or 'não identificada'}"
 
