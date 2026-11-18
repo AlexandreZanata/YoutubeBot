@@ -135,6 +135,11 @@ def export_run(run: Run, rules: MapsRules, now: datetime, lead_keys: set[str],
                              "reason": f"fora da cidade: {listing['city']}",
                              "identity": listing["identity"]})
             continue
+        reason = score.exclusion_reason(listing, rules, lead_keys, dnc_keys)
+        if reason:
+            excluded.append({"name": listing.get("name", ""), "reason": reason,
+                             "identity": listing["identity"]})
+            continue
         check = checks.get(listing["identity"])
         if check is None:
             pending += 1
