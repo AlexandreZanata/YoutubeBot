@@ -61,7 +61,8 @@ Barbearia Exemplo,(65) 90000-0001,Cuiabá,Barbearia,https://maps.app.goo.gl/...,
 `import` accepts `name` and `phone` (required) plus the optional columns. It rejects a row whose
 phone is not a valid Brazilian number, whose `website` is filled (the opening says they have no
 site) or whose `maps_url` is not a Google Maps link; it skips duplicates and numbers on the
-do-not-contact list. Importing is the owner's approval of the list. Keep the CSV outside the
+do-not-contact list. Importing is the owner's approval of the list. How the list is found and
+filtered on Google Maps is in [Maps research](COMMERCIAL-MAPS-RESEARCH.md). Keep the CSV outside the
 repository.
 
 ## Lead names and phone contacts

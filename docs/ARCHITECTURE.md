@@ -27,7 +27,8 @@ algorithms are preserved; new account/adapter modules compose them.
   SQLite reference index (`reference.py`) for sub-millisecond VPS catalog lookups and price-change
   comparisons. See [commercial](COMMERCIAL.md). `commercial/whatsapp/` holds the WhatsApp Web
   sender and listener; `commercial/whatsapp/sales/` is the Zaflas sales agent on top of them.
-  See [WhatsApp sales](COMMERCIAL-WHATSAPP-SALES.md).
+  See [WhatsApp sales](COMMERCIAL-WHATSAPP-SALES.md). The planned `commercial/maps/` research
+  module (contract only) feeds that agent with reviewed leads: [Maps research](COMMERCIAL-MAPS-RESEARCH.md).
 - `tools/ytbot/social/`: private per-network promotion profiles, visible login and hidden
   Xvfb operation after login; X starts the module. See [social](SOCIAL.md) and the
   [promotion focus](PROMOTION.md). The agent runbook for research, audit and the 30-day

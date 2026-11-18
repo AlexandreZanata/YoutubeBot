@@ -149,6 +149,12 @@ a payment message and a refusal after interest go to the owner. A staff member i
 decision maker's contact; a number they send becomes a referral lead with its own opening and
 its own daily limit. See [sales agent](docs/COMMERCIAL-WHATSAPP-SALES.md).
 
+Google Maps lead research is a contract without code yet: one tab, a person's pace, the owner's
+manual Google login, a stop at any challenge, read-only on Google, a confirmation search before
+a business counts as having no site, and an owner-reviewed CSV as the only output. Its filters,
+score and the "Ajuste do Google Maps" access steps are in
+[Maps research](docs/COMMERCIAL-MAPS-RESEARCH.md).
+
 When delivering captured products from this workstation to the remote Procurali VPS (database,
 site, Telegram offers group queue, and WhatsApp Web assisted drafts), never copy VPS origin IPs,
 SSH private keys or device tokens into this repository and never post to Telegram/WhatsApp directly

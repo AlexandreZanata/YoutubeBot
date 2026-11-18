@@ -7,7 +7,9 @@ Mercado Livre is the first network.
 
 The full structure, state machine, failure matrix and troubleshooting live in
 [WHATSAPP](COMMERCIAL-WHATSAPP.md); the Zaflas sales agent (rules file, conversation states,
-memory, model and safeguards) lives in [WHATSAPP-SALES](COMMERCIAL-WHATSAPP-SALES.md). The
+memory, model and safeguards) lives in [WHATSAPP-SALES](COMMERCIAL-WHATSAPP-SALES.md); the
+Google Maps lead research that feeds it (filters, score, "Ajuste do Google Maps") lives in
+[MAPS-RESEARCH](COMMERCIAL-MAPS-RESEARCH.md). The
 commercial module also carries an owner-operated WhatsApp Web session. It follows the
 Telegram commercial rules: one chat at a time, a minimum interval between messages, a live
 gate, an idempotency journal and no bulk automation.
