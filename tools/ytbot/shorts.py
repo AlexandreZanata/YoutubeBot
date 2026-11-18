@@ -26,6 +26,12 @@ SHORT_TOPICS = (
     "Pasto bonito não significa pasto produtivo",
     "Plantas daninhas resistentes: como identificar?",
     "Quem é dono dos dados das máquinas agrícolas?",
+    "Por que a análise de solo não termina na coleta?",
+    "O que o mapa de produtividade revela depois da colheita?",
+    "Como escolher entre plantio direto e cultivo mínimo?",
+    "Quando a irrigação compensa o investimento?",
+    "Por que o milho safrinha exige planejamento antecipado?",
+    "Como o clima afeta a janela de aplicação de defensivos?",
 )
 
 
@@ -33,8 +39,22 @@ def log(message: str) -> None:
     print(f"[shorts] {message}", flush=True)
 
 
+def occupied_slots(root: Path) -> set[tuple[int, int, int, int]]:
+    slots = set()
+    for upload in root.glob("*/upload.json"):
+        try:
+            data = json.loads(upload.read_text(encoding="utf-8"))
+            slot = datetime.strptime(data.get("slot", ""), "%Y-%m-%d %H:%M")
+        except (OSError, ValueError):
+            continue
+        if data.get("scheduled"):
+            slots.add((slot.year, slot.month, slot.day, slot.hour))
+    return slots
+
+
 def short_slots(count: int, per_day: int = 2, start: date | None = None,
-                skip: int = 0) -> list[datetime]:
+                skip: int = 0,
+                occupied: set[tuple[int, int, int, int]] | None = None) -> list[datetime]:
     if per_day < 1 or per_day > 2:
         raise ValueError("per_day must be 1 or 2")
     hours = (9, 18)[:per_day]
@@ -42,7 +62,8 @@ def short_slots(count: int, per_day: int = 2, start: date | None = None,
     slots = []
     for index in range(count + skip):
         slot = datetime.combine(day + timedelta(days=index // per_day), time(hour=hours[index % per_day]))
-        while slot <= datetime.now() + timedelta(minutes=60):
+        while slot <= datetime.now() + timedelta(minutes=60) or (
+                occupied and (slot.year, slot.month, slot.day, slot.hour) in occupied):
             slot += timedelta(days=1)
         slots.append(slot)
     return slots[skip:]
@@ -121,7 +142,8 @@ def run_shorts(channel_slug: str, count: int = 12, per_day: int = 2,
     store.activate("legacy")
     runtime.start_hidden_chrome()
     topics = list(SHORT_TOPICS[start_index:start_index + count])
-    slots = short_slots(len(topics), per_day, start, skip_slots)
+    slots = short_slots(len(topics), per_day, start, skip_slots,
+                        occupied_slots(config.DATA_DIR / "shorts"))
     failures = []
     with sync_playwright() as playwright:
         gen_browser, gen = runtime.connect_hidden(playwright)

@@ -24,6 +24,11 @@ CHANNELS = {
             "Peter's Nets: When Obedience Comes Before the Catch",
             "The Widow's Oil: When Little Is All You Have",
             "Joseph in Prison: When the Promise Feels Forgotten",
+            "The Prodigal Son: When You Come Home With Nothing",
+            "The Woman at the Well: When Someone Sees You Whole",
+            "Paul's Thorn: When the Answer Is No",
+            "The Friends Who Dug Through the Roof",
+            "Stephen at the Stones: When Forgiveness Costs Everything",
         ),
     },
     "zanata": {
@@ -37,6 +42,11 @@ CHANNELS = {
             "Why a Scapegoat Unites a Crowd: René Girard",
             "The Banality of Evil: Arendt on Ordinary People",
             "The Denial of Death: Becker on Why We Build",
+            "Why Good People Obey: Milgram and Authority",
+            "The Elephant and the Rider: Haidt on Moral Intuition",
+            "Flow: Csikszentmihalyi on the State of Absorption",
+            "Man's Search for Meaning: Frankl in the Camp",
+            "The Social Animal: How Groups Shape the Self",
         ),
     },
     "whispers-from-heaven": {
@@ -50,6 +60,11 @@ CHANNELS = {
             "A Prayer You Whisper Is Still Heard",
             "The Peace That Does Not Depend on the Storm",
             "He Gathers the Weary, One by One",
+            "When You Feel Forgotten, He Has Not Left",
+            "The God Who Runs to Meet You",
+            "A Lamp for the Darkest Room",
+            "The Hands That Hold Tomorrow",
+            "Rest for the Ones Who Carry Everyone",
         ),
     },
 }
@@ -59,15 +74,30 @@ def log(message: str) -> None:
     print(f"[faith-shorts] {message}", flush=True)
 
 
-def short_slots(count: int, hours: tuple[int, int], start: date,
-                skip: int = 0) -> list[datetime]:
+def occupied_slots(root: Path) -> set[tuple[int, int, int, int]]:
+    slots = set()
+    for upload in root.glob("*/upload.json"):
+        try:
+            data = json.loads(upload.read_text(encoding="utf-8"))
+            slot = datetime.strptime(data.get("slot", ""), "%Y-%m-%d %H:%M")
+        except (OSError, ValueError):
+            continue
+        if data.get("scheduled"):
+            slots.add((slot.year, slot.month, slot.day, slot.hour))
+    return slots
+
+
+def short_slots(count: int, hours: tuple[int, ...], start: date,
+                skip: int = 0,
+                occupied: set[tuple[int, int, int, int]] | None = None) -> list[datetime]:
     slots = []
     day = start
     index = 0
     while len(slots) < count + skip:
         for hour in hours:
             slot = datetime.combine(day, dtime(hour=hour))
-            if slot > datetime.now() + timedelta(minutes=60):
+            if slot > datetime.now() + timedelta(minutes=60) and not (
+                    occupied and (slot.year, slot.month, slot.day, slot.hour) in occupied):
                 slots.append(slot)
                 if len(slots) == count + skip:
                     return slots[skip:]
@@ -143,7 +173,8 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
     runtime.start_hidden_chrome()
     topics = list(spec["topics"])[start_index:start_index + count]
     slots = short_slots(len(topics), spec["hours"],
-                        start or (date.today() + timedelta(days=1)), skip_slots)
+                        start or (date.today() + timedelta(days=1)), skip_slots,
+                        occupied_slots(config.DATA_DIR / "shorts"))
     failures = []
     with sync_playwright() as playwright:
         gen_browser, gen = runtime.connect_hidden(playwright)
