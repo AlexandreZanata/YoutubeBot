@@ -216,29 +216,29 @@ def research(page, run: Run, rules: MapsRules, searches, limit: int, now: dateti
     for search in searches:
         if remaining <= 0:
             break
-        row = done_rows.get(normalize(search.query))
+        query = f"{search.query} em {run.city} - {run.state}"
+        row = done_rows.get(normalize(query))
         if row is None:
             if previous_search:
                 _pause(sleep, rng, rules.pacing["between_searches_min_seconds"],
                        rules.pacing["between_searches_max_seconds"])
             previous_search = True
-            run.append_query({"query": search.query, "group": search.group,
-                              "status": "started",
+            run.append_query({"query": query, "group": search.group, "status": "started",
                               "at": now.isoformat(timespec="seconds")})
-            _search(page, rules, search.query, rng)
+            _search(page, rules, query, rng)
             _wait_for(page, rules, "results",
                       lambda html, rules=rules: _results_ready(html, rules),
                       float(rules.pacing["page_timeout_seconds"]))
             links = _collect(page, rules, rng, sleep)
-            run.append_query({"query": search.query, "group": search.group, "status": "done",
+            run.append_query({"query": query, "group": search.group, "status": "done",
                               "found": len(links), "links": links,
                               "at": datetime.now(ZoneInfo(rules.timezone)).isoformat(
                                   timespec="seconds")})
-            log(f"[maps] {search.query}: {len(links)} empresas na lista")
+            log(f"[maps] {query}: {len(links)} empresas na lista")
         else:
             links = list(row.get("links") or [])
-            log(f"[maps] {search.query}: retomando {len(links)} empresas da lista")
-        count, remaining = _open_links(page, run, rules, search.query, search.group, links,
+            log(f"[maps] {query}: retomando {len(links)} empresas da lista")
+        count, remaining = _open_links(page, run, rules, query, search.group, links,
                                        remaining, attempted, log, sleep, rng)
         opened += count
     return {"opened": opened, "remaining": remaining}

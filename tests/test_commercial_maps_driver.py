@@ -113,8 +113,10 @@ class MapsDriverTests(unittest.TestCase):
                                  log=lambda _message: None, sleep=lambda _seconds: None,
                                  rng=random.Random(7))
         self.assertEqual(result["opened"], 1)
+        self.assertEqual(page.typed[0][0], "dentista em Lucas do Rio Verde - MT")
         self.assertEqual(len(self.run.read_listings()), 1)
         done = [entry for entry in self.run.queries() if entry["status"] == "done"]
+        self.assertEqual(done[0]["query"], "dentista em Lucas do Rio Verde - MT")
         self.assertEqual(len(done[0]["links"]), 3)
         first_opened = list(page.opened)
 
