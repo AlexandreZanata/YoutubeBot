@@ -116,7 +116,7 @@ python3 -m tools.ytbot commercial sales central  --network whatsapp [--json]
 python3 -m tools.ytbot commercial sales simulate --network whatsapp --text "Quanto custa?"
 python3 -m tools.ytbot commercial sales rehearse --network whatsapp [--only negoci] [--no-llm]
 python3 -m tools.ytbot commercial sales run      --network whatsapp --once
-python3 -m tools.ytbot commercial sales run      --network whatsapp --live --interval 30
+python3 -m tools.ytbot commercial sales run      --network whatsapp --live --interval 10
 python3 -m tools.ytbot commercial sales run      --network whatsapp --live --prospect --limit 3
 python3 -m tools.ytbot commercial sales handoffs --network whatsapp
 python3 -m tools.ytbot commercial sales history  --network whatsapp --lead L1a2b3c4d5e
@@ -137,8 +137,9 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   CDP connection closes outside a send (the computer slept, Chrome restarted; seen on
   2026-11-18 as `TargetClosedError` after a night), the run reconnects to the hidden browser
   and continues, up to 3 times in a row; a failed send still stops the run. A `SIGTERM`
-  (stopping the background run) ends it like Ctrl+C: its WhatsApp tab is closed and the run
-  lock released, so restarts no longer leave extra tabs in the hidden browser.
+  asks the run to stop: it finishes the current step (never in the middle of a send), closes
+  its WhatsApp tab and releases the run lock, so restarts no longer leave extra tabs in the
+  hidden browser. A second `SIGTERM` stops at once; `SIGKILL` still leaves the tab open.
 - `resolve` hands a conversation back to the agent after the owner handled it; `block` adds the
   number to the do-not-contact list.
 
@@ -415,10 +416,13 @@ contact sees the messages arrive at these gaps. Owner values (2026-11-17):
 | Each link | 4 s (at least 3 s after typing it, for the preview card) |
 | Reply message | its length at 20 characters per second, ±15 %, clamped to 2–10 s |
 | First message of a reply | plus reading time, 40 characters per second, 1–4 s |
-| Between two chats | 10–30 s |
+| Between two chats | 10–30 s (none when the next reply stays in the same chat) |
 
-The send is confirmed as soon as the new bubble appears (polled for up to 8 s). One
-conversation at a time; typing stays the sender's chunked typing, never a paste. All values
+The send is confirmed as soon as the new bubble appears (polled for up to 8 s). The chat list
+is scanned every 10 s (`--interval`). A chat that is already open for the same lead is reused:
+no page reload and no between-chats pause, so a reply goes out about 10 to 20 s after the
+message instead of 40 to 70 s (measured 2026-11-18: 43 s from the scan to the delivered reply,
+30 s of it in the pause and the reload). One conversation at a time; typing stays the sender's chunked typing, never a paste. All values
 live in `[opening]` and `[pacing]` of the rules file.
 
 ## Safeguards

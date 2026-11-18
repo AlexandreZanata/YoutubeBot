@@ -107,6 +107,26 @@ class SalesAgentTests(unittest.TestCase):
         self.assertIsNone(self.store.lead(second["id"]).get("chat"))
         self.assertEqual(self.store.find_lead("Maria Padaria")["id"], first["id"])
 
+    def test_a_reply_in_the_chat_just_opened_has_no_between_chats_pause(self):
+        # Measured 2026-11-18: the 10-30 s pause in the same chat delayed the reply.
+        lead, agent, channel = self.opened_lead()
+        channel.bubbles = self.opening_bubbles() + [{"dir": "in", "text": "Quanto custa?"}]
+        self.pauses.clear()
+        agent.ingest([self.event("Quanto custa?")])
+        replies = agent.reply_pending()
+        self.assertEqual(replies[0]["lead"], lead["id"])
+        self.assertGreater(len(channel.sent), 8)
+        self.assertEqual(self.pauses, [])
+
+    def test_switching_to_another_chat_still_pauses(self):
+        first, second = self.leads(2)
+        agent, _ = self.agent()
+        agent.open_lead(self.store.lead(first["id"]))
+        self.pauses.clear()
+        agent.open_lead(self.store.lead(second["id"]))
+        self.assertEqual(len(self.pauses), 1)
+        self.assertGreaterEqual(self.pauses[0], 10)
+
     def test_daily_limit_of_ten_first_contacts(self):
         self.leads(12)
         agent, channel = self.agent()
@@ -474,3 +494,73 @@ class SalesAgentTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Locator:
+    def __init__(self, page, selector):
+        self.page, self.selector = page, selector
+
+    @property
+    def first(self):
+        return self
+
+    def count(self):
+        return 1 if self.page.ready else 0
+
+    def inner_text(self, timeout=None):
+        return self.page.title
+
+
+class ChatPage:
+    """Only what `WhatsAppChannel.open` touches: navigation, composer and header title."""
+
+    def __init__(self, title):
+        self.title = title
+        self.ready = False
+        self.visits = []
+
+    def add_init_script(self, script):
+        pass
+
+    def goto(self, url, timeout=None):
+        self.visits.append(url)
+        self.ready = True
+
+    def locator(self, selector):
+        return Locator(self, selector)
+
+    def wait_for_timeout(self, ms):
+        pass
+
+
+class WhatsAppChannelTests(unittest.TestCase):
+    def channel(self, page):
+        from tools.ytbot.commercial.whatsapp.sales.agent import WhatsAppChannel
+        from tools.ytbot.commercial.whatsapp.sales.pacing import SalesPacing
+        channel = WhatsAppChannel(page, SalesPacing.from_rules(load()), Path("journal.jsonl"))
+        channel.typing = sender.Pacing(open_chat_min=0.0, open_chat_max=0.0)
+        return channel
+
+    def test_the_chat_already_on_screen_is_reused_without_reloading(self):
+        page = ChatPage("Maria Padaria")
+        channel = self.channel(page)
+        lead = {"id": "L1", "name": "Empresa", "phone": "5565900000001", "chat": "Maria Padaria"}
+        self.assertEqual(channel.open(lead), "ready")
+        self.assertEqual(channel.open(lead), "ready")
+        self.assertEqual(len(page.visits), 1)
+
+    def test_another_lead_or_another_chat_on_screen_reloads(self):
+        page = ChatPage("Maria Padaria")
+        channel = self.channel(page)
+        first = {"id": "L1", "name": "Empresa", "phone": "5565900000001", "chat": "Maria Padaria"}
+        second = {"id": "L2", "name": "Outra", "phone": "5565900000002", "chat": "Outra"}
+        channel.open(first)
+        channel.open(second)
+        self.assertEqual(len(page.visits), 2)
+        page.title = "Outra conversa"
+        channel.open(second)
+        self.assertEqual(len(page.visits), 3)
+        unbound = {**first, "chat": None}
+        channel.open(unbound)
+        channel.open(unbound)
+        self.assertEqual(len(page.visits), 5)

@@ -79,17 +79,32 @@ class WhatsAppChannel:
         self.pacing = pacing
         self.journal_path = journal_path
         self.typing = sender.Pacing()
+        self.current = None  # lead whose chat this page shows
         try:
             page.add_init_script(sender.MEDIA_HOOK)
         except Exception:
             pass
 
     def open(self, lead: dict) -> str:
+        """Open the lead's chat; one already on screen is reused instead of reloading."""
+        if self.current == lead["id"] and self._showing(lead.get("chat")):
+            return "ready"
+        self.current = None
         try:
             sender.open_chat(self.page, lead["name"], self.typing, phone=lead["phone"])
         except sender.InvalidNumber:
             return "invalid-number"
+        self.current = lead["id"]
         return "ready"
+
+    def _showing(self, chat: str | None) -> bool:
+        if not chat:
+            return False
+        try:
+            return (bool(self.page.locator(sender.COMPOSER).count())
+                    and sender.chat_title(self.page) == chat)
+        except Exception:
+            return False
 
     def chat_title(self) -> str:
         return sender.chat_title(self.page)
@@ -125,6 +140,7 @@ class SalesAgent:
         self.pacing = SalesPacing.from_rules(rules)
         self.transcriber = transcriber or local_transcriber
         self._chats = 0
+        self._last_chat = None
         self._planned: set[tuple[str, str]] = set()
         if live and channel is None:
             raise ValueError("live mode needs a WhatsApp channel")
@@ -144,10 +160,14 @@ class SalesAgent:
         parsed = datetime.fromisoformat(value)
         return parsed if parsed.tzinfo else parsed.replace(tzinfo=self.zone)
 
-    def _next_chat(self) -> None:
+    def _next_chat(self, lead: dict) -> None:
+        """Pause between two different chats; another reply in the same chat needs none."""
+        if lead["id"] == self._last_chat:
+            return
         if self._chats:
             self.sleep(self.pacing.between_chats(self.rng))
         self._chats += 1
+        self._last_chat = lead["id"]
 
     def _open_chat(self, lead: dict) -> str:
         """Open the lead's chat by number and remember the name WhatsApp shows for it.
@@ -491,7 +511,7 @@ class SalesAgent:
                 return {**result, "state": "already-planned"}
             self._planned.add(planned)
         if self.live:
-            self._next_chat()
+            self._next_chat(lead)
             try:
                 status = self._open_chat(lead)
             except Exception as error:
@@ -717,7 +737,7 @@ class SalesAgent:
         if any(sender.journal_state(self.store.journal_path, item["key"]) for item in items):
             self.store.update_lead(lead["id"], state="unconfirmed", opened_at=stamp(now))
             return {**result, "state": "already-opened"}
-        self._next_chat()
+        self._next_chat(lead)
         # Recorded before the browser acts, so a crash never sends the opening twice.
         self.store.update_lead(lead["id"], state="opening", opened_at=stamp(now))
         try:
@@ -769,7 +789,7 @@ class SalesAgent:
             return {**result, "state": "planned", "messages": messages}
         number = lead.get("followups", 0) + 1
         items = self._items(lead, f"followup#{number}", messages, None)
-        self._next_chat()
+        self._next_chat(lead)
         try:
             status = self._open_chat(lead)
         except Exception as error:

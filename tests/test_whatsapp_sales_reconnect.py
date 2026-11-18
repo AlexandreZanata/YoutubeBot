@@ -109,7 +109,7 @@ if __name__ == "__main__":
 
 
 class StopSignalTests(unittest.TestCase):
-    def test_sigterm_closes_the_tab_and_releases_the_run_lock(self):
+    def test_sigterm_asks_to_stop_then_closes_the_tab_and_releases_the_lock(self):
         import os
         import signal
         import tempfile
@@ -133,19 +133,33 @@ class StopSignalTests(unittest.TestCase):
 
         locks = []
 
-        def stopped(agent, *_args, **_kwargs):
+        def stopped(agent, session, run_args, stopped=None, **_kwargs):
             locks.append(agent.store.lock_path.exists())
+            self.assertFalse(stopped())
             os.kill(os.getpid(), signal.SIGTERM)
+            locks.append(stopped())
 
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory) / "whatsapp"
             factory = lambda: SimpleNamespace(network=lambda name: base)  # noqa: E731
             run_args = SimpleNamespace(**{**vars(args()), "live": False, "no_llm": True})
             previous = signal.getsignal(signal.SIGTERM)
-            with mock.patch.object(commands, "run_cycles", stopped), \
-                    self.assertRaises(SystemExit):
+            with mock.patch.object(commands, "run_cycles", stopped):
                 commands.command_run(run_args, factory, page_factory)
             self.assertEqual(signal.getsignal(signal.SIGTERM), previous)
             self.assertIn("page", closed)
-            self.assertEqual(locks, [True])
+            self.assertEqual(locks, [True, True])
             self.assertFalse(SalesStore(base).lock_path.exists())
+
+
+class StopRequestTests(unittest.TestCase):
+    def test_a_stop_request_ends_the_wait_and_the_loop_without_another_cycle(self):
+        agent, session = Agent(), Session(Page())
+        asked = []
+        waits = []
+        session.page.wait_for_timeout = lambda ms: (waits.append(ms), asked.append(True))
+        commands.run_cycles(agent, session, args(max_cycles=0, interval=10),
+                            listen=lambda *a, **k: [], out=lambda line: None,
+                            stopped=lambda: bool(asked))
+        self.assertEqual(agent.cycles, 1)
+        self.assertEqual(waits, [1000])

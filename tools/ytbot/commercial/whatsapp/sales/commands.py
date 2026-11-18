@@ -305,7 +305,7 @@ class Session:
             agent.channel = self.channel
 
 
-def run_cycles(agent, session, args, listen=None, out=None) -> None:
+def run_cycles(agent, session, args, listen=None, out=None, stopped=None) -> None:
     """Listen, answer, follow up and open leads until told to stop.
 
     A closed page outside a send (the computer slept, Chrome restarted) reconnects up to
@@ -314,6 +314,7 @@ def run_cycles(agent, session, args, listen=None, out=None) -> None:
     """
     listen = listen or whatsapp_listener.listen
     out = out or (lambda line: print(line, flush=True))
+    stopped = stopped or (lambda: False)
     rules_path = Path(args.rules) if args.rules else RULES_PATH
     rules_seen = rules_path.stat().st_mtime
     cycles = failures = 0
@@ -326,6 +327,9 @@ def run_cycles(agent, session, args, listen=None, out=None) -> None:
         session.reopen(agent, error)
 
     while True:
+        if stopped():
+            out("[sales] stop requested; the run ends between two steps, never inside a send")
+            return
         rules_seen = reload_if_changed(agent, rules_path, rules_seen)
         try:
             events = listen(session.page, agent.store.base, once=True, limit=args.max_chats)
@@ -344,7 +348,11 @@ def run_cycles(agent, session, args, listen=None, out=None) -> None:
         if args.once or (args.max_cycles and cycles >= args.max_cycles):
             return
         try:
-            session.page.wait_for_timeout(args.interval * 1000)
+            # One second at a time, so a stop request ends the wait at once.
+            for _ in range(int(args.interval)):
+                if stopped():
+                    break
+                session.page.wait_for_timeout(1000)
         except Exception as error:
             recover(error)
 
@@ -362,15 +370,21 @@ def command_run(args, store_factory, page_factory) -> None:
     except RuntimeError as error:
         store.release()
         raise SystemExit(f"[sales] {error}")
+    requested = []
+
     def stop(signum, frame):
-        # A plain SIGTERM skips `finally`: the tab would stay open in the hidden browser.
-        raise SystemExit(f"[sales] stopped by signal {signum}")
+        # Playwright swallows an exception raised here, and a default SIGTERM skips `finally`
+        # (the tab stayed open). The first signal asks the loop to end after the current step;
+        # a second one stops at once.
+        if requested:
+            raise SystemExit(f"[sales] stopped by signal {signum}")
+        requested.append(signum)
 
     previous = signal.signal(signal.SIGTERM, stop)
     try:
         agent = SalesAgent(rules, store, session.channel if args.live else None, model,
                            live=args.live)
-        run_cycles(agent, session, args)
+        run_cycles(agent, session, args, stopped=lambda: bool(requested))
     finally:
         signal.signal(signal.SIGTERM, previous)
         session.close()
@@ -449,7 +463,8 @@ def add_parser(actions, store_factory, page_factory) -> None:
                      help="also send openings to new leads (daily limit applies)")
     run.add_argument("--limit", type=int, default=None, help="max openings in this run")
     run.add_argument("--once", action="store_true")
-    run.add_argument("--interval", type=int, default=30)
+    run.add_argument("--interval", type=int, default=10,
+                     help="seconds between two scans of the chat list (default 10)")
     run.add_argument("--max-cycles", type=int, default=0)
     run.add_argument("--max-chats", type=int, default=30)
     run.add_argument("--no-llm", action="store_true")
