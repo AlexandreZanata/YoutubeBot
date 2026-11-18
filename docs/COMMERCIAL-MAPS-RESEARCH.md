@@ -1,9 +1,8 @@
 # Google Maps lead research
 
-Status: implemented (2026-11-18). The contract below is the
-source of truth; the module is `tools/ytbot/commercial/maps/`. Tests use saved HTML fixtures
-only. A real, owner-requested run is still pending and uses `--limit 10` in
-`Lucas do Rio Verde - MT` first.
+Status: implemented and exercised in a live run in Sinop - MT on 2026-11-18. The contract
+below is the source of truth; the module is `tools/ytbot/commercial/maps/`. Tests use saved
+HTML fixtures only; the live run is summarized at the end.
 
 The research produces an owner-reviewed CSV for the WhatsApp sales agent
 ([WHATSAPP-SALES](COMMERCIAL-WHATSAPP-SALES.md)). It never sends a message, never writes on
@@ -245,14 +244,50 @@ Operational details:
 - `ajuste-maps.csv` carries the found site in `website`, so it is not importable until the
   sales rules have the "Ajuste do Google Maps" opening and price.
 
+## Live run (2026-11-18)
+
+The owner-requested run used Sinop - MT with `--limit 30`: 30 businesses read, 20 from Sinop
+and 10 from Sorriso (excluded by the address city). The 20 Sinop listings produced 11 site
+candidates and one "Ajuste do Google Maps" candidate after confirmation; 6 already had a
+working site and Rident/OrthoDontic were excluded as chains. Nothing was imported.
+
+The live layout differed from the saved fixtures and was corrected in the module:
+`input[role=combobox]` plus the "Pesquisar" button, `jsaction*=category`, the hours aria label,
+the "Ordenar" review menu with "um mês atrás" dates, and photo presence as the 1-9 bucket when
+Maps hides the count. Google also returned dental directories as search results; the owner
+tunes `confirmation.ignore_domains` for them (cadeodentista, magicpin, agendarconsulta,
+dentmap, mechameaqui/mechamenozap, b2bseg, loqal, studioadamas, guiafacil, cylex,
+dentistas.net.br, waze, encontramatogrosso and similar). `bit.ly` and booking hubs count as
+marketplaces, never as an own site.
+
+One confirmation search hit Google's `/sorry` challenge. The module stopped, wrote
+`needs-attention.json` and notified the owner; the owner solved the challenge by hand in the
+visible window and the run resumed. No challenge was automated or bypassed.
+
+### Live page map (owner tuning reference)
+
+The module already applies these signals; this table is the owner's reference when Google
+changes the page again.
+
+| Area | Real signal seen on 2026-11-18 | Module use |
+| --- | --- | --- |
+| Search | `input[role=combobox]`, `button[aria-label='Pesquisar']`; the query is `<categoria> em <Cidade> - <UF>` | `_search` types and clicks, never sends only the category |
+| Results feed | `div[role='feed']`, `a[href*='/maps/place/']`; sponsored and organic cards, about ten visible and more after scrolling, repeated hrefs | `_collect` scrolls, dedupes and caps at `max_results_per_query` |
+| Nearby city | the feed can include another city; the place address ends `..., Cidade - UF` | city parsed from the address; other cities excluded before confirmation |
+| Detail panel | `h1`; `button[jsaction*=category]`; rating `span/div[role=img][aria-label*='estrelas']`; review count `[aria-label*='avalia']`; `button[data-item-id='address']`, `phone:tel:`, `a[data-item-id='authority']` | `extract.parse_listing` |
+| Hours and photos | hours by `[aria-label*='Horário de funcionamento']`; "Ver fotos" without a count | hours present/absent; photo presence as the 1-9 bucket |
+| Reviews | tab "Avaliações", "Ordenar" menu, `menuitemradio` "Mais recentes"; dates `hoje`, `ontem`, `3 dias atrás`, `um mês atrás` | `_review_age` + `newest_review_age` |
+| Google confirmation | the shell text "Resultados da pesquisa"; AI overview or knowledge panel with no organic `h3`; explicit no-results phrase | `search_page` / `no_search_results`; empty result set is valid |
+| Directories | dental guides, marketplaces, booking hubs and navigation pages in the first page | `ignore_domains`, `marketplace` and `social-only` classes |
+| Stop | `/sorry`, reCAPTCHA frame, sign-in challenge, consent or an unknown layout | `ChallengeError` / `LayoutError`; the run stops and notifies |
+
 ## Verification and limits
 
 Tests use saved HTML fixtures for listings, the results feed and Google result pages; CI never
-touches Google. The live selectors and the reviews sub-panel still need the owner-requested
-physical run (`--limit 10` in `Lucas do Rio Verde - MT` first). The confirmation search proves
-the sites it finds; it cannot prove that a site does not exist, so the owner reviews the list
-before importing. Google's terms restrict automated access; keep the module owner-operated,
-slow and low-volume, and stop at the first challenge. If the volume must grow, use the paid
-Google Places API with the owner's key instead of scaling the browser.
+touches Google. The confirmation search proves the sites it finds; it cannot prove that a site
+does not exist, so the owner reviews the list before importing. Google's terms restrict
+automated access; keep the module owner-operated, slow and low-volume, and stop at the first
+challenge. If the volume must grow, use the paid Google Places API with the owner's key
+instead of scaling the browser.
 
 The research never imports, never messages and never writes on Google.
