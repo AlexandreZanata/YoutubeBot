@@ -1,7 +1,9 @@
+import json
 import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
+from unittest import mock
 
 from PIL import Image
 
@@ -39,6 +41,21 @@ class CommunityPostTests(unittest.TestCase):
         self.assertEqual(community.relative_minutes("há 2 horas"), 120)
         self.assertEqual(community.relative_minutes("1 day ago"), 1440)
         self.assertEqual(community.relative_minutes("há 3 dias"), 4320)
+
+    def test_journal_keeps_the_latest_entry_and_appends_the_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data = Path(directory)
+            channel = mock.Mock(slug="zaflas")
+            with mock.patch.object(community.config, "DATA_DIR", data), \
+                    mock.patch.object(community.config, "CHANNEL", channel):
+                community._journal({"state": "started", "topic": "A", "at": "2026-11-17T07:00:00"})
+                community._journal({"state": "posted", "topic": "A", "at": "2026-11-17T07:01:00"})
+            latest = json.loads((data / "community.json").read_text(encoding="utf-8"))
+            self.assertEqual(latest["state"], "posted")
+            lines = (data / community.HISTORY_FILE).read_text(encoding="utf-8").splitlines()
+            history = [json.loads(line) for line in lines]
+            self.assertEqual([entry["state"] for entry in history], ["started", "posted"])
+            self.assertTrue(all(entry["channel"] == "zaflas" for entry in history))
 
     def test_post_type_catalog_covers_the_community_options(self):
         self.assertEqual(set(community.POST_TYPES), {

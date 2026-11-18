@@ -47,6 +47,9 @@ algorithms are preserved; new account/adapter modules compose them.
   visible sign-in, optional read-only OAuth and explicit channel bindings.
 - `library.py`: bounded read-only summaries of existing run data, not a second catalog.
 - `src/ui/accounts_window.py`: additive account/channel/video-history window.
+- `desktop/`: Rust + Slint manager. `crates/reports` aggregates the private records per
+  period/channel without writing them, `crates/manager-core` owns sessions, settings and the
+  typed CLI actions, `apps/manager` is the UI. See [desktop](DESKTOP.md).
 - `service.py`, `service_jobs.py`: bounded JSON CLI, durable jobs, process identity,
   account/channel locks, separate bounded systemd media units and conservative lost-actor reconciliation.
 

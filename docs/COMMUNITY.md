@@ -8,6 +8,11 @@ https://zaflas.com.br/. The automatic flow generates that art with Codex; it nev
 video thumbnail, and when the art cannot be generated it publishes nothing. An unconfirmed
 publish is recorded in `.local/ytbot/community.json` and is never retried blindly.
 
+`community.json` keeps only the latest entry (it drives the 24-hour check). Every journal
+transition (`started`, `unconfirmed`, `posted`) is also appended, with the channel slug, to
+`community-history.jsonl` in the same folder; the [desktop manager](DESKTOP.md) counts monthly
+posts from it and falls back to the single entry on older installs.
+
 ```bash
 python3 -m tools.ytbot community --channel fallem-prince
 python3 -m tools.ytbot community --channel fallem-prince --topic "An exact topic"

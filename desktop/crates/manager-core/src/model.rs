@@ -12,6 +12,10 @@ pub struct SessionInfo {
     pub detail: String,
     pub port: u16,
     pub scope: String,
+    /// A browser process for this profile is alive right now.
+    pub running: bool,
+    /// `hidden` or `visible` when the bot recorded it; empty otherwise.
+    pub mode: String,
 }
 
 impl SessionInfo {

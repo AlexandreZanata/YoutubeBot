@@ -31,3 +31,16 @@ jobs:
           python -m pip install -r requirements-desktop.txt
       - name: Verify preserved and new workflows
         run: npm run verify
+  desktop-crates:
+    # The UI crate needs Slint's system libraries; the pure crates hold the counting rules.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust format
+        run: cargo fmt --all --check
+      - name: Reports and domain tests
+        run: cargo test --locked -p reports -p manager-core
