@@ -88,12 +88,19 @@ class LanchoneteRulesTests(unittest.TestCase):
         self.assertIn("troco", text)
 
     def test_private_test_mirror_matches_the_production_catalog(self):
-        """The 24h test file may differ only in hours and pacing, never in menu or texts."""
+        """The 24h test file may differ only in hours and pacing, never in menu or texts.
+
+        The mirror lives in private `.local` state, so CI (which has no `.local`)
+        skips this; on the owner's PC it enforces that the test file never drifts
+        from the production rules.
+        """
         from pathlib import Path
 
-        mirror = lanchonete_rules.load(
-            Path(__file__).parent.parent
-            / ".local/commercial/whatsapp/lanchonete/test_rules.toml")
+        mirror_path = (Path(__file__).parent.parent
+                       / ".local/commercial/whatsapp/lanchonete/test_rules.toml")
+        if not mirror_path.is_file():
+            self.skipTest("no private test mirror on this machine")
+        mirror = lanchonete_rules.load(mirror_path)
         self.assertEqual([(item.id, item.price_cents) for item in mirror.items],
                          [(item.id, item.price_cents) for item in self.rules.items])
         self.assertEqual([(extra.id, extra.price_cents) for extra in mirror.extras],
