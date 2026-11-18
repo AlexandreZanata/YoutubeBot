@@ -186,6 +186,7 @@ the model using only the facts.
 | Domain, `.com.br`, `registro.br` | `domain` | reply | Layperson explanation (`suaempresa.com.br`), `https://registro.br/` to test names, 3 options: buy manually, buy manually + we help configure, or we buy (+R$ 40 on 1st monthly fee for 1 year) |
 | Payment, down payment, Pix, card | `payment` | reply | R$ 250 down; the rest in the quote |
 | Asks for examples | `examples` | reply | The four links, one per message |
+| "Não estou conseguindo abrir o link", "os sites não abrem", "não dá pra clicar" | `links_not_opening` | reply | Fixed: WhatsApp blocks links from numbers not saved in the phone; save the contact (Alexandre, da Zaflas Inova Simples) and tap again, or copy the address (zaflas.com.br) into the browser. No hand-off |
 | "Tenho interesse", "gostei" | `interested` | reply | Offer a quote |
 | "Sim" after the quote offer | `quote_accept` | qualify | Asks the business type and what the site or system should have |
 | Project description while qualifying | `quote_details` | quote | Fixed ack; the owner prepares the quote (notified) |

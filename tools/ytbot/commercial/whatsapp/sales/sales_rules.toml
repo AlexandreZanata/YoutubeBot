@@ -325,6 +325,22 @@ patterns = ['golpe', 'fraude', 'e confiavel', 'e seguro', 'desconfi', 'como (eu 
 messages = ["Entendo a desconfiança, é bom ter cuidado! Já te respondo pessoalmente."]
 
 [[intents]]
+id = "links_not_opening"
+action = "reply"
+fixed = true
+when = "Diz que não consegue abrir, ver ou clicar nos links ou exemplos ('não estou conseguindo abrir o link', 'os sites não abrem', 'o link não funciona'). O WhatsApp bloqueia links de números que não estão salvos na agenda."
+patterns = [
+  'nao (estou |to |tou |esta |ta )?(consigo|consegui|conseguindo|da pra|deu pra|abre|abriu|abrem|abrindo|carrega|carregou|carregando|funciona|funcionou|aparece|apareceu)[^.?!]{0,30}(abrir|acessar|entrar|ver|clicar|link|site|exemplo)',
+  '(link|links|site|sites|exemplo|exemplos)[^.?!]{0,40}nao (abre|abrem|abriu|abriram|carrega|carregam|funciona|funcionam|aparece|aparecem|esta abrindo|estao abrindo|clica)',
+  '(link|links)[^.?!]{0,20}(bloquead|desativad|travad)',
+]
+messages = [
+  "Ah, isso é normal! Por segurança, o WhatsApp não deixa abrir links enviados por um número que ainda não está salvo na agenda.",
+  "Se você salvar meu contato (Alexandre, da Zaflas Inova Simples), os links passam a abrir normalmente: é só tocar neles de novo.",
+  "Se preferir, também dá para copiar o endereço, como zaflas.com.br, e colar no navegador do celular.",
+]
+
+[[intents]]
 id = "who_are_you"
 action = "reply"
 fixed = false

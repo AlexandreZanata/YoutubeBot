@@ -68,6 +68,15 @@ class SalesClassifierTests(unittest.TestCase):
         for text, expected in cases.items():
             self.check(text, expected)
 
+    def test_links_that_do_not_open_get_the_save_contact_answer(self):
+        for text in ("eu não estou conseguindo abrir o link de exemplos", "os links não abrem",
+                     "não consigo ver os exemplos", "o site não abre aqui",
+                     "não dá pra clicar no link", "link bloqueado"):
+            self.check(text, "links_not_opening")
+        self.check("não consegui abrir os sites", "links_not_opening", state="qualifying")
+        self.check("Não quero site, quero um aplicativo", "system_request")
+        self.check("não consigo agora, me chama amanhã", "callback_later")
+
     def test_app_prices_are_never_confused_with_the_site(self):
         self.check("Então um aplicativo sai 500 reais?", "app_at_site_price")
         self.check("por 500 faz um app?", "app_at_site_price")

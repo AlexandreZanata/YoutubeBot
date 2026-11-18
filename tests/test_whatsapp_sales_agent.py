@@ -203,6 +203,16 @@ class SalesAgentTests(unittest.TestCase):
         agent.reply_pending()
         self.assertEqual(len(channel.sent), sent)
 
+    def test_links_that_do_not_open_are_explained_without_a_hand_off(self):
+        lead, agent, channel = self.opened_lead()
+        agent.ingest([self.event("Eu não estou conseguindo abrir o link de exemplos")])
+        agent.reply_pending()
+        sent = [item["text"] for item in channel.sent[-3:]]
+        self.assertEqual(sent, list(self.rules.intent("links_not_opening").messages))
+        self.assertIn("salvar meu contato", sent[1])
+        self.assertEqual(self.store.lead(lead["id"])["state"], "engaged")
+        self.assertEqual(self.notes, [])
+
     def test_robot_question_gets_the_honest_answer(self):
         _, agent, channel = self.opened_lead()
         agent.ingest([self.event("Isso é robô?")])

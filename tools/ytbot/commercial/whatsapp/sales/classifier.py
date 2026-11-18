@@ -19,7 +19,7 @@ FIRST = ("referral", "payment_sent", "ready_to_buy", "gatekeeper")
 # material questions stay part of the project details (`quote_details`).
 QUALIFYING_OVERRIDES = ("human_request", "bot_question", "how_got_number", "trust_concern",
                         "call_request", "callback_later", "sticker", "payment_sent",
-                        "ready_to_buy")
+                        "ready_to_buy", "links_not_opening")
 QUALIFYING_REFUSAL = re.compile(
     r"nao (tenho|temos) (mais )?interesse|sem interesse|\bdesisti\b|"
     r"nao (quero|queremos) mais\b|cancela(r)? (tudo|o orcamento|isso)"
@@ -28,7 +28,8 @@ QUALIFYING_DONE_FOR_QUOTE = re.compile(r"^pode fazer[.! ]*$")
 # Intents the local classifier decides alone for short messages (no model call).
 DECISIVE = ("opt_out", "refusal", "auto_reply", "bot_question", "sticker", "thanks",
             "audio", "media", "human_request", "trust_concern", "callback_later", "referral",
-            "payment_sent", "gatekeeper", "app_at_site_price", "system_price")
+            "payment_sent", "gatekeeper", "app_at_site_price", "system_price",
+            "links_not_opening")
 SHORT = 80
 # A photo or document with a caption arrives as "Photo\n<caption>": the caption is the message.
 MEDIA_LABEL = re.compile(r"^(photo|foto|image|imagem|video|document|documento)\s+(?=\S)")
