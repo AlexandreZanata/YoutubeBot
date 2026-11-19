@@ -35,8 +35,9 @@ SHORT = 80
 MEDIA_LABEL = re.compile(r"^(photo|foto|image|imagem|video|document|documento)\s+(?=\S)")
 LABEL_LINE = re.compile(r"^\s*(photo|foto|image|imagem|video|vídeo|document|documento)\s*\n(?=\S)",
                         re.IGNORECASE)
-# Always final locally: while qualifying, the text is the project description.
-ALWAYS_DECISIVE = ("quote_details",)
+# Always final locally: while qualifying, the text is the project description; business
+# auto-replies (which are often >80 chars) are always ignored to avoid bot-vs-bot loops.
+ALWAYS_DECISIVE = ("quote_details", "auto_reply")
 
 
 def for_model(text: str) -> str:

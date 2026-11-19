@@ -87,6 +87,21 @@ def _ours(text: str, sent: list[str]) -> bool:
     return any(item and (item[:24] in plain or plain[:24] in item) for item in sent)
 
 
+def is_closed_error(error: BaseException) -> bool:
+    """The browser page or CDP connection closed (suspend/resume, Chrome restart)."""
+    text = str(error)
+    return (type(error).__name__ == "TargetClosedError" or "has been closed" in text
+            or "Connection closed" in text or "Browser closed" in text)
+
+
+def _failed_outcome(item: dict) -> bool:
+    """True when an action (or its triggered referral opening) failed or is unconfirmed."""
+    if item.get("state") in ("error", "unconfirmed"):
+        return True
+    ref = item.get("referral_opening")
+    return isinstance(ref, dict) and ref.get("state") in ("error", "unconfirmed")
+
+
 def split_pending(history: list[dict]) -> tuple[list[dict], list[dict]]:
     """(conversation before the unanswered messages, unanswered incoming messages)."""
     entries = effective(history)
@@ -150,7 +165,8 @@ class WhatsAppChannel:
 class SalesAgent:
     def __init__(self, rules: SalesRules, store: SalesStore, channel=None, llm=None,
                  live: bool = False, clock=None, sleep=time.sleep, rng=random,
-                 notify=owner_notify.desktop_notify, log=None, transcriber=None):
+                 notify=owner_notify.desktop_notify, log=None, transcriber=None,
+                 paced_openings: bool = False, allowed_leads: set[str] | None = None):
         self.rules = rules
         self.store = store
         self.channel = channel
@@ -164,13 +180,35 @@ class SalesAgent:
         self.log = log or (lambda message: print(f"[sales] {message}", flush=True))
         self.pacing = SalesPacing.from_rules(rules)
         self.transcriber = transcriber or local_transcriber
+        self.paced_openings = paced_openings
+        self.allowed_leads = set(allowed_leads) if allowed_leads is not None else None
         self._chats = 0
         self._last_chat = None
+        self._last_was_opening = False
+        self._last_activity_at: datetime | None = None
+        self._next_opening_at: datetime | None = None
+        self._last_blocker = ""
+        self._central_mtime: float | None = None
         self._planned: set[tuple[str, str]] = set()
         if live and channel is None:
             raise ValueError("live mode needs a WhatsApp channel")
 
     # Helpers -------------------------------------------------------------------------
+    def _in_scope(self, lead_id: str) -> bool:
+        """When scoped (`--only-leads` / `--only-csv`), ignore leads outside the target batch."""
+        return self.allowed_leads is None or lead_id in self.allowed_leads
+
+    @staticmethod
+    def _is_echo(plain: str, sent: list[str]) -> bool:
+        """True when a chat-list preview is our own last message (including link/ellipsis)."""
+        if not plain:
+            return False
+        if plain in sent:
+            return True
+        stripped = plain.rstrip(".… ")
+        if len(stripped) >= 24 and any(item.startswith(stripped) for item in sent):
+            return True
+        return any(item.startswith("https://") and item in plain for item in sent)
     def use_rules(self, rules: SalesRules) -> None:
         """Switch to an edited rules file between cycles (the owner tunes texts live)."""
         self.rules = rules
@@ -185,14 +223,24 @@ class SalesAgent:
         parsed = datetime.fromisoformat(value)
         return parsed if parsed.tzinfo else parsed.replace(tzinfo=self.zone)
 
-    def _next_chat(self, lead: dict) -> None:
-        """Pause between two different chats; another reply in the same chat needs none."""
+    def _next_chat(self, lead: dict, opening: bool = False) -> None:
+        """Pause between two different chats; consecutive cold openings use the opening interval."""
         if lead["id"] == self._last_chat:
+            self._last_was_opening = opening
             return
         if self._chats:
-            self.sleep(self.pacing.between_chats(self.rng))
+            if opening and self._last_was_opening and not self.paced_openings:
+                self.sleep(self.pacing.between_openings(self.rng))
+            elif self.paced_openings and self._last_activity_at is not None:
+                elapsed = (self.now() - self._last_activity_at).total_seconds()
+                pause = self.pacing.between_chats(self.rng)
+                if elapsed < pause:
+                    self.sleep(pause - max(0.0, elapsed))
+            else:
+                self.sleep(self.pacing.between_chats(self.rng))
         self._chats += 1
         self._last_chat = lead["id"]
+        self._last_was_opening = opening
 
     def _open_chat(self, lead: dict) -> str:
         """Open the lead's chat by number and remember the name WhatsApp shows for it.
@@ -290,14 +338,16 @@ class SalesAgent:
         touched = []
         for event in events:
             lead = self.store.find_lead(event.get("chat", ""))
-            if lead is None or not event.get("text"):
+            if lead is None or not self._in_scope(lead["id"]) or not event.get("text"):
                 continue
             history = self.store.history(lead["id"])
             if any(entry.get("event") == event.get("id") for entry in history):
                 continue
             sent = [normalize(entry.get("text", "")) for entry in history[-40:]
                     if entry.get("dir") == "out"]
-            if normalize(event["text"]) in sent:
+            # Only our latest outgoing bubble can appear as a chat-list preview echo; older
+            # opening bubbles like "Bom dia" or "Tudo bem?" must never swallow a real reply.
+            if self._is_echo(normalize(event["text"]), sent[-1:]):
                 continue  # the chat list echoing our own last message
             now = stamp(self.now())
             self.store.remember(lead["id"], {"at": now, "dir": "in", "text": event["text"],
@@ -348,7 +398,8 @@ class SalesAgent:
     # Replies -------------------------------------------------------------------------
     def pending(self) -> list[dict]:
         leads = [lead for lead in self.store.leads().values()
-                 if lead.get("awaiting") and lead["state"] in REPLYABLE + SILENT_STATES]
+                 if lead.get("awaiting") and lead["state"] in REPLYABLE + SILENT_STATES
+                 and self._in_scope(lead["id"])]
         return sorted(leads, key=lambda lead: lead.get("last_in_at") or "")
 
     def reply_pending(self) -> list[dict]:
@@ -357,7 +408,13 @@ class SalesAgent:
             if waiting:
                 self.log(f"outside reply hours; {waiting} conversation(s) wait for the window")
             return []
-        return [self.reply(lead) for lead in self.pending()]
+        results = []
+        for lead in self.pending():
+            outcome = self.reply(lead)
+            results.append(outcome)
+            if _failed_outcome(outcome):
+                break
+        return results
 
     def _merge_chat(self, lead: dict, bubbles: list[dict]) -> list[str] | None:
         """Store what the contact sent since our last message, as read in the open chat.
@@ -631,12 +688,17 @@ class SalesAgent:
             try:
                 status = self._open_chat(lead)
             except Exception as error:
+                if is_closed_error(error):
+                    self._last_chat = None
+                    raise
                 return {**result, "state": "error", "error": str(error)[:300]}
             if status != "ready":
+                self._last_activity_at = self.now()
                 self.store.update_lead(lead["id"], state="invalid-number", awaiting=None)
                 return {**result, "state": "invalid-number"}
             owner_text = self._merge_chat(lead, self.channel.read_recent())
             if owner_text is not None:
+                self._last_activity_at = self.now()
                 return self._owner_took_over(lead, owner_text, result)
         if lead["state"] in SILENT_STATES:
             if not self.live:
@@ -763,6 +825,8 @@ class SalesAgent:
                 decision.action, decision.priority = "handoff", "needed"
                 decision.owner_reason = (f"O número indicado já está nos contatos{where}; "
                                          "decida como seguir com ele")
+        if decision.referred and self.allowed_leads is not None:
+            self.allowed_leads.add(decision.referred)
         who = decider or texts["who_unnamed"]
         thanks = texts["thanks"] if staff else texts["thanks_unnamed"]
         decision.messages = [thanks.replace("{staff}", staff).replace("{who}", who)]
@@ -804,6 +868,7 @@ class SalesAgent:
             items = self._items(lead, f"reply#{lead['awaiting']}", decision.messages, text)
             results = self.channel.send(lead, items, {"kind": "sales-reply", "lead": lead["id"],
                                                       "intent": decision.intent})
+            self._last_activity_at = self.now()
             done, worst = self._remember_sent(lead, items, results, "reply", decision.intent)
             if not done:
                 self._fence(lead, worst, "resposta")
@@ -890,12 +955,55 @@ class SalesAgent:
             found.append({"lead": lead["id"], "name": lead["name"], "state": "unconfirmed"})
         return found
 
+    def _ensure_opening_cooldown(self) -> None:
+        """On startup, honor the opening interval after any cold opening already sent today."""
+        if self._next_opening_at is not None or not self.live:
+            return
+        now = self.now()
+        today = now.date()
+        recent = []
+        for lead in self.store.leads().values():
+            if lead.get("referral"):
+                continue
+            opened = self._parse(lead.get("opened_at"))
+            if not opened or opened.astimezone(self.zone).date() != today:
+                continue
+            when = self._parse(lead.get("last_out_at") if lead.get("state") == "opened"
+                               else lead.get("opened_at")) or opened
+            recent.append(when.astimezone(self.zone))
+        if not recent:
+            return
+        latest = max(recent)
+        elapsed = (now - latest).total_seconds()
+        if 0 <= elapsed < self.pacing.between_openings_min:
+            wait = self.pacing.between_openings(self.rng)
+            self._next_opening_at = latest + timedelta(seconds=wait)
+            self.log(f"pacing openings: next company at {self._next_opening_at.strftime('%H:%M:%S')}")
+
+    def _prospect_paced(self, limit: int | None = None) -> list[dict]:
+        """Open at most one company when the opening cooldown has elapsed (non-blocking)."""
+        if limit is not None and limit <= 0:
+            return []
+        if self.live:
+            self._ensure_opening_cooldown()
+            if self._next_opening_at is not None and self.now() < self._next_opening_at:
+                return []
+        results = self.prospect(1)
+        if self.live and any(item["state"] == "opened" for item in results):
+            wait = self.pacing.between_openings(self.rng)
+            self._next_opening_at = self.now() + timedelta(seconds=wait)
+            self.log(f"next opening in {wait:.0f}s (at {self._next_opening_at.strftime('%H:%M:%S')})")
+        return results
+
     def prospect(self, limit: int | None = None, queue_only: bool = False) -> list[dict]:
         """Open new leads one at a time; `queue_only` keeps to the Maps queue (`sales queue`)."""
         blocked = self.opening_blocker(queue_only)
         if blocked:
-            self.log(f"no first contact now: {blocked}")
+            if blocked != self._last_blocker:
+                self.log(f"no first contact now: {blocked}")
+                self._last_blocker = blocked
             return []
+        self._last_blocker = ""
         left = {"cold": int(self.rules.limits["daily_openings"]) - self.openings_today("cold"),
                 "referral": int(self.rules.raw["referral"]["daily_limit"])
                 - self.openings_today("referral")}
@@ -903,6 +1011,7 @@ class SalesAgent:
         # leads keep the owner's CSV order (`queue_position`).
         candidates = sorted((lead for lead in self.store.leads().values()
                              if lead["state"] == "new" and not lead.get("opened_at")
+                             and self._in_scope(lead["id"])
                              and (in_queue(lead) or not queue_only)),
                             key=lambda lead: (not lead.get("referral"), *order_key(lead)))
         results = []
@@ -940,22 +1049,28 @@ class SalesAgent:
         if any(sender.journal_state(self.store.journal_path, item["key"]) for item in items):
             self.store.update_lead(lead["id"], state="unconfirmed", opened_at=stamp(now))
             return {**result, "state": "already-opened"}
-        self._next_chat(lead)
+        self._next_chat(lead, opening=not bool(source))
         # Recorded before the browser acts, so a crash never sends the opening twice.
         self.store.update_lead(lead["id"], state="opening", opened_at=stamp(now))
         try:
             status = self._open_chat(lead)
         except Exception as error:
             # Nothing was typed yet: the lead stays new and the error is shown in the queue.
+            closed = is_closed_error(error)
             self.store.update_lead(lead["id"], state="new", opened_at=None,
-                                   open_error=str(error)[:200])
+                                   open_error=None if closed else str(error)[:200])
+            if closed:
+                self._last_chat = None
+                raise
             return {**result, "state": "error", "error": str(error)[:300]}
         if status != "ready":
+            self._last_activity_at = self.now()
             self.store.update_lead(lead["id"], state="invalid-number", opened_at=None)
             return {**result, "state": "invalid-number"}
         listener.allow_contact(self.store.contact_rules_path, self._contact_entry(lead))
         self.store.update_lead(lead["id"], open_error=None)
         results = self.channel.send(lead, items, {"kind": "sales-opening", "lead": lead["id"]})
+        self._last_activity_at = self.now()
         done, worst = self._remember_sent(lead, items, results, "opening")
         if not done:
             self._fence(lead, worst, "abertura")
@@ -968,7 +1083,7 @@ class SalesAgent:
         limits = self.rules.limits
         results = []
         for lead in list(self.store.leads().values()):
-            if lead.get("last_in_at"):
+            if not self._in_scope(lead["id"]) or lead.get("last_in_at"):
                 continue
             last_out = self._parse(lead.get("last_out_at"))
             if last_out is None:
@@ -977,7 +1092,10 @@ class SalesAgent:
             if (lead["state"] == "opened" and lead.get("followups", 0) < int(limits["max_followups"])
                     and waited >= timedelta(hours=float(limits["followup_after_hours"]))):
                 if self.rules.in_window(now, "opening"):
-                    results.append(self._followup(lead))
+                    outcome = self._followup(lead)
+                    results.append(outcome)
+                    if _failed_outcome(outcome):
+                        break
             elif (lead["state"] in ("opened", "followed-up")
                   and waited >= timedelta(hours=float(limits["no_response_after_followup_hours"]))
                   and lead.get("followups", 0) >= int(limits["max_followups"])):
@@ -999,14 +1117,20 @@ class SalesAgent:
         try:
             status = self._open_chat(lead)
         except Exception as error:
+            if is_closed_error(error):
+                self._last_chat = None
+                raise
             return {**result, "state": "error", "error": str(error)[:300]}
         if status != "ready":
+            self._last_activity_at = self.now()
             self.store.update_lead(lead["id"], state="invalid-number")
             return {**result, "state": "invalid-number"}
         owner_text = self._merge_chat(lead, self.channel.read_recent())
         if owner_text is not None:
+            self._last_activity_at = self.now()
             return self._owner_took_over(lead, owner_text, result)
         results = self.channel.send(lead, items, {"kind": "sales-followup", "lead": lead["id"]})
+        self._last_activity_at = self.now()
         self.store.update_lead(lead["id"], followups=number)
         done, worst = self._remember_sent(lead, items, results, "followup")
         if not done:
@@ -1019,11 +1143,25 @@ class SalesAgent:
     def cycle(self, events: list[dict], prospect: bool = False,
               limit: int | None = None) -> dict:
         """One pass: store incoming, answer, follow up, then (optionally) open new leads."""
-        summary = {"ingested": self.ingest(events), "replies": self.reply_pending(),
-                   "followups": self.followups()}
-        summary["openings"] = self.prospect(limit) if prospect else []
+        ingested = self.ingest(events)
+        replies = self.reply_pending()
+        failed = any(_failed_outcome(item) for item in replies)
+        followups = [] if failed else self.followups()
+        failed = failed or any(_failed_outcome(item) for item in followups)
+        if prospect and not failed:
+            openings = (self._prospect_paced(limit) if self.paced_openings and self.live
+                        else self.prospect(limit))
+        else:
+            openings = []
+        summary = {"ingested": ingested, "replies": replies,
+                   "followups": followups, "openings": openings}
         try:
-            central.write(self.store, self.now())
+            leads_mtime = (self.store.leads_path.stat().st_mtime
+                           if self.store.leads_path.exists() else None)
+            if (any(summary.values()) or self._central_mtime is None
+                    or leads_mtime != self._central_mtime):
+                central.write(self.store, self.now())
+                self._central_mtime = leads_mtime
         except OSError as error:
             self.log(f"central.json not written: {error}")
         return summary

@@ -50,6 +50,8 @@ jitter = 0.15
 link_preview_seconds = 3.0          # minimum wait after typing a link, for the preview card
 between_chats_min_seconds = 10.0
 between_chats_max_seconds = 30.0
+between_openings_min_seconds = 120.0
+between_openings_max_seconds = 180.0
 
 [llm]
 # Owner decision 2026-11-17 (evening): OpenCode Go free models first, in rotation, then the
@@ -324,8 +326,11 @@ fixed = true
 when = "Resposta automática de WhatsApp Business: saudação de ausência, horário de atendimento, 'em breve retornaremos', menu numérico."
 patterns = [
   'esta e uma (mensagem|resposta) automatica', 'obrigad[oa] (por|pelo) (entrar em )?contato',
-  'retornaremos', 'em breve (responderemos|retornaremos|entraremos)', 'nosso horario de atendimento',
-  'digite (o numero|1|uma opcao)', 'no momento (nao estamos|estamos fora)', 'agradecemos (o|seu) contato',
+  'retornaremos', 'em breve (responderemos|retornaremos|entraremos|nossa equipe)',
+  'assim que possivel (responderemos|retornaremos|entraremos)', 'nossa equipe (ira |vai )?(responder|retornar|atender)',
+  'nosso horario de atendimento', 'atendimento (automatico|eletronico)',
+  'digite (o numero|1|uma opcao)', 'selecione uma (das )?opco',
+  'no momento (nao estamos|estamos fora)', 'agradecemos (o |o seu |seu )?contato',
 ]
 messages = []
 
@@ -506,11 +511,12 @@ action = "reply"
 fixed = true
 when = "Quem responde é funcionário ou atendente e não decide: 'sou funcionária', 'o dono não está', 'quem decide é o gerente', 'vou passar pro responsável', 'ele te chama'."
 patterns = [
-  'sou (funcionari|atendente|recepcionista|secretari|colaborador)', 'nao sou (o |a )?(dono|dona|responsavel|proprietari)',
-  '(o|a) (dono|dona|responsavel|proprietari[oa]|gerente|chefe|patra[oa]) (nao esta|nao ta|nao se encontra|esta ocupad|ta ocupad|que (decide|ve|cuida|resolve))',
-  'quem (decide|resolve|ve isso|cuida (disso|dessa parte))', 'vou (passar|repassar|mostrar|falar) (isso )?(pro|para o|pra|para a) (dono|dona|responsavel|chefe|gerente|patra[oa])',
+  'sou (funcionari|atendente|recepcionista|secretari|colaborador)', 'aqui e (da |a )?(recepcao|secretaria)',
+  'nao sou (o |a )?(dono|dona|responsavel|proprietari)',
+  '(o|a) (dono|dona|responsavel|proprietari[oa]|gerente|chefe|patra[oa]|doutor|doutora|dr\.?|dra\.?) (nao esta|nao ta|nao se encontra|esta ocupad|ta ocupad|esta em atendimento|ta em atendimento|que (decide|ve|cuida|resolve))',
+  'quem (decide|resolve|ve isso|cuida (disso|dessa parte))', 'vou (passar|repassar|mostrar|falar) (isso )?(pro|para o|pra|para a) (dono|dona|responsavel|chefe|gerente|patra[oa]|doutor|doutora|dr\.?|dra\.?)',
   'deixa eu ver com (o|a)', 'preciso ver com (o|a)', 'tenho que ver com (o|a)', 'nao sou eu que (decido|cuido)',
-  'vou (ver|falar|conversar) com (o|a) (dono|dona|responsavel|chefe|gerente|patra[oa])', '(ele|ela) (te )?(chama|retorna|liga|responde)',
+  'vou (ver|falar|conversar) com (o|a) (dono|dona|responsavel|chefe|gerente|patra[oa]|doutor|doutora|dr\.?|dra\.?)', '(ele|ela) (te )?(chama|retorna|liga|responde)',
 ]
 messages = [
   "Muito obrigado pelo retorno!",

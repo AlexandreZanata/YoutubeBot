@@ -145,14 +145,24 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   and hand-off. Run it after editing the rules; about US$ 0.02 per full run.
 - `run` scans the chat list (listener), stores incoming messages of funnel leads, answers
   them, sends due follow-ups and, with `--prospect`, opens new leads up to the daily limit.
-  Without `--live` it prints the decisions and changes no lead state. It stops on the first
-  send that is not confirmed. An edited `sales_rules.toml` is reloaded before the next cycle;
-  an invalid edit is reported and the previous rules stay in use. When the browser page or the
-  CDP connection closes outside a send (the computer slept, Chrome restarted; seen on
-  2026-11-18 as `TargetClosedError` after a night), the run reconnects to the hidden browser
-  and continues, up to 3 times in a row; a failed send still stops the run. A `SIGTERM`
-  asks the run to stop: it finishes the current step (never in the middle of a send), closes
-  its WhatsApp tab and releases the run lock, so restarts no longer leave extra tabs in the
+  Without `--live` it prints the decisions and changes no lead state. In continuous mode
+  (without `--once`), `--prospect` opens at most one company per `between_openings` cooldown
+  (120 to 180 seconds, persisted across restarts via `opened_at`) without blocking the loop,
+  so the bot keeps scanning and replying to already-opened companies between openings; `--limit`
+  caps the total openings of that run while keeping the reply loop alive afterward. Pass
+  `--only-csv <path>` or `--only-leads <id1,id2>` to restrict `run` strictly to a target batch
+  (and any referral created by those leads), leaving all other leads and personal chats untouched.
+  It stops immediately on the first `unconfirmed` or failed send (including inside `reply_pending`
+  and `referral_opening`) without touching further chats. An edited `sales_rules.toml` is reloaded
+  before the next cycle; an invalid edit is reported and the previous rules stay in use. When the
+  browser page or the CDP connection closes outside a send (including before typing inside
+  `_open_chat`; the computer slept, Chrome restarted; seen on 2026-11-18 as `TargetClosedError`
+  after a night), the run reconnects to the hidden browser and continues, up to 3 times in a row;
+  a failed send still stops the run. Chat-list echo suppression compares only the latest outgoing
+  bubble (so short customer replies like `"Bom dia"` or `"Tudo bem?"` are never dropped), and
+  WhatsApp Business auto-replies (`auto_reply`) are always decided locally regardless of length.
+  A `SIGTERM` asks the run to stop: it finishes the current step (never in the middle of a send),
+  closes its WhatsApp tab and releases the run lock, so restarts no longer leave extra tabs in the
   hidden browser. A second `SIGTERM` stops at once; `SIGKILL` still leaves the tab open.
 - `resolve` hands a conversation back to the agent after the owner handled it; `block` adds the
   number to the do-not-contact list.
