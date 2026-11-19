@@ -62,6 +62,12 @@ ChatGPT browser conversation. The fallback is explicit in the log, writes its ow
 `codex_media.available()` is true again and Codex resumes. An ordinary Codex failure still
 stops with the assets preserved.
 
+The browser image path sends the leading 4,000 characters of the channel brief plus the video
+topic, because the web image tool rejects the full Zaflas and Whispers briefs; the identity is
+front-loaded, so the opening sections keep the look. Topic lines are taken only from a
+finished answer and discarded when they match ChatGPT interface text, so a page phrase can
+never become a video topic.
+
 Keep `.local/`, Codex login state and private task logs outside GitHub. Installation and
 browser sign-in help: [Linux setup](INSTALL-LINUX.md).
 

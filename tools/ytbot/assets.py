@@ -92,8 +92,16 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
         prompt_file = {"classic": "thumbnail-classic.txt",
                        "shorts": "thumbnail-shorts.txt",
                        "short-background": "shorts_background.txt"}.get(style, "thumbnail.txt")
-        request = (config.prompt(prompt_file)
-                   + "\n\nARTICLE (excerpt, included below):\n" + article_excerpt(run_dir))
+        topic_path = run_dir / "topic.txt"
+        topic = topic_path.read_text(encoding="utf-8").strip() if topic_path.is_file() else ""
+        identity = config.prompt(prompt_file)
+        # The web image tool fails on the full Zaflas/Whispers briefs; their identity
+        # is front-loaded, so the browser path keeps the leading sections only.
+        if len(identity) > 4000:
+            identity = identity[:4000].rsplit("\n\n", 1)[0]
+        request = (identity
+                   + "\n\nVideo topic: " + topic
+                   + "\n\nGenerate the final image now and reply only after it exists.")
         send_text(page, request)
         log("thumbnail prompt sent")
         deadline = time.time() + timeout
