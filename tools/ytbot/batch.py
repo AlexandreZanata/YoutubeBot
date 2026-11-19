@@ -129,7 +129,7 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
         asset_failures = _asset_phase(context, topics, workers)
         failures += asset_failures
         try:
-            community.ensure_post(upload_context, topics)
+            community.ensure_post(upload_context, topics, art_context=context)
         except Exception as error:
             log(f"community post warning: {error}")
         failed_topics = {topic for topic, _error in asset_failures}

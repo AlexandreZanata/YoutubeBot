@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import re
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from PIL import Image, ImageOps
 
-from . import codex_media, config, logic
+from . import assets, chat, codex_media, config, logic
 
 POST_TYPES = (
     "text",
@@ -51,13 +53,16 @@ TEXT = {
         "{topic}\n\n"
         "Every new video starts with a question like this. Before I record it, "
         "I want to hear your answer: what do you think, and why?\n\n"
+        "Watch the video: {video}\n\n"
         "Tell me in the comments."
     ),
     "pt-BR": (
         "{topic}\n\n"
         "Todo novo vídeo começa com uma pergunta assim. Antes de gravar, "
         "quero ouvir a sua resposta: o que você acha, e por quê?\n\n"
-        "Conte nos comentários."
+        "Assista ao vídeo: {video}\n\n"
+        "Conte nos comentários.\n\n"
+        "🌱 Site: {site}"
     ),
 }
 
@@ -90,12 +95,14 @@ def open_community(page) -> None:
     page.wait_for_timeout(5000)
 
 
-def post_text(topic: str, language: str = "en") -> str:
+def post_text(topic: str, language: str = "en", video: str = "",
+              site: str = "https://zaflas.com.br/") -> str:
     question = topic.strip()
     if not question.endswith("?"):
         question += "?"
     template = TEXT.get(language, TEXT["en"])
-    return template.format(topic=question)
+    return template.format(topic=question, video=video or "https://www.youtube.com/",
+                           site=site)
 
 
 def square_image(source: Path, destination: Path, size: int = 1080) -> Path:
@@ -272,13 +279,78 @@ ART_STYLES = {
 }
 
 
-def _generate_art(topic: str) -> Path | None:
+def related_video() -> dict:
+    """The channel's most recent scheduled video becomes the post's link."""
+    rows = []
+    for upload in config.RUNS.glob("*/upload.json"):
+        try:
+            data = json.loads(upload.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not data.get("scheduled") or not data.get("videoId"):
+            continue
+        meta = upload.parent / "metadata.json"
+        title = ""
+        if meta.is_file():
+            try:
+                title = json.loads(meta.read_text(encoding="utf-8")).get("title", "")
+            except (OSError, ValueError):
+                title = ""
+        rows.append((data.get("slot", ""), data["videoId"], title))
+    if not rows:
+        return {}
+    slot, video, title = max(rows)
+    return {"slot": slot, "video": video, "title": title,
+            "url": f"https://youtu.be/{video}"}
+
+
+def _browser_art(topic: str, context) -> Path | None:
+    from datetime import date
+    from PIL import Image, ImageOps
+
+    slug = config.CHANNEL.slug if config.CHANNEL else "channel"
+    style = ART_STYLES.get(slug, "cinematic")
+    prompt = ("Create one square 1:1 image for a YouTube community post. No text, no letters, "
+              "no numbers, no logos, no watermarks, no borders. Style: " + style
+              + ". Illustrate this question: " + topic[:160]
+              + ". Generate the final image now and reply only after it exists.")
+    page = context.new_page()
+    try:
+        page.goto("https://chatgpt.com/", timeout=90000)
+        page.wait_for_timeout(7000)
+        chat.dismiss_notice(page)
+        chat.send_text(page, prompt)
+        deadline = time.time() + 900
+        while time.time() < deadline:
+            page.wait_for_timeout(5000)
+            data = assets.image_data_url(page)
+            if data and data.startswith("data:image/"):
+                destination = config.DATA / "community" / f"{slug}-{date.today():%Y%m%d}.png"
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                source = destination.with_suffix(".source.png")
+                source.write_bytes(base64.b64decode(data.split(",", 1)[1]))
+                with Image.open(source) as image:
+                    ImageOps.fit(image.convert("RGB"), (1080, 1080),
+                                 Image.Resampling.LANCZOS).save(
+                        destination, format="PNG", optimize=True)
+                source.unlink(missing_ok=True)
+                destination.chmod(0o600)
+                return destination
+            body = page.locator("body").inner_text()
+            if "Image generation failed" in body:
+                raise RuntimeError("ChatGPT image generation failed for the community post")
+        raise RuntimeError("community art was not generated")
+    finally:
+        page.close()
+
+
+def _generate_art(topic: str, context=None) -> Path | None:
     """One dedicated square image per post; never a crop of a video thumbnail."""
     from datetime import date
     from PIL import Image, ImageOps
 
     if not codex_media.available():
-        return None
+        return _browser_art(topic, context) if context is not None else None
     slug = config.CHANNEL.slug if config.CHANNEL else "channel"
     style = ART_STYLES.get(slug, "cinematic")
     run_dir = config.DATA / "community" / "codex" / slug
@@ -315,7 +387,46 @@ def _topic_image(topics: list[str]) -> tuple[str, Path | None]:
     return topics[0], None
 
 
-def ensure_post(context, topics: list[str]) -> dict:
+def publish_all(slugs=None, dry_run: bool = False) -> dict:
+    """Publish today's post on every channel before the next production run."""
+    from playwright.sync_api import sync_playwright
+
+    from . import account, channels, runtime
+    from .accounts_store import AccountStore
+
+    store = AccountStore()
+    bindings = store.load()["bindings"]
+    results = {}
+    store.activate("legacy")
+    runtime.start_hidden_chrome()
+    with sync_playwright() as playwright:
+        art_browser = playwright.chromium.connect_over_cdp(
+            f"http://127.0.0.1:{store.account('legacy')['cdp_port']}", timeout=60000)
+        art_context = art_browser.contexts[0]
+        for slug in slugs or list(channels.CHANNELS):
+            identifier = (bindings.get(slug) or {}).get("account_id", "legacy")
+            try:
+                with store.profile_lock(identifier):
+                    store.activate(identifier)
+                    channels.apply(slug)
+                    video = related_video()
+                    topic = video.get("title") or "What do you think?"
+                    runtime.start_hidden_chrome()
+                    browser = playwright.chromium.connect_over_cdp(
+                        f"http://127.0.0.1:{store.account(identifier)['cdp_port']}",
+                        timeout=60000)
+                    context = browser.contexts[0]
+                    account.ensure_channel(context)
+                    results[slug] = ensure_post(context, [topic], dry_run, art_context)
+                    browser.close()
+            except Exception as error:
+                results[slug] = {"state": "failed", "error": str(error)}
+                log(f"{slug}: {error}")
+        art_browser.close()
+    return results
+
+
+def ensure_post(context, topics: list[str], dry_run: bool = False, art_context=None) -> dict:
     page = context.new_page()
     try:
         open_community(page)
@@ -326,8 +437,14 @@ def ensure_post(context, topics: list[str]) -> dict:
                 return {"state": "present"}
             log("community has no post today; publishing a new one")
         topic, _thumbnail = _topic_image(topics)
-        text = post_text(topic, config.CHANNEL.language if config.CHANNEL else "en")
-        image = _generate_art(topic)
+        video = related_video()
+        text = post_text(topic, config.CHANNEL.language if config.CHANNEL else "en",
+                         video.get("url", ""))
+        if dry_run:
+            log(f"would publish: {text}")
+            return {"state": "dry-run", "topic": topic, "text": text,
+                    "video": video.get("url", "")}
+        image = _generate_art(topic, art_context or context)
         if image is None:
             log("dedicated post art is required; skipping the automatic post")
             return {"state": "skipped-art"}

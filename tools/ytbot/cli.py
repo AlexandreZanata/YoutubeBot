@@ -46,6 +46,11 @@ def command_check(args) -> None:
 
 
 def command_community(args) -> None:
+    if not args.channel:
+        results = community.publish_all(dry_run=args.dry_run)
+        if not results:
+            raise SystemExit("no channel posts were attempted")
+        return
     channels.apply(args.channel)
     runtime.start_hidden_chrome()
     from playwright.sync_api import sync_playwright
@@ -55,7 +60,7 @@ def command_community(args) -> None:
         topics = args.topic or []
         if not topics and config.TOPICS.is_file():
             topics = [config.TOPICS.read_text(encoding="utf-8").splitlines()[0].strip()]
-        community.ensure_post(context, topics or ["What do you think?"])
+        community.ensure_post(context, topics or ["What do you think?"], args.dry_run)
 
 
 def command_comments(args) -> None:
@@ -161,8 +166,9 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--channel", choices=sorted(channels.CHANNELS), default="")
     check.set_defaults(func=command_check)
     community_parser = sub.add_parser("community", help="check the Community tab and publish a first post when empty")
-    community_parser.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True)
+    community_parser.add_argument("--channel", choices=sorted(channels.CHANNELS), default="")
     community_parser.add_argument("--topic", action="append", default=[])
+    community_parser.add_argument("--dry-run", action="store_true")
     community_parser.set_defaults(func=command_community)
     shorts = sub.add_parser("shorts", help="generate, render and schedule vertical Shorts")
     shorts.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True)

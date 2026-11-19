@@ -14,9 +14,17 @@ transition (`started`, `unconfirmed`, `posted`) is also appended, with the chann
 posts from it and falls back to the single entry on older installs.
 
 ```bash
+python3 -m tools.ytbot community
+python3 -m tools.ytbot community --dry-run
 python3 -m tools.ytbot community --channel fallem-prince
 python3 -m tools.ytbot community --channel fallem-prince --topic "An exact topic"
 ```
+
+With no `--channel`, the bot visits every channel with its own account and publishes the post
+when the 24-hour rule allows it. The topic is the most recent scheduled video's title, and the
+post always carries that video's `https://youtu.be/<id>` link. When Codex is out of credits the
+dedicated square art comes from the ChatGPT browser window, still exported at 1080x1080; if
+neither provider produces art, nothing is published.
 
 The channel must be explicit. The same check runs automatically inside
 `python3 -m tools.ytbot run`.
