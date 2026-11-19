@@ -82,7 +82,7 @@ upload and scheduling flow after approval.
 
 ## Shorts
 
-One Short per day at 21:00, 90 to 140 English words, one true historical detail or photograph,
+One Short every two days at 09:00, 90 to 140 English words, one true historical detail or photograph,
 one generated vertical image in the archival style (never presented as a document) and no custom
 thumbnail.
 

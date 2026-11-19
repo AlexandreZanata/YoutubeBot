@@ -48,6 +48,8 @@ and slot hours, and no Short receives a custom thumbnail:
 | Infinite Random Worlds | `faith-shorts` | 1 per day at 09:00 |
 | Vocal Pages | `faith-shorts` | 1 per day at 21:00 |
 | Midnight Tales | `faith-shorts` | 1 every 2 days at 09:00 |
+| Sepia Atlas | `faith-shorts` | 1 every 2 days at 09:00 |
+| Bathylora | `faith-shorts` | 1 every 2 days at 21:00 |
 
 ## Intelligent Shorts distribution
 

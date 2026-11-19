@@ -136,6 +136,25 @@ CHANNELS = {
         slots=(21,),
         interval_days=2,
     ),
+    "bathylora": Channel(
+        slug="bathylora",
+        name="Bathylora",
+        handle="@Bathylora",
+        channel_id="UCxuhkOi4CDDStvQFpRGsoXA",
+        prompts="bathylora",
+        background="thumbnail",
+        language="en",
+        min_article_chars=13000,
+        article_retry=(
+            "Target narration length: 1,900 to 3,200 English words (15 to 25 minutes "
+            "at the channel's 0.9x documentary pace, tolerance up to 40 minutes / "
+            "~5,100 words). Keep the same ocean science subject, verified sources and "
+            "documentary arc; never pad with filler."
+        ),
+        max_article_chars=36000,
+        slots=(21,),
+        interval_days=2,
+    ),
     "midnight-tales": Channel(
         slug="midnight-tales",
         name="Midnight Tales",

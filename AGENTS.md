@@ -20,8 +20,8 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   the owner. Operator/browser interface language never changes content language.
 - `tools/ytbot` keeps channel prompts, deduplication, resumable stage records and sequential
   upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`,
-  `infinite-random-worlds`, `vocal-pages`, `zanata`, `reflection`, `midnight-tales` and
-  `sepia-atlas`.
+  `infinite-random-worlds`, `vocal-pages`, `zanata`, `reflection`, `midnight-tales`,
+  `sepia-atlas` and `bathylora`.
   Whispers uses 2,400 to 2,800 words (15 to 17 minutes), Sacred Brown Engraving thumbnails,
   brown stippling background and the metadata/tag patterns in
   [its channel profile](docs/channels/whispers-from-heaven.md). Zaflas uses Brazilian
@@ -41,6 +41,18 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   Never fabricate a historical photograph or present a generated image as documentary evidence.
   The first episode stays private for owner review and is never auto-published. See
   [its channel profile](docs/channels/sepia-atlas.md).
+- Bathylora (`@Bathylora`, `UCxuhkOi4CDDStvQFpRGsoXA`) is English-only, American English,
+  premium deep-ocean science documentaries built on authentic oceanographic photography (NOAA
+  Ocean Exploration priority, USGS and verified open scientific archives): 15 to 25 minutes
+  average (1,900 to 3,200 words, tolerance up to 40 minutes / ~5,100 words), one video every two days
+  at 21:00, mandatory `0.9x` narration speed (`slow_narration(..., factor=0.9)`), mandatory
+  broadcast documentary voice filter (`DOCUMENTARY_VOICE_FILTER`) with subtle filtered analog
+  room-tone, smooth 1.2s optical cross-dissolves, mandatory narration-to-image synchronization,
+  **Abyssal Cinema** visual identity (Abyssal Black `#030B12`, Deep Ocean `#071F2C`,
+  Bioluminescent Cyan `#55D9D0`, Ocean Mist `#B5D2D7`, Arctic White `#EDF7F5`, Submersed Teal
+  `#164958`) and **The Depth Mark** emblem. Never reuse Sepia Atlas aesthetics, never fabricate
+  species or discoveries, never present AI imagery as scientific evidence, and keep the first
+  episode private for owner review. See [its channel profile](docs/channels/bathylora.md).
 - Midnight Tales is English-only long-form sleep stories for adults, 6,500 to 9,000 words
   (45 to 65 minutes), one video every two days at 21:00 and one Short every two days at 09:00.
   Thumbnails are painterly cinematic scenes with no text, and the thumbnail is the still video
@@ -133,8 +145,8 @@ custom thumbnail. Every Short must have its own image tied to its story; never r
 another Short, and a near-duplicate background is replaced once. Each channel keeps its own art
 style, topic queue and slot hours: Zaflas
 09:00/18:00, reflection 08:00/20:00, Whispers 09:00/21:00, zanata 09:00, Fallem Prince 21:00,
-Infinite Random Worlds 09:00, Vocal Pages 21:00, Midnight Tales one every two days at 09:00 and
-Sepia Atlas 21:00.
+Infinite Random Worlds 09:00, Vocal Pages 21:00, Midnight Tales one every two days at 09:00,
+Sepia Atlas 21:00 and Bathylora 21:00.
 The Zaflas `shorts` command remains for legacy batches; new Shorts go through `faith-shorts`.
 Generation uses the legacy ChatGPT profile and only the upload touches the channel profile. Do
 not route Shorts through the long-form batch. See [Shorts](docs/SHORTS.md).
@@ -154,7 +166,7 @@ DOM map, state machine and troubleshooting are in
 
 The Zaflas Inova Simples sales agent is the only list use (owner decision 2026-11-17): it opens
 one-to-one conversations only with businesses from the owner's reviewed Google Maps CSV (never
-scraped), at most 30 first contacts per day in business hours, never repeats an opening and
+scraped), at most 50 first contacts per day in business hours, never repeats an opening and
 sends at most one follow-up. It answers funnel leads by
 `tools/ytbot/commercial/whatsapp/sales/sales_rules.toml`, through OpenCode Go: free models
 first (zero price in the live catalog, rotating, paused on timeout or no credits), then only
@@ -164,7 +176,7 @@ its fixed text or goes to the owner. A refusal is a permanent do-not-contact ent
 question gets an honest answer, the OpenCode key stays in `.local/`, and `--live` stays
 required. Imported numbers start with replies active: the agent answers a lead that writes even before
 an opening, `sales activate|pause` toggles that per lead, and `run --live --prospect --limit`
-opens one number at a time up to 10/day. `sales queue list|send` is a view of `leads.json`
+opens one number at a time up to 50/day. `sales queue list|send` is a view of `leads.json`
 (Maps leads in CSV order, no second store) whose `send --live --limit 1` opens exactly one
 number through the same path and run lock; the opening names the business as on Google Maps. The rules' values are of the static institutional
 site only; apps and systems are always quoted by the owner and the bot must never tie the site
