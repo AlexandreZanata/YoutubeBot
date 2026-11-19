@@ -12,7 +12,7 @@ and the journal in [WhatsApp Web](COMMERCIAL-WHATSAPP.md); there is no second se
 | First contact | One-to-one prospecting, only to numbers from a list the owner approved. No broadcast. |
 | Lead source | A CSV the owner builds by reviewing Google Maps. No scraping, no Places API. |
 | Replies | OpenCode Go free models first in rotation, then `deepseek-v4.1-flash` → `muse-spark-1.3-contributor` (updated the same evening). |
-| Daily limit | 10 first contacts per day. |
+| Daily limit | 50 first contacts per day. |
 
 ## Files
 
@@ -177,7 +177,7 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   opening to someone already in conversation. `activate --all` re-enables older leads,
   `pause --lead <id>` stops automatic replies and sends the message to "Precisa de você". `sales leads` and the
   Central show `reply: ativo` or `pausado`.
-- Openings stay one number at a time, in import order, up to 10/day and only in the opening
+- Openings stay one number at a time, in import order, up to 50/day and only in the opening
   window. Use `--limit 1` to start exactly one number per invocation or `--limit 10` for the
   daily batch; the existing pacing, journal and repeat fences apply to both.
 - The owner's selected list may be kept in
@@ -214,7 +214,7 @@ python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --l
   `send_sequence`: the lead becomes `opening` with `opened_at` before the browser acts, the
   journal fences every bubble, and a lead is `sent` only when `open_lead` returns `opened`. It
   stops at the first `unconfirmed` or `error` and retries nothing by itself. The opening window
-  (07:00 to 17:00, Monday to Friday), the 10/day limit, pacing, do-not-contact and invalid
+  (07:00 to 17:00, Monday to Friday), the 50/day limit, pacing, do-not-contact and invalid
   numbers apply exactly as in `run --prospect`; a blocked run prints the reason.
 - **One sender at a time.** `queue send --live` and `run` share the lock, so one refuses while
   the other runs. Stop the `run` loop (SIGTERM ends it between two steps), send, then start it
@@ -295,6 +295,7 @@ the model using only the facts.
 | Photo, video, document, location | `media` | handoff | Fixed ack; owner notified. A caption is read as the message text |
 | Sticker or GIF only | `sticker` | ignore | Nothing |
 | "Já temos site" | `already_has_site` | close | Thanks; available later |
+| "Irei encaminhar para o responsável!!", "vou encaminhar para a diretoria/marketing", "já encaminhei" | `forwarded_to_decider` | close | Fixed: "Entendido, muito obrigado! Fico no aguardo do retorno." (no hand-off; chat reopens automatically if the decider writes back) |
 | "Vou pensar", "mais pra frente" | `later` | close | Available whenever they want |
 | "Tudo bem e você?" | `greeting_reply` | reply | Short answer and an open question |
 | "Obrigado", "ok" | `thanks` | ignore | Nothing |
@@ -306,6 +307,10 @@ the model using only the facts.
 ## Staff, referral, closing and end states (owner, 2026-11-17)
 
 ```text
+Someone says they will forward the proposal ("Irei encaminhar para o responsável!!", "vou encaminhar para o marketing")
+  └─▶ forwarded_to_decider · fixed thanks + wait ("Entendido, muito obrigado! Fico no aguardo do retorno.") → state closed
+      (no second contact request, no owner hand-off; chat reopens to engaged automatically if the decider writes back)
+
 A staff member answers ("sou funcionária", "o dono não está", "vou passar pro dono")
   └─▶ gatekeeper · state gatekeeper (the bot keeps the chat)
       "Muito obrigado pelo retorno!"
@@ -562,7 +567,7 @@ live in `[opening]` and `[pacing]` of the rules file.
 - `--live` is required to send; the default prints the plan.
 - Refusal or opt-out → salted hash in `do-not-contact.json`, removal from the `rules.json`
   allow list, and no message ever again, including follow-ups and re-imports.
-- At most 10 first contacts per day (America/Cuiaba), weekdays 07:00–17:00 (replies also 07:00–17:00).
+- At most 50 first contacts per day (America/Cuiaba), weekdays 07:00–17:00 (replies also 07:00–17:00).
 - The opening is recorded before the browser acts and its journal keys are per lead, so it is
   never repeated, even after a crash.
 - One follow-up after 72 h without an answer; `no-response` 96 h later, then silence.

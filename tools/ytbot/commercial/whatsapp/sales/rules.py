@@ -18,7 +18,7 @@ ACTIONS = ("reply", "qualify", "quote", "collect", "close", "block", "handoff", 
 REQUIRED_INTENTS = ("opt_out", "refusal", "auto_reply", "bot_question", "unknown",
                     "quote_accept", "quote_details", "custom_platform", "system_request",
                     "site_institutional", "domain", "human_request", "stuck", "ready_to_buy",
-                    "close_site", "payment_sent", "referral", "gatekeeper")
+                    "close_site", "payment_sent", "referral", "forwarded_to_decider", "gatekeeper")
 HANDOFF_ACTIONS = ("handoff", "quote", "collect", "won", "buy", "refer")
 PRIORITIES = ("hot", "needed", "alert")
 MONEY = re.compile(r"r\$\s*(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?")

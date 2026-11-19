@@ -179,6 +179,22 @@ class SalesDecisionTests(unittest.TestCase):
         )
         self.assertEqual((decision.intent, decision.action), ("custom_platform", "qualify"))
 
+    def test_long_forwarding_message_beats_model_unknown_and_handoff(self):
+        long_text = ("Olá Alexandre, boa tarde! Obrigado pela mensagem, irei encaminhar sua "
+                     "proposta para o setor responsável da academia analisar.")
+        for answer in (
+            {"intent": "unknown", "handoff": True, "messages": []},
+            {"intent": "forwarded_to_decider", "handoff": True, "messages": []},
+        ):
+            decision, _ = self.run_model(long_text, answer)
+            self.assertEqual((decision.intent, decision.action), ("forwarded_to_decider", "close"))
+            self.assertEqual(decision.messages, list(self.rules.intent("forwarded_to_decider").messages))
+        short_decision, short_model = self.run_model("Irei encaminhar para o responsável!!",
+                                                     {"intent": "unknown", "messages": []})
+        self.assertEqual(short_model.calls, [])
+        self.assertEqual((short_decision.intent, short_decision.action),
+                         ("forwarded_to_decider", "close"))
+
 
 if __name__ == "__main__":
     unittest.main()

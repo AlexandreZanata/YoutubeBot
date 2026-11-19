@@ -150,7 +150,7 @@ DOM map, state machine and troubleshooting are in
 
 The Zaflas Inova Simples sales agent is the only list use (owner decision 2026-11-17): it opens
 one-to-one conversations only with businesses from the owner's reviewed Google Maps CSV (never
-scraped), at most 10 first contacts per day in business hours, never repeats an opening and
+scraped), at most 50 first contacts per day in business hours, never repeats an opening and
 sends at most one follow-up. It answers funnel leads by
 `tools/ytbot/commercial/whatsapp/sales/sales_rules.toml`, through OpenCode Go: free models
 first (zero price in the live catalog, rotating, paused on timeout or no credits), then only
@@ -160,7 +160,7 @@ its fixed text or goes to the owner. A refusal is a permanent do-not-contact ent
 question gets an honest answer, the OpenCode key stays in `.local/`, and `--live` stays
 required. Imported numbers start with replies active: the agent answers a lead that writes even before
 an opening, `sales activate|pause` toggles that per lead, and `run --live --prospect --limit`
-opens one number at a time up to 10/day. `sales queue list|send` is a view of `leads.json`
+opens one number at a time up to 50/day. `sales queue list|send` is a view of `leads.json`
 (Maps leads in CSV order, no second store) whose `send --live --limit 1` opens exactly one
 number through the same path and run lock; the opening names the business as on Google Maps. The rules' values are of the static institutional
 site only; apps and systems are always quoted by the owner and the bot must never tie the site

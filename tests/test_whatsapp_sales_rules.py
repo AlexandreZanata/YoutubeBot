@@ -94,14 +94,23 @@ class SalesRulesTests(unittest.TestCase):
         self.assertEqual(
             guard.violations(self.rules, [self.rules.brief_system["first_question_custom"]]), [])
 
+    def test_forwarded_to_decider_intent_is_fixed_close_and_passes_guard(self):
+        from tools.ytbot.commercial.whatsapp.sales import guard
+        intent = self.rules.intent("forwarded_to_decider")
+        self.assertEqual((intent.action, intent.fixed), ("close", True))
+        self.assertEqual(guard.violations(self.rules, list(intent.messages)), [])
+        reply = " ".join(intent.messages).casefold()
+        self.assertIn("obrigado", reply)
+        self.assertIn("aguardo", reply)
+
     def test_site_prices_are_stated_as_site_only(self):
         facts = " ".join(self.rules.raw["facts"]["sistemas"])
         self.assertIn("NÃO custam R$ 500", facts)
         self.assertIn("SOMENTE para o site institucional",
                       " ".join(self.rules.raw["facts"]["site_institucional"]))
 
-    def test_daily_opening_limit_is_ten(self):
-        self.assertEqual(self.rules.limits["daily_openings"], 10)
+    def test_daily_opening_limit_is_fifty(self):
+        self.assertEqual(self.rules.limits["daily_openings"], 50)
 
     def test_opening_window_is_weekday_business_hours(self):
         self.assertTrue(self.rules.in_window(MONDAY, "opening"))
@@ -124,7 +133,7 @@ class SalesRulesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "rules.toml"
             text = sales_rules.RULES_PATH.read_text(encoding="utf-8")
-            path.write_text(text.replace("daily_openings = 10", "daily_openings = 5"),
+            path.write_text(text.replace("daily_openings = 50", "daily_openings = 5"),
                             encoding="utf-8")
             agent = Agent()
             seen = reload_if_changed(agent, path, 0.0)

@@ -166,13 +166,14 @@ class QueueTests(unittest.TestCase):
         preview, _ = self.queue("send")
         self.assertIn("fora do horário de abertura", preview["blocked"])
 
-    def test_the_daily_limit_of_ten_holds(self):
-        rows = [{"name": f"Loja {index}", "phone": PHONES[index]} for index in range(12)]
+    def test_the_daily_limit_holds(self):
+        limit = int(self.rules.limits["daily_openings"])
+        rows = [{"name": f"Loja {index}", "phone": PHONES[index]} for index in range(limit + 2)]
         self.import_rows(rows)
-        output, _ = self.queue("send", live=True, limit=12)
-        self.assertEqual(sum(1 for item in output["sent"] if item["state"] == "opened"), 10)
+        output, _ = self.queue("send", live=True, limit=limit + 2)
+        self.assertEqual(sum(1 for item in output["sent"] if item["state"] == "opened"), limit)
         again, _ = self.queue("send", live=True)
-        self.assertEqual(again["blocked"], "limite diário de 10 aberturas atingido")
+        self.assertEqual(again["blocked"], f"limite diário de {limit} aberturas atingido")
 
     def test_do_not_contact_is_skipped_and_the_next_one_is_sent(self):
         self.import_rows()
