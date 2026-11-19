@@ -9,3 +9,5 @@ Crie UMA imagem de fundo vertical 9:16 para um YouTube Short do canal Zaflas Agr
   mais limpo para as legendas queimadas.
 - Sem texto, letras, números, logotipos, marca d'água, bordas ou interface.
 - Imagem segura e realista; nada de elementos futuristas, ícones ou colagens.
+
+- Esta imagem é de um Short específico: mostre o assunto e o lugar desta história e nunca repita cena, personagem ou composição de outro Short.

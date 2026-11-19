@@ -118,7 +118,9 @@ void/two-color poster interpretation is superseded. Alternate the dense prompt w
 
 Every channel now publishes Vertical Shorts through the `faith-shorts` protocol: 1080x1920,
 35 to 55 seconds, one generated image per Short as its background, burned-in subtitles and no
-custom thumbnail. Each channel keeps its own art style, topic queue and slot hours: Zaflas
+custom thumbnail. Every Short must have its own image tied to its story; never reuse a scene from
+another Short, and a near-duplicate background is replaced once. Each channel keeps its own art
+style, topic queue and slot hours: Zaflas
 09:00/18:00, reflection 08:00/20:00, Whispers 09:00/21:00, zanata 09:00, Fallem Prince 21:00,
 Infinite Random Worlds 09:00, Vocal Pages 21:00 and Midnight Tales one every two days at 09:00.
 The Zaflas `shorts` command remains for legacy batches; new Shorts go through `faith-shorts`.

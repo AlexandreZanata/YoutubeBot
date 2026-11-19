@@ -250,7 +250,7 @@ def _recent_image(root: Path, since: float) -> Path | None:
     return max(candidates, key=lambda item: item.stat().st_mtime).resolve()
 
 
-def generate_thumbnail(run_dir: Path, style: str = "dense") -> Path:
+def generate_thumbnail(run_dir: Path, style: str = "dense", variation: str = "") -> Path:
     schema = {"type": "object", "properties": {"image_path": {"type": "string", "maxLength": 4096}},
               "required": ["image_path"], "additionalProperties": False}
     if style not in ("dense", "classic", "shorts", "short-background"):
@@ -264,7 +264,9 @@ def generate_thumbnail(run_dir: Path, style: str = "dense") -> Path:
               "with objects such as books, doors or mirrors; avoid harmful actions or restrictive cords around a body. "
               "Return only JSON with the absolute path of the image actually saved by that tool. "
               "The image engine creates the image; you only coordinate the request.\nVISUAL IDENTITY:\n"
-              + config.prompt(prompt_file) + "\n<ARTICLE>\n" + _article(run_dir)[:8000] + "\n</ARTICLE>")
+              + config.prompt(prompt_file)
+              + ("\n" + variation if variation else "")
+              + "\n<ARTICLE>\n" + _article(run_dir)[:8000] + "\n</ARTICLE>")
     started = time.time()
     value = _execute(run_dir, "thumbnail", prompt, schema, images=True)
     generated_root = (Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")) / "generated_images").resolve()

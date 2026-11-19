@@ -67,11 +67,12 @@ def image_data_url(page) -> str | None:
     )
 
 
-def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: int = 1200) -> Path | None:
+def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: int = 1200,
+                       variation: str = "") -> Path | None:
     if codex_media.available():
         for attempt in range(2):
             try:
-                return codex_media.generate_thumbnail(run_dir, style)
+                return codex_media.generate_thumbnail(run_dir, style, variation)
             except codex_media.CodexUsageLimit as error:
                 log(str(error))
                 break
@@ -99,8 +100,11 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
         # is front-loaded, so the browser path keeps the leading sections only.
         if len(identity) > 4000:
             identity = identity[:4000].rsplit("\n\n", 1)[0]
-        request = (identity
-                   + "\n\nVideo topic: " + topic
+        subject = (topic + "\n\nShow this story's own subject, place and moment. Do not reuse "
+                   "a character, setting or composition from another video.")
+        request = (subject
+                   + "\n\n" + identity
+                   + ("\n\n" + variation if variation else "")
                    + "\n\nGenerate the final image now and reply only after it exists.")
         send_text(page, request)
         log("thumbnail prompt sent")

@@ -213,6 +213,49 @@ def short_slots(count: int, hours: tuple[int, ...], start: date,
     return slots
 
 
+def background_signature(path: Path) -> int:
+    from PIL import Image
+
+    with Image.open(path) as image:
+        small = image.convert("L").resize((16, 16), Image.Resampling.LANCZOS)
+        pixels = list(small.getdata())
+    mean = sum(pixels) / len(pixels)
+    return sum(1 << index for index, value in enumerate(pixels) if value > mean)
+
+
+def similar_background(root: Path, run_dir: Path, limit: int = 24) -> Path | None:
+    current = run_dir / "thumbnail.png"
+    if not current.is_file():
+        return None
+    signature = background_signature(current)
+    for other in root.glob("*/thumbnail.png"):
+        if other.parent == run_dir or not other.is_file():
+            continue
+        if bin(signature ^ background_signature(other)).count("1") < limit:
+            return other
+    return None
+
+
+def ensure_unique_background(gen, run_dir: Path, root: Path) -> None:
+    """Every Short owns one image; a near-duplicate is replaced once."""
+    for _attempt in range(2):
+        duplicate = similar_background(root, run_dir)
+        if duplicate is None:
+            return
+        log(f"background too similar to {duplicate.parent.name}; generating a new scene")
+        stamp = int(time.time())
+        (run_dir / "thumbnail.png").rename(run_dir / f"thumbnail-similar-{stamp}.png")
+        state = run_dir / ".codex-media" / "thumbnail"
+        if state.is_dir():
+            state.rename(state.with_name(f"thumbnail-attempt-{stamp}"))
+        assets.generate_thumbnail(
+            gen, run_dir, "short-background",
+            variation="Create a clearly different scene from the previous attempt: change the "
+                      "place, the objects, the light and the composition.")
+    if similar_background(root, run_dir) is not None:
+        log("background still resembles another Short; kept for review")
+
+
 def generate_script(page, topic: str, run_dir: Path) -> str:
     page.goto(config.GPT_URL, timeout=90000)
     page.wait_for_timeout(7000)
@@ -320,6 +363,7 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
                     pass
             try:
                 assets.generate_thumbnail(gen, run_dir, "short-background")
+                ensure_unique_background(gen, run_dir, root)
                 render_short(run_dir)
                 meta = metadata(topic, text, spec)
                 (run_dir / "metadata.json").write_text(

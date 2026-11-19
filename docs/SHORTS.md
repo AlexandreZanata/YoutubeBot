@@ -22,6 +22,14 @@ them, always with one generated background image and burned-in subtitles.
 
 The long-form Zaflas videos remain one per day at 12:00. Shorts are separate uploads.
 
+## One image per Short
+
+Every Short generates its own 1080x1920 image from that story's subject and place. Never reuse
+a background, character or composition from another Short. The image request leads with the
+topic and asks for a scene specific to it; after generation the bot compares a perceptual
+signature with the channel's other Shorts and, when a new image is too similar, keeps the old
+attempt and generates a different scene once.
+
 Zaflas is the only Portuguese channel. A short script that comes back in English is rejected
 and rewritten once; a second English result fails the asset before audio, render or upload.
 

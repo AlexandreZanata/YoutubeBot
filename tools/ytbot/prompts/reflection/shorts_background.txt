@@ -7,3 +7,5 @@ Create ONE vertical 9:16 background image for a YouTube Short from the word of r
   kept calmer for burned-in subtitles.
 - No text, no letters, no numbers, no logos, no watermark, no borders, no UI.
 - Safe and reverent imagery; no injury, no horror, no modern objects.
+
+- One specific Short only: show this story's subject and place, and never reuse a scene, character or composition from another Short.
