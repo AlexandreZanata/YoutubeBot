@@ -145,14 +145,24 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   and hand-off. Run it after editing the rules; about US$ 0.02 per full run.
 - `run` scans the chat list (listener), stores incoming messages of funnel leads, answers
   them, sends due follow-ups and, with `--prospect`, opens new leads up to the daily limit.
-  Without `--live` it prints the decisions and changes no lead state. It stops on the first
-  send that is not confirmed. An edited `sales_rules.toml` is reloaded before the next cycle;
-  an invalid edit is reported and the previous rules stay in use. When the browser page or the
-  CDP connection closes outside a send (the computer slept, Chrome restarted; seen on
-  2026-11-18 as `TargetClosedError` after a night), the run reconnects to the hidden browser
-  and continues, up to 3 times in a row; a failed send still stops the run. A `SIGTERM`
-  asks the run to stop: it finishes the current step (never in the middle of a send), closes
-  its WhatsApp tab and releases the run lock, so restarts no longer leave extra tabs in the
+  Without `--live` it prints the decisions and changes no lead state. In continuous mode
+  (without `--once`), `--prospect` opens at most one company per `between_openings` cooldown
+  (120 to 180 seconds, persisted across restarts via `opened_at`) without blocking the loop,
+  so the bot keeps scanning and replying to already-opened companies between openings; `--limit`
+  caps the total openings of that run while keeping the reply loop alive afterward. Pass
+  `--only-csv <path>` or `--only-leads <id1,id2>` to restrict `run` strictly to a target batch
+  (and any referral created by those leads), leaving all other leads and personal chats untouched.
+  It stops immediately on the first `unconfirmed` or failed send (including inside `reply_pending`
+  and `referral_opening`) without touching further chats. An edited `sales_rules.toml` is reloaded
+  before the next cycle; an invalid edit is reported and the previous rules stay in use. When the
+  browser page or the CDP connection closes outside a send (including before typing inside
+  `_open_chat`; the computer slept, Chrome restarted; seen on 2026-11-18 as `TargetClosedError`
+  after a night), the run reconnects to the hidden browser and continues, up to 3 times in a row;
+  a failed send still stops the run. Chat-list echo suppression compares only the latest outgoing
+  bubble (so short customer replies like `"Bom dia"` or `"Tudo bem?"` are never dropped), and
+  WhatsApp Business auto-replies (`auto_reply`) are always decided locally regardless of length.
+  A `SIGTERM` asks the run to stop: it finishes the current step (never in the middle of a send),
+  closes its WhatsApp tab and releases the run lock, so restarts no longer leave extra tabs in the
   hidden browser. A second `SIGTERM` stops at once; `SIGKILL` still leaves the tab open.
 - `resolve` hands a conversation back to the agent after the owner handled it; `block` adds the
   number to the do-not-contact list.
@@ -198,7 +208,7 @@ python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --l
   `send_sequence`: the lead becomes `opening` with `opened_at` before the browser acts, the
   journal fences every bubble, and a lead is `sent` only when `open_lead` returns `opened`. It
   stops at the first `unconfirmed` or `error` and retries nothing by itself. The opening window
-  (08:30 to 17:30, Monday to Friday), the 10/day limit, pacing, do-not-contact and invalid
+  (07:00 to 17:00, Monday to Friday), the 10/day limit, pacing, do-not-contact and invalid
   numbers apply exactly as in `run --prospect`; a blocked run prints the reason.
 - **One sender at a time.** `queue send --live` and `run` share the lock, so one refuses while
   the other runs. Stop the `run` loop (SIGTERM ends it between two steps), send, then start it
@@ -283,7 +293,7 @@ the model using only the facts.
 | "Tudo bem e você?" | `greeting_reply` | reply | Short answer and an open question |
 | "Obrigado", "ok" | `thanks` | ignore | Nothing |
 | Anything not in the facts: city, invoice, contract, technology, e-mail, ambiguous text | `unknown` | handoff | Fixed: "Certo! Vou verificar direitinho e já te respondo."; owner notified |
-| Message outside 07:00–21:00 | — | — | Stored; answered at the start of the next reply window |
+| Message outside 07:00–17:00 | — | — | Stored; answered at the start of the next reply window |
 | The owner typed in the chat | — | — | Any message the bot did not send, after the bot's latest message in that chat (older personal or archived-cycle messages do not count), found when the chat opens to answer or to follow up; state `owner`, automation pauses |
 | A refused contact writes again | — | — | No automated answer; owner notified |
 
@@ -546,7 +556,7 @@ live in `[opening]` and `[pacing]` of the rules file.
 - `--live` is required to send; the default prints the plan.
 - Refusal or opt-out → salted hash in `do-not-contact.json`, removal from the `rules.json`
   allow list, and no message ever again, including follow-ups and re-imports.
-- At most 10 first contacts per day (America/Cuiaba), weekdays 08:30–17:30.
+- At most 10 first contacts per day (America/Cuiaba), weekdays 07:00–17:00 (replies also 07:00–17:00).
 - The opening is recorded before the browser acts and its journal keys are per lead, so it is
   never repeated, even after a crash.
 - One follow-up after 72 h without an answer; `no-response` 96 h later, then silence.
