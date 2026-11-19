@@ -161,6 +161,12 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   a failed send still stops the run. Chat-list echo suppression compares only the latest outgoing
   bubble (so short customer replies like `"Bom dia"` or `"Tudo bem?"` are never dropped), and
   WhatsApp Business auto-replies (`auto_reply`) are always decided locally regardless of length.
+  When a contact is actively typing (`"digitando..."` / `"typing..."` in the chat list or open
+  chat header — strictly typing only, never audio recording), the lead is categorized in the
+  `typing` wait state (`typing: true`, `state: "typing"`, `action: "wait"`): the bot sends
+  nothing (also re-checking right before sending after model inference) until the contact finishes
+  typing, then merges and answers all arrived bubbles together (capped at
+  `max_typing_wait_seconds = 60` so a stuck browser indicator can never stall a chat).
   A `SIGTERM` asks the run to stop: it finishes the current step (never in the middle of a send),
   closes its WhatsApp tab and releases the run lock, so restarts no longer leave extra tabs in the
   hidden browser. A second `SIGTERM` stops at once; `SIGKILL` still leaves the tab open.

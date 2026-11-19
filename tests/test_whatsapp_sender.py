@@ -44,6 +44,20 @@ class WhatsAppSenderTests(unittest.TestCase):
             self.assertEqual(results[0]["state"], "dry-run")
             self.assertFalse(sender.already_sent(path, sender.message_key("Ana", "Oi", None)))
 
+    def test_is_typing_detects_only_typing_header_status(self):
+        class HeaderPage:
+            def __init__(self, statuses):
+                self.statuses = statuses
+
+            def evaluate(self, script):
+                return self.statuses
+
+        for positive in (["digitando..."], ["Digitando…"], ["typing..."], ["typing"]):
+            self.assertTrue(sender.is_typing(HeaderPage(positive)), positive)
+        for negative in (["gravando áudio..."], ["recording audio..."], ["online"],
+                         ["visto por último hoje às 08:20"], []):
+            self.assertFalse(sender.is_typing(HeaderPage(negative)), negative)
+
 
 if __name__ == "__main__":
     unittest.main()

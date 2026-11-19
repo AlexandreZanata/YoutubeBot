@@ -141,6 +141,40 @@ class WhatsAppListenerTests(unittest.TestCase):
         self.assertEqual(page.visits, 1)
         self.assertEqual(len(events), 1)
 
+    def test_scan_once_categorizes_only_typing_status_and_never_audio_recording(self):
+        class FakeLocator:
+            def count(self):
+                return 1
+
+        class TypingPage:
+            url = "https://web.whatsapp.com/"
+
+            def locator(self, selector):
+                return FakeLocator()
+
+            def evaluate(self, script, arg):
+                return [
+                    {"title": "Clínica A", "stamp": "08:20", "preview": "digitando...",
+                     "outgoing": False, "unread": True, "statusTitles": [], "fallbackText": ""},
+                    {"title": "Clínica B", "stamp": "08:20", "preview": "typing…",
+                     "outgoing": False, "unread": False, "statusTitles": [], "fallbackText": ""},
+                    {"title": "Clínica C", "stamp": "08:20", "preview": "gravando áudio...",
+                     "outgoing": False, "unread": True, "statusTitles": [], "fallbackText": ""},
+                ]
+
+        seen: set[str] = set()
+        events = listener.scan_once(TypingPage(), seen, {"mode": "allow", "contacts": []})
+        by_chat = {item["chat"]: item for item in events}
+        self.assertEqual(by_chat["Clínica A"]["kind"], "typing")
+        self.assertEqual(by_chat["Clínica A"]["text"], "")
+        self.assertTrue(by_chat["Clínica A"]["typing"])
+        self.assertEqual(by_chat["Clínica B"]["kind"], "typing")
+        # Audio recording is NOT categorized as typing (strictly "digitando" / "typing" only).
+        self.assertNotEqual(by_chat["Clínica C"].get("kind"), "typing")
+        self.assertEqual(by_chat["Clínica C"]["text"], "gravando áudio...")
+        # Typing indicators never enter `seen`, so subsequent typing bursts keep firing.
+        self.assertEqual(len(seen), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
