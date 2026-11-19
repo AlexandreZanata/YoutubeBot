@@ -738,6 +738,24 @@ class CampaignEndToEndTests(unittest.TestCase):
         self.assertEqual([s for s in channel.sent if s["lead"] == second["id"]], [],
                          "must not send to second chat after unconfirmed first")
 
+    def test_error_opening_skips_to_next_and_never_pauses_prospecting(self):
+        _, clinics = self._import_clinics()
+        channel = SimulatedWhatsApp(self.store.journal_path, self.clock,
+                                    fail_open_once={clinics[0]["id"]: RuntimeError(
+                                        "WhatsApp chat did not open for the number")})
+        agent = SalesAgent(self.rules, self.store, channel, None, live=True,
+                           clock=self.clock, sleep=self._sleep, rng=random.Random(2),
+                           notify=self.notes.append, log=self.logs.append, paced_openings=True)
+        session = ScriptedSession(self.clock, channel)
+        commands.run_cycles(agent, session, _run_args(limit=10, interval=2),
+                            listen=lambda *a, **k: [], out=lambda line: None,
+                            stopped=lambda: len(channel.opening_windows) >= 2)
+        self.assertEqual(self.store.lead(clinics[0]["id"])["state"], "new")
+        self.assertIn("did not open", self.store.lead(clinics[0]["id"])["open_error"])
+        opened = [window[0] for window in channel.opening_windows]
+        self.assertEqual(opened, [clinics[1]["id"], clinics[2]["id"]],
+                         "the failed chat is skipped, the next ones open on schedule")
+
     def test_blocking_prospect_uses_two_to_three_minute_opening_interval(self):
         _, clinics = self._import_clinics()
         channel = SimulatedWhatsApp(self.store.journal_path, self.clock)

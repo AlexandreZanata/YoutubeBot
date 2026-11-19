@@ -297,5 +297,56 @@ class WhatsAppSenderTests(unittest.TestCase):
             self.assertEqual(shot.parent, debug_dir)
 
 
+    def test_ai_notice_modal_is_dismissed_on_chat_open(self):
+        class Node:
+            def __init__(self, page, selector):
+                self.page = page
+                self.selector = selector
+
+            @property
+            def first(self):
+                return self
+
+            def count(self):
+                if self.selector == "#main":
+                    return 1
+                if self.selector == 'div[role="dialog"] button:has-text("OK")':
+                    return 1 if self.page.modal and not self.page.dismissed else 0
+                return 0
+
+            def inner_text(self):
+                if self.selector == "#main" and self.page.modal and not self.page.dismissed:
+                    return ("Get quick help from business chats that use AI from Meta "
+                            "OK")
+                return "regular chat content"
+
+            def click(self, timeout=None):
+                self.page.dismissed = True
+
+        class ModalPage:
+            modal = True
+
+            def __init__(self):
+                self.dismissed = False
+                self.waits = 0
+
+            def locator(self, selector):
+                return Node(self, selector)
+
+            def wait_for_timeout(self, ms):
+                self.waits += 1
+
+        class PlainPage(ModalPage):
+            modal = False
+
+        page = ModalPage()
+        self.assertTrue(sender.dismiss_ai_notice(page))
+        self.assertTrue(page.dismissed)
+        self.assertFalse(sender.dismiss_ai_notice(page),
+                         "a dismissed modal is not clicked again")
+        plain = PlainPage()
+        self.assertFalse(sender.dismiss_ai_notice(plain))
+        self.assertFalse(plain.dismissed)
+
 if __name__ == "__main__":
     unittest.main()

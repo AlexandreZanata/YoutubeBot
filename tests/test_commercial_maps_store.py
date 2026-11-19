@@ -116,6 +116,29 @@ class MapsRecordTests(unittest.TestCase):
         report = render.export_run(self.run, self.rules, NOW, set(), set())
         self.assertEqual((report["pending"], report["candidates"]), (1, 0))
 
+    def test_mobile_only_drops_landlines(self):
+        for value in (listing(),
+                      listing(name="Fixaria", phone="(65) 3333-0001", address="R. B, 2 - Centro")):
+            self.run.append_listing({**value, "state": "read"})
+            self.run.append_check({"identity": record.identity(value), "outcome": "no-site"})
+        report = render.export_run(self.run, self.rules, NOW, set(), set(), mobile_only=True)
+        self.assertEqual(report["candidates"], 1)
+        self.assertIn("telefone fixo (filtro WhatsApp)",
+                      (self.run.path / "report.md").read_text(encoding="utf-8"))
+        with (self.run.path / "candidatos.csv").open(encoding="utf-8") as handle:
+            self.assertEqual([row["name"] for row in csv.DictReader(handle)],
+                             ["Clínica Exemplo"])
+
+    def test_duplicate_phone_keeps_one_candidate(self):
+        for address in ("R. A, 1 - Centro", "R. B, 2 - Centro"):
+            value = listing(name="Agro Dupla", address=address)
+            self.run.append_listing({**value, "state": "read"})
+            self.run.append_check({"identity": record.identity(value), "outcome": "no-site"})
+        report = render.export_run(self.run, self.rules, NOW, set(), set(), mobile_only=True)
+        self.assertEqual(report["candidates"], 1)
+        self.assertIn("duplicado (mesmo telefone)",
+                      (self.run.path / "report.md").read_text(encoding="utf-8"))
+
     def test_export_command_uses_the_private_maps_run(self):
         self.run.append_listing({**listing(), "state": "read"})
         self.run.append_check({"identity": record.identity(listing()), "outcome": "no-site"})

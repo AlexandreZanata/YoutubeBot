@@ -139,6 +139,96 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(len(agent.prospect()), 2)
         self.assertTrue(self.pauses, "chats are paced one after another")
 
+    def test_error_opening_skips_to_next_instead_of_stopping(self):
+        leads = self.leads(3)
+        agent, channel = self.agent()
+        calls = []
+        real_open = channel.open
+
+        def flaky_open(lead):
+            calls.append(lead["id"])
+            if len(calls) == 1:
+                raise RuntimeError("WhatsApp chat did not open for the number")
+            return real_open(lead)
+
+        channel.open = flaky_open
+        results = agent.prospect()
+        self.assertEqual([item["state"] for item in results], ["error", "opened", "opened"])
+        failed = self.store.lead(leads[0]["id"])
+        self.assertEqual(failed["state"], "new", "nothing was typed, so it stays new")
+        self.assertIn("did not open", failed["open_error"])
+        self.assertIsNone(failed["opened_at"])
+        # The automatic run skips the failed lead from now on.
+        self.assertEqual(agent.prospect(), [])
+
+    def test_manual_send_retries_a_failed_lead(self):
+        leads = self.leads(2)
+        agent, channel = self.agent()
+        real_open = channel.open
+        channel.open = lambda lead: (_ for _ in ()).throw(
+            RuntimeError("WhatsApp chat did not open for the number"))
+        self.assertEqual([item["state"] for item in agent.prospect()], ["error", "error"])
+        channel.open = real_open
+        retried = agent.prospect(queue_only=True)
+        self.assertEqual([item["lead"] for item in retried],
+                         [leads[0]["id"], leads[1]["id"]])
+        self.assertEqual([item["state"] for item in retried], ["opened", "opened"])
+
+    def _write_reserve(self, rows):
+        directory = Path(self.directory.name) / "whatsapp" / "sales" / "importar"
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / "reserva-teste.csv"
+        lines = ["name,phone,city,category,maps_url,website,note"]
+        lines += [f"{row['name']},{row['phone']},{row.get('city', '')},,,," for row in rows]
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return path
+
+    def test_error_backfills_the_next_reserve_company_at_the_end(self):
+        from sales_fixtures import PHONES
+        leads = self.leads(2)
+        self._write_reserve([{"name": "Reserva Um", "phone": PHONES[20], "city": "Cuiabá"},
+                             {"name": "Reserva Dois", "phone": PHONES[21], "city": "Sinop"}])
+        agent, channel = self.agent()
+        real_open = channel.open
+        channel.open = lambda lead: (_ for _ in ()).throw(
+            RuntimeError("WhatsApp chat did not open for the number"))
+        results = agent.prospect()
+        self.assertEqual([item["state"] for item in results], ["error", "error"])
+        queued = sorted((lead for lead in self.store.leads().values()
+                         if lead.get("queue_position")),
+                        key=lambda lead: int(lead["queue_position"]))
+        self.assertEqual([lead["name"] for lead in queued[-2:]],
+                         ["Reserva Um", "Reserva Dois"],
+                         "one replacement per failure, at the end of the queue")
+        self.assertEqual(self.store.lead(queued[-2]["id"])["state"], "new")
+        # Next cycle opens the replacements; the failed leads are never retried.
+        channel.open = real_open
+        again = agent.prospect()
+        self.assertEqual([item["state"] for item in again], ["opened", "opened"])
+        self.assertEqual([item["name"] for item in again], ["Reserva Um", "Reserva Dois"])
+
+    def test_unconfirmed_backfills_and_never_retries(self):
+        from sales_fixtures import PHONES
+        leads = self.leads(2)
+        self._write_reserve([{"name": "Reserva Um", "phone": PHONES[20], "city": "Cuiabá"}])
+        agent, channel = self.agent(channel=FakeChannel(
+            self.store.journal_path, states=["unconfirmed"] + ["sent"] * 30))
+        results = agent.prospect()
+        states = [item["state"] for item in results]
+        self.assertEqual(states[0], "unconfirmed")
+        self.assertIn("opened", states[1:], "the line moves on after an unconfirmed send")
+        self.assertEqual(self.store.lead(leads[0]["id"])["state"], "unconfirmed")
+        queued = sorted((lead for lead in self.store.leads().values()
+                         if lead.get("queue_position")),
+                        key=lambda lead: int(lead["queue_position"]))
+        self.assertEqual(queued[-1]["name"], "Reserva Um")
+        # The reserve lead opens on the next cycle; the unconfirmed one is never retried.
+        again = agent.prospect()
+        opened_names = [self.store.lead(item["lead"])["name"] for item in again
+                        if item["state"] == "opened"]
+        self.assertIn("Reserva Um", opened_names)
+        self.assertNotIn(leads[0]["id"], [item["lead"] for item in again])
+
     def test_no_first_contact_outside_business_hours(self):
         self.leads(1)
         self.clock.now = MONDAY.replace(hour=20)

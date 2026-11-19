@@ -28,6 +28,10 @@ REQUIRED_CONFIRMATION = (
     "search_url", "timeout_seconds", "max_page_bytes", "max_search_candidates", "user_agent",
     "domain_tlds", "ignore_domains", "parking_markers", "name_stopwords",
 )
+REQUIRED_PLACES = ("endpoint", "key_file", "key_env", "page_size", "max_pages",
+                   "timeout_seconds")
+REQUIRED_WEBSEARCH = ("ddg_url", "bing_url", "between_queries_min_seconds",
+                      "between_queries_max_seconds")
 
 
 class RulesError(ValueError):
@@ -102,6 +106,8 @@ class MapsRules:
     labels: dict[str, tuple[str, ...]]
     website: dict[str, tuple[str, ...]]
     confirmation: dict
+    places: dict
+    websearch: dict
     offers: dict
     scoring: dict
     tiers: dict
@@ -145,7 +151,8 @@ def load(path: Path | None = None) -> MapsRules:
         raise RulesError(f"invalid TOML in {path}: {error}") from error
 
     for section in ("limits", "pacing", "browser", "selectors", "labels", "website",
-                    "confirmation", "offers", "scoring", "tiers", "exclusions"):
+                    "confirmation", "places", "websearch", "offers", "scoring", "tiers",
+                    "exclusions"):
         if not isinstance(raw.get(section), dict):
             raise RulesError(f"missing [{section}] section")
 
@@ -204,6 +211,36 @@ def load(path: Path | None = None) -> MapsRules:
         raise RulesError("confirmation.user_agent cannot be empty")
     for key in ("domain_tlds", "ignore_domains", "parking_markers", "name_stopwords"):
         confirmation[key] = _strings(confirmation[key], f"confirmation.{key}")
+
+    places = raw["places"]
+    for key in REQUIRED_PLACES:
+        if key not in places:
+            raise RulesError(f"places.{key} is required")
+    for key in ("endpoint", "key_file", "key_env"):
+        places[key] = str(places[key]).strip()
+        if not places[key]:
+            raise RulesError(f"places.{key} cannot be empty")
+    if not places["endpoint"].startswith("https://"):
+        raise RulesError("places.endpoint must use https")
+    places["page_size"] = int(_positive(places["page_size"], "places.page_size"))
+    if not 1 <= places["page_size"] <= 20:
+        raise RulesError("places.page_size must be between 1 and 20")
+    places["max_pages"] = int(_positive(places["max_pages"], "places.max_pages"))
+    places["timeout_seconds"] = _positive(places["timeout_seconds"],
+                                          "places.timeout_seconds")
+
+    websearch = raw["websearch"]
+    for key in REQUIRED_WEBSEARCH:
+        if key not in websearch:
+            raise RulesError(f"websearch.{key} is required")
+    for key in ("ddg_url", "bing_url"):
+        websearch[key] = str(websearch[key]).strip()
+        if "{query}" not in websearch[key]:
+            raise RulesError(f"websearch.{key} must contain {{query}}")
+    for key in ("between_queries_min_seconds", "between_queries_max_seconds"):
+        websearch[key] = _positive(websearch[key], f"websearch.{key}")
+    if websearch["between_queries_min_seconds"] > websearch["between_queries_max_seconds"]:
+        raise RulesError("websearch.between_queries_min_seconds cannot be greater than max")
 
     offers = {key: str(raw["offers"].get(key) or "") for key in ("adjust", "redesign")}
     if not all(offers.values()):
@@ -290,7 +327,8 @@ def load(path: Path | None = None) -> MapsRules:
     return MapsRules(
         path=path, version=int(raw.get("version", 0)), timezone=timezone,
         limits=limits, pacing=pacing, browser=raw["browser"], selectors=selectors,
-        labels=labels, website=website, confirmation=confirmation, offers=offers,
+        labels=labels, website=website, confirmation=confirmation, places=places,
+        websearch=websearch, offers=offers,
         scoring=raw["scoring"], tiers=tiers, groups=groups, searches=tuple(searches),
         exclusions=exclusions, raw=raw,
     )

@@ -98,7 +98,7 @@ class ReconnectTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.run_loop(Agent([failed]), Session(Page()))
 
-    def test_unconfirmed_opening_pauses_prospecting_but_keeps_reply_loop_alive(self):
+    def test_unconfirmed_opening_no_longer_pauses_prospecting(self):
         class TrackingAgent(Agent):
             def __init__(self, summaries):
                 super().__init__(summaries)
@@ -116,7 +116,8 @@ class ReconnectTests(unittest.TestCase):
         agent = TrackingAgent(summaries)
         self.run_loop(agent, Session(Page()), prospect=True, max_cycles=3)
         self.assertEqual(agent.cycles, 3)
-        self.assertEqual(agent.prospect_flags, [True, False, False])
+        self.assertEqual(agent.prospect_flags, [True, True, True],
+                         "the line moves on after unconfirmed; the fenced lead is never retried")
 
     def test_unconfirmed_opening_with_once_still_stops(self):
         failed = {**EMPTY, "openings": [{"lead": "L1", "state": "unconfirmed"}]}

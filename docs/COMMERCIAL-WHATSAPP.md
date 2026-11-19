@@ -176,6 +176,7 @@ The key hashes `to + text + image name`. `send` refuses a key already marked `se
 | Send button missing | no `Send`/`Enviar` after typing | Press Enter as fallback; verify the bubble |
 | Image attach fails | no image input | Click `Attach` first; confirm the file is a real image |
 | Message unconfirmed | last outgoing bubble lacks the text | Journal `unconfirmed`; do not retry blindly |
+| "AI from Meta" interstitial | modal "Get quick help from business chats" covers a new business chat | `sender.dismiss_ai_notice` clicks OK on open; typing behind it never confirms |
 | Session expired | `status` returns `login-required` | Owner rescans the QR |
 | Browser stuck | CDP port refuses connections | `commercial stop --network whatsapp`, then `status` |
 | Page or connection closed after a suspend | `TargetClosedError` in `sales run` | The run reconnects on its own (3 times in a row at most); a send in progress is fenced, never retried |
