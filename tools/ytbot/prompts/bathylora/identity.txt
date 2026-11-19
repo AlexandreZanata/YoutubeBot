@@ -1,0 +1,53 @@
+BATHYLORA VISUAL IDENTITY LOCK — ABYSSAL CINEMA
+
+Every visual belongs to Bathylora, a premium independent deep-ocean science documentary brand
+dedicated to authentic oceanographic photography, expedition footage and verifiable marine
+discoveries. Slogan: "The Ocean Has Stories We Have Never Seen."
+
+The recognizable aesthetic is ABYSSAL CINEMA: deep-sea darkness, natural bioluminescence,
+scientific expedition photography, submersible lamp illumination, deep blue-teal water,
+natural animal silhouettes, subtle bathymetric contour textures and restrained editorial
+typography. Never reuse the sepia, gold or brown palette of Sepia Atlas.
+
+Official Palette:
+- Abyssal Black #030B12 (primary dark background)
+- Deep Ocean #071F2C (surfaces and depth layers)
+- Bioluminescent Cyan #55D9D0 (restrained highlights and brand signoff)
+- Ocean Mist #B5D2D7 (secondary information and captions)
+- Arctic White #EDF7F5 (primary typography)
+- Submersed Teal #164958 (supporting graphic accents and bathymetric lines)
+
+Typography: clean, contemporary editorial sans-serif for bold legible titles at small sizes,
+sober supporting sans for secondary lines, and technical tabular proportions for depths,
+coordinates and expedition dates. Never use exaggerated sci-fi fonts, aggressive neon glow,
+3D beveled letters or horror aesthetics.
+
+Symbol — The Depth Mark: a minimalist geometric circular emblem composed of a refined
+horizontal sea-surface line, a subtle vertical descending path disappearing into abyssal
+negative space, and a tiny luminous Bioluminescent Cyan (#55D9D0) point at the bottom
+extremity. Works square, circular, transparent and monochrome at tiny sizes. Never use
+sharks, monstrous tentacles, skulls, tridents, detailed submarines, NOAA logos or other
+institution emblems.
+
+Permanent Emblem Prompt:
+"Design a premium minimalist geometric emblem for Bathylora, an authentic deep-ocean
+documentary brand. Create a distinctive circular symbol inspired by the ocean surface and
+the unknown depths below it. One refined horizontal line evokes the sea surface, a subtle
+descending path disappears into dark negative space, and a tiny bioluminescent cyan point
+symbolizes exploration and discovery. Deep abyssal black background, restrained
+bioluminescent cyan, exceptionally clear silhouette, refined editorial precision, strong
+identity at small sizes, sophisticated science documentary aesthetics. Flat vector-like
+execution. No text, letters, gradients, 3D, sharks, tentacles, submarines, skulls, horror
+imagery, watermarks or decorative clutter."
+
+Editorial & Visual Authenticity:
+- Authentic oceanographic photographs and ROV frames remain authentic. Never fabricate an
+  animal, expedition, species or discovery, and never present AI-generated imagery as
+  scientific documentary evidence.
+- Brand graphics (icon, banner, watermark, Shorts atmospheric backgrounds and clearly labelled
+  explanatory depth diagrams) may be newly designed, never presented as field photographs.
+- Every thumbnail must be specific to its episode, anchored in a real licensed underwater
+  photograph, using one of three templates: Model A (The Encounter), Model B (The Discovery)
+  or Model C (The Unknown).
+- The finished work must feel like a curated independent science film, never horror, gaming,
+  conspiracy or an automated slideshow.

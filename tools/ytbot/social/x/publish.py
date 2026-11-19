@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 
 from ...accounts_store import read_private, write_private
 from ..store import SocialStore
+from . import pacing
 
 
 PROJECT_HOSTS = (
@@ -112,6 +113,17 @@ def _write_replies(store: SocialStore, network: str, data: dict) -> None:
     write_private(_replies_path(store, network), data)
 
 
+def _last_published_at(store: SocialStore, network: str) -> datetime | None:
+    moments: list[datetime] = []
+    for record in agenda.read_posts(store, network).get("posts", {}).values():
+        if record.get("state") in ("posted", "unconfirmed") and record.get("posted_at"):
+            moments.append(datetime.fromisoformat(record["posted_at"]))
+    for record in _read_replies(store, network).get("replies", {}).values():
+        if record.get("state") in ("posted", "unconfirmed") and record.get("posted_at"):
+            moments.append(datetime.fromisoformat(record["posted_at"]))
+    return max(moments) if moments else None
+
+
 def _save_reply(store: SocialStore, network: str, status_id: str, record: dict) -> None:
     data = _read_replies(store, network)
     data.setdefault("replies", {})[status_id] = record
@@ -133,6 +145,9 @@ def reply(context, store: SocialStore, network: str, target_url: str, text: str,
         raise RuntimeError(f"the reply is {length} characters on X; the limit is 280")
     if _read_replies(store, network).get("replies", {}).get(status_id):
         raise RuntimeError("this target already has a reply in the private journal; inspect it")
+
+    if not dry_run:
+        pacing.wait(_last_published_at(store, network))
 
     page = context.new_page()
     try:
@@ -224,6 +239,9 @@ def publish(context, store: SocialStore, network: str, item: dict, *,
     if item["status"] != "approved":
         raise RuntimeError(f"{item['id']} is {item['status']}; approve the copy before posting")
     image = _image_path(item)
+
+    if not dry_run:
+        pacing.wait(_last_published_at(store, network))
 
     page = context.new_page()
     try:

@@ -139,7 +139,7 @@ def decide(rules: SalesRules, lead: dict, history: list[dict], text: str, llm=No
     intent = rules.intent(intent_id)
     reason = str(data.get("reason", ""))[:300]
     if intent.action in MODEL_TEXT_ACTIONS and data.get("handoff") is True \
-            and intent_id != "custom_platform":
+            and intent_id not in ("custom_platform", "forwarded_to_decider"):
         decision = Decision(intent_id, "handoff", rules.handoff_messages(), "fixed", hint,
                             reason, priority="needed",
                             owner_reason=f"O modelo pediu ajuda: {reason or intent_id}")

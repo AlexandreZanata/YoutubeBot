@@ -239,10 +239,21 @@ def dismiss_ai_notice(page) -> bool:
     return False
 
 
+def looks_like_phone(value: str) -> bool:
+    """A contact field holding a phone number instead of a saved name."""
+    digits = re.sub(r"\D", "", value or "")
+    return len(digits) >= 10 and len(digits) <= 15
+
+
 def open_chat(page, to: str, pacing: Pacing, phone: str | None = None) -> None:
-    """Open the conversation by saved name (search) or by number (click-to-chat URL)."""
-    if phone:
-        _open_by_phone(page, phone, pacing)
+    """Open the conversation by saved name (search) or by number (click-to-chat URL).
+
+    A `to` holding a phone number always takes the deterministic
+    `send?phone=` URL: name search is fuzzy and once opened the
+    Motorista Frotss chat for a similar-digit number.
+    """
+    if phone or looks_like_phone(to):
+        _open_by_phone(page, phone or to, pacing)
         dismiss_ai_notice(page)
         return
     page.goto(LOGIN_URL, timeout=90000)
@@ -263,8 +274,15 @@ def _open_by_phone(page, phone: str, pacing: Pacing, timeout: float = 60.0) -> N
     page.goto(f"{LOGIN_URL}send?phone={digits}", timeout=90000)
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        if page.locator(COMPOSER).count():
-            page.wait_for_timeout(1200)
+        loc = page.locator(COMPOSER)
+        composer = getattr(loc, "first", loc)
+        try:
+            ready = bool(composer.count()
+                         and (not hasattr(composer, "is_visible") or composer.is_visible()))
+        except Exception:
+            ready = False
+        if ready:
+            page.wait_for_timeout(1500)
             time.sleep(pacing.open_chat_pause())
             return
         body = page.locator("body").inner_text() if page.locator("body").count() else ""
@@ -361,9 +379,15 @@ def _outgoing_ids(page) -> set[str]:
 def confirmed(page, text: str, before: set[str]) -> bool:
     """The newest outgoing bubble is new (when ids exist) and starts like the message."""
     prefix = text.strip()[:24]
+    key_prefix = text_key(text)[:24]
     bubbles = read_bubbles(page, 15)
     outgoing = [bubble for bubble in bubbles if bubble["dir"] == "out"]
-    if not outgoing or prefix not in outgoing[-1]["text"]:
+    if not outgoing:
+        return False
+    last_text = outgoing[-1]["text"]
+    matched = ((prefix and prefix in last_text)
+               or (key_prefix and key_prefix in text_key(last_text)))
+    if not matched:
         return False
     newest = outgoing[-1]["id"]
     return not newest or newest not in before
@@ -405,9 +429,39 @@ def focus_composer(page):
     return composer
 
 
+def _composer_has(composer, needle: str) -> bool:
+    """True when the composer holds the typed message key."""
+    try:
+        return bool(needle and composer.count() and needle in text_key(composer.inner_text()))
+    except Exception:
+        return False
+
+
+def _trigger_send(page, composer) -> None:
+    """Click the Send button inside #main (or globally), or press Enter on the focused box."""
+    main = page.locator("#main")
+    scopes = [main] if main.count() and hasattr(main, "get_by_role") else []
+    scopes.append(page)
+    for scope in scopes:
+        for label in SEND_BUTTONS:
+            button = scope.get_by_role("button", name=label)
+            if button.count():
+                button.first.click()
+                return
+    btn = page.locator('[data-testid="compose-btn-send"]')
+    if btn.count():
+        btn.first.click()
+        return
+    try:
+        composer.focus()
+    except Exception:
+        pass
+    page.keyboard.press("Enter")
+
+
 def deliver(page, text: str, pacing: Pacing, delay: float | None = None,
             image: Path | None = None, link_wait: float = 0.0, timing: dict | None = None,
-            confirm_timeout: float = 8.0) -> str:
+            confirm_timeout: float = 12.0) -> str:
     """Type and send one message in the open chat; `sent` only when the bubble is seen.
 
     `delay` is the interval since the previous send (or since the call when there is none) and
@@ -422,7 +476,7 @@ def deliver(page, text: str, pacing: Pacing, delay: float | None = None,
     composer = focus_composer(page)
     human_type(page, text, pacing)
     needle = text_key(text)[:30]
-    if not needle or needle not in text_key(composer.inner_text()):
+    if not _composer_has(composer, needle):
         page.keyboard.press("Control+A")
         page.keyboard.press("Delete")
         raise RuntimeError("the text did not reach the composer; nothing was sent")
@@ -434,13 +488,22 @@ def deliver(page, text: str, pacing: Pacing, delay: float | None = None,
     remaining = ready - time.monotonic()
     if remaining > 0:
         time.sleep(remaining)
-    for label in SEND_BUTTONS:
-        button = page.get_by_role("button", name=label)
-        if button.count():
-            button.first.click()
-            break
-    else:
-        page.keyboard.press("Enter")
+    composer = page.locator(COMPOSER).first
+    if not _composer_has(composer, needle):
+        if confirmed(page, text, before):
+            return "sent"
+        # Chat hydration (e.g. Meta Business Account notice) cleared the draft before Send.
+        composer = focus_composer(page)
+        human_type(page, text, pacing)
+        if not _composer_has(composer, needle):
+            page.keyboard.press("Control+A")
+            page.keyboard.press("Delete")
+            raise RuntimeError("the text disappeared from the composer before send; "
+                               "nothing was sent")
+        page.wait_for_timeout(150)
+        if link_wait and URL_IN_TEXT.search(text):
+            time.sleep(link_wait)
+    _trigger_send(page, composer)
     timing["last_send"] = time.monotonic()
     deadline = timing["last_send"] + confirm_timeout
     while True:
@@ -518,8 +581,11 @@ def send_sequence(page, to: str, items: list[dict], pacing: Pacing, journal_path
                                    "at": datetime.now().isoformat(timespec="seconds")})
             results.append({"key": item["key"], "state": "error", "error": str(error)[:300]})
             break
-        journal(journal_path, {**entry, "state": state,
-                               "at": datetime.now().isoformat(timespec="seconds")})
+        shot = debug_screenshot(page, debug_dir) if state != "sent" else ""
+        done = {**entry, "state": state, "at": datetime.now().isoformat(timespec="seconds")}
+        if shot:
+            done["screenshot"] = shot
+        journal(journal_path, done)
         results.append({"key": item["key"], "state": state})
         if state != "sent":
             break

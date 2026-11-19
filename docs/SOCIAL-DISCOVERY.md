@@ -100,7 +100,7 @@ The reply must not:
 
 ## Polemic comments
 
-Fifteen polemic comments join the ten contextual replies every day, 25 comments in total. They target public posts under
+Fifteen polemic comments join the ten contextual replies every day, 25 replies in total. They target public posts under
 24 hours with large reach (high likes or views) in the same four niches. The comment defends a
 contrarian but defensible thesis that invites disagreement; it never attacks a person, invents a
 number, promises a result or uses a bait phrase. One project link maximum, after the argument.

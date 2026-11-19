@@ -46,6 +46,25 @@ class SalesAgentTests(unittest.TestCase):
         agent.prospect()
         return lead, agent, channel
 
+    def test_reply_waits_for_the_owner_debounce_before_answering(self):
+        lead = self.leads(1)[0]
+        agent, channel = self.agent()
+        agent.reply_debounce = 30.0
+        agent.prospect()
+        agent.ingest([self.event("Bom dia")])
+        self.assertEqual(agent.reply_pending(), [],
+                         "the first bubble is not answered while a second may arrive")
+        self.clock.now += timedelta(seconds=31)
+        answered = agent.reply_pending()
+        self.assertEqual([item["state"] for item in answered], ["engaged"])
+
+    def test_disabled_debounce_answers_immediately(self):
+        self.leads(1)
+        agent, channel = self.agent()
+        agent.prospect()
+        agent.ingest([self.event("Bom dia")])
+        self.assertEqual([item["state"] for item in agent.reply_pending()], ["engaged"])
+
     # Openings ------------------------------------------------------------------------
     def test_opening_sends_the_script_in_order_and_records_memory(self):
         lead, _, channel = self.opened_lead()

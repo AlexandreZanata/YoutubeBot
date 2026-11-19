@@ -458,7 +458,9 @@ def command_run(args, store_factory, page_factory) -> None:
     try:
         agent = SalesAgent(rules, store, session.channel if args.live else None, model,
                            live=args.live, paced_openings=not args.once,
-                           allowed_leads=allowed)
+                           allowed_leads=allowed,
+                           reply_debounce=float(rules.pacing.get("reply_debounce_seconds",
+                                                                 30.0)))
         if args.live:
             for item in agent.reconcile_openings():
                 print(json.dumps({"reconciled": item}, ensure_ascii=False), flush=True)

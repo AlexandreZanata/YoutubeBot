@@ -20,6 +20,7 @@ SHORTS_CHANNELS = {
     "vocal-pages": {"command": "faith-shorts", "extra": []},
     "midnight-tales": {"command": "faith-shorts", "extra": []},
     "sepia-atlas": {"command": "faith-shorts", "extra": []},
+    "bathylora": {"command": "faith-shorts", "extra": []},
 }
 
 

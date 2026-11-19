@@ -175,6 +175,28 @@ missing or invalid file stops the post before any browser interaction.
 The journal is the source of truth. A `started` or `unconfirmed` record blocks another publish
 until a human checks the profile and edits the private state deliberately.
 
+## Pacing and account safety
+
+Publishing follows a controlled rhythm; it never posts two items at the same time. The goal is legitimate pacing and review,
+not hiding automation: simulating keystrokes, rotating identities or evading platform detection
+is out of scope and forbidden.
+
+- Daily cap: 25 replies (ten contextual plus fifteen polemic).
+- Window: 09:00 to 20:00 America/Cuiaba. No posts at night.
+- One original post per day, at 09:00.
+- Replies go one at a time, 2 to 5 minutes apart, counted from the journal's last `posted_at`,
+  with the wait randomized inside that range.
+- At most two replies per author per day and one per thread.
+- Review the text and the target before clicking. Use the normal editor; do not simulate
+  typing.
+- Rotate products and theses; never reuse a template.
+- On unconfirmed, rate limit or challenge, stop for the day and inspect the profile; never
+  retry. Two unconfirmed in a week pause automation for 48 hours.
+- The owner approves the day's queue and the agent publishes only on command.
+- The publisher enforces the gap from the journal: `post` and `reply` sleep only the
+  missing part of a random 2 to 5 minute interval before opening the browser. A dry run
+  never waits.
+
 ## Discovery
 
 Recent public posts can be curated for a contextual reply. The discovery flow is separate

@@ -13,7 +13,7 @@ from .rules import SalesRules, normalize
 SAFETY = ("opt_out", "refusal", "auto_reply")
 # Checked right after the safety intents: a number, a payment or a staff member answering says
 # more about the conversation than any word they contain ("vou falar com o dono").
-FIRST = ("referral", "payment_sent", "ready_to_buy", "gatekeeper")
+FIRST = ("referral", "payment_sent", "ready_to_buy", "forwarded_to_decider", "gatekeeper")
 # While qualifying, these still win over "the text is the project description".
 # Media, phone numbers for the site, and short "agora não / não tenho" answers to optional
 # material questions stay part of the project details (`quote_details`).
@@ -28,8 +28,8 @@ QUALIFYING_DONE_FOR_QUOTE = re.compile(r"^pode fazer[.! ]*$")
 # Intents the local classifier decides alone for short messages (no model call).
 DECISIVE = ("opt_out", "refusal", "auto_reply", "bot_question", "sticker", "thanks",
             "audio", "media", "human_request", "trust_concern", "callback_later", "referral",
-            "payment_sent", "gatekeeper", "app_at_site_price", "system_price",
-            "links_not_opening")
+            "payment_sent", "forwarded_to_decider", "gatekeeper", "app_at_site_price",
+            "system_price", "links_not_opening")
 SHORT = 80
 # A photo or document with a caption arrives as "Photo\n<caption>": the caption is the message.
 MEDIA_LABEL = re.compile(r"^(photo|foto|image|imagem|video|document|documento)\s+(?=\S)")

@@ -1,0 +1,17 @@
+Create a premium scientific ocean documentary thumbnail for Bathylora, using the provided authentic underwater photograph as the factual visual foundation.
+
+BATHYLORA VISUAL IDENTITY LOCK (ABYSSAL CINEMA):
+Palette: Abyssal Black #030B12, Deep Ocean #071F2C, Bioluminescent Cyan #55D9D0, Ocean Mist #B5D2D7, Arctic White #EDF7F5, Submersed Teal #164958. Never use sepia, gold or brown tones.
+
+Choose the template that best fits the episode:
+- Model A (The Encounter): one real deep-sea animal occupies the visual center against dark water with natural contrast and short text.
+- Model B (The Discovery): an underwater geological feature, hydrothermal vent, seamount or ROV expedition scene emphasizing scale and depth.
+- Model C (The Unknown): a genuinely unusual verified photograph framed cleanly to highlight the real biological or geological detail without deceptive manipulation.
+
+Rules:
+- Preserve the real subject and its scientific identity; never invent animals, fabricated expeditions, fake species or composite creatures.
+- Apply restrained cinematic framing, high readability at small sizes, natural contrast, deep abyssal negative space and refined editorial composition.
+- Favor genuine underwater mystery and scale rather than horror or spectacle.
+- If text is used, use no more than four short words in refined, highly legible Arctic White (#EDF7F5) or restrained Bioluminescent Cyan (#55D9D0) sans-serif typography.
+- Add a small discreet Bathylora Depth Mark signature in one corner if it does not interfere with the photograph.
+- No exaggerated glowing eyes, red arrows, circles, sensational symbols, clickbait badges, NOAA logos or decorative watermarks.

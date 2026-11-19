@@ -1,0 +1,26 @@
+Create one original English-language ocean science documentary for Bathylora.
+
+Choose a clearly defined subject in deep-sea biology, ocean exploration, underwater geology, marine ecology, or documented scientific discovery.
+
+Research the subject using reliable oceanographic institutions, official expedition archives (prioritizing NOAA Ocean Exploration, NOAA Fisheries, NOAA National Marine Sanctuaries, USGS and open scientific collections), scientific literature and verifiable observations.
+
+Build a compelling documentary narrative with accurate scientific terminology, real expedition details, identifiable locations, depths and meaningful explanations.
+
+Write in natural American English, with a calm, precise and immersive documentary voice.
+
+Open with a remarkable real observation, recorded image or scientific fact. Develop the documentary through concrete examples, real expeditions and authentic visual evidence. End with a contemplative, scientifically grounded observation — avoid generic cliches about "the ocean keeping secrets".
+
+The visual storytelling must prioritize authentic underwater photographs and ROV frames that directly correspond to the spoken narration. In every section and scene, explicitly name the concrete species, expedition, submersible, habitat, geological formation, or approximate depth being shown so the narration always talks directly about the photograph on screen — never write long abstract passages without a concrete visual anchor.
+
+Never fabricate an animal, expedition, discovery, image, scientific claim, quotation, date or source. Never use AI-generated underwater creatures as documentary evidence. Distinguish confirmed scientific observations from hypotheses, open questions and uncertain identifications.
+
+Avoid sensationalism, horror framing, generic scripts, repetitive slideshows and exaggerated claims.
+
+Requirements:
+
+- Everything must be 100% in American English.
+- Length: target 1,900 to 3,200 words (15 to 25 minutes at the channel's 0.9x documentary pace), with tolerance up to 5,100 words (40 minutes) when the subject warrants deeper scientific coverage; never pad with repetition or cut essential research.
+- One clearly defined subject, clear scientific progression and calm expedition pacing.
+- No headings, lists, labels, notes, citations, links or metadata inside the narration.
+- No introduction about your process and no closing commentary outside the narration.
+- Output only the narration text that will be read aloud.

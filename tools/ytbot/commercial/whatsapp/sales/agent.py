@@ -169,7 +169,8 @@ class SalesAgent:
     def __init__(self, rules: SalesRules, store: SalesStore, channel=None, llm=None,
                  live: bool = False, clock=None, sleep=time.sleep, rng=random,
                  notify=owner_notify.desktop_notify, log=None, transcriber=None,
-                 paced_openings: bool = False, allowed_leads: set[str] | None = None):
+                 paced_openings: bool = False, allowed_leads: set[str] | None = None,
+                 reply_debounce: float | None = None):
         self.rules = rules
         self.store = store
         self.channel = channel
@@ -194,6 +195,8 @@ class SalesAgent:
         self._central_mtime: float | None = None
         self._typing_cycle: set[str] = set()
         self._planned: set[tuple[str, str]] = set()
+        # Opt-in: the live loop passes the rule value; unit tests keep answering at once.
+        self.reply_debounce = float(reply_debounce or 0.0)
         if live and channel is None:
             raise ValueError("live mode needs a WhatsApp channel")
 
@@ -453,6 +456,20 @@ class SalesAgent:
                  and self._in_scope(lead["id"])]
         return sorted(leads, key=lambda lead: lead.get("last_in_at") or "")
 
+    def _in_reply_debounce(self, lead: dict) -> bool:
+        """True while the contact may still be typing another bubble.
+
+        A person often sends two or three messages in a row; replying to the first
+        one reads like a machine. The rules set the quiet window (default 30 s).
+        """
+        window = self.reply_debounce
+        if window <= 0:
+            return False
+        last = self._parse(lead.get("last_in_at"))
+        if last is None:
+            return False
+        return (self.now() - last).total_seconds() < window
+
     def reply_pending(self) -> list[dict]:
         if not self.rules.in_window(self.now(), "reply"):
             waiting = len(self.pending())
@@ -461,6 +478,11 @@ class SalesAgent:
             return []
         results = []
         for lead in self.pending():
+            if self._in_reply_debounce(lead):
+                self.log(f"{lead.get('name', lead['id'])}: aguardando "
+                         f"{self.rules.pacing.get('reply_debounce_seconds', 30):.0f}s "
+                         "para ver se vem outra mensagem")
+                continue
             outcome = self.reply(lead)
             results.append(outcome)
             if _failed_outcome(outcome):
@@ -822,8 +844,9 @@ class SalesAgent:
         elif decision.intent == "refusal" and lead.get("interest"):
             decision.action, decision.priority = "lose", "needed"
             decision.owner_reason = "Desistiu da compra: você decide se retoma"
-        elif decision.intent == "gatekeeper" or (lead["state"] == "gatekeeper"
-                                                and decision.intent != "referral"):
+        elif decision.intent == "gatekeeper" or (
+                lead["state"] == "gatekeeper"
+                and decision.intent not in ("referral", "forwarded_to_decider")):
             decision = self._gatekeeper(lead, decision, text)
         return decision
 
@@ -912,8 +935,9 @@ class SalesAgent:
 
     def _check_progress(self, lead: dict, decision: Decision) -> Decision:
         """Hand off when the bot is not moving the conversation toward a quote."""
-        if decision.action not in ("reply", "qualify", "close") or decision.intent == "gatekeeper":
-            return decision  # the staff flow has its own kind close
+        if decision.action not in ("reply", "qualify", "close") \
+                or decision.intent in ("gatekeeper", "forwarded_to_decider"):
+            return decision  # staff and forwarding flows have their own kind close
         intents = lead.get("intents") or []
         if intents and intents[-1] == decision.intent:
             return stuck(self.rules, decision.hint, "pergunta repetida")

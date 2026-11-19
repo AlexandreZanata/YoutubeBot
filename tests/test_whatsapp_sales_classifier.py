@@ -131,6 +131,37 @@ class SalesClassifierTests(unittest.TestCase):
         self.assertFalse(classifier.decisive("refusal", long_text))
         self.assertFalse(classifier.decisive("price", "Quanto custa?"))
 
+    def test_forwarding_to_responsible_maps_to_forwarded_to_decider_without_breaking_guards(self):
+        for text in (
+            "Irei encaminhar para o responsável!!",
+            "Vou encaminhar para o responsável",
+            "Estarei encaminhando para a diretoria",
+            "Vou encaminhar pro setor de marketing",
+            "Já encaminhei pro dono",
+            "Encaminhei para a gerência",
+            "Vou repassar para o responsável",
+            "Irei passar para o responsável",
+            "Vou passar para o responsável",
+            "Vou encaminhar!",
+            "Já encaminhei",
+        ):
+            self.check(text, "forwarded_to_decider")
+        self.assertTrue(classifier.decisive("forwarded_to_decider", "Irei encaminhar para o responsável!!"))
+        self.check("Vou encaminhar, mas pode chamar no (65) 90000-0009", "referral")
+        self.check("Não temos interesse, não vou encaminhar", "refusal")
+        self.check("Esta é uma mensagem automática. Encaminharemos para o setor responsável.", "auto_reply")
+        self.check("Encaminhei o comprovante pro financeiro", "payment_sent")
+        self.check("Vou encaminhar a logo pro marketing", "quote_details", state="qualifying")
+        self.check("Sou funcionária, o dono não está", "gatekeeper")
+        self.check("Vou passar pra doutora ver", "gatekeeper")
+        self.check("Vou passar pro dono, ele te chama", "gatekeeper")
+        self.check("Quero falar com o responsável", "human_request")
+        for msg in ("Muito obrigado", "Muito obrigada!"):
+            self.check(msg, "thanks")
+            self.assertTrue(classifier.decisive("thanks", msg))
+        self.check("No momento não tenho interesse\nMuito obrigado", "refusal")
+        self.assertTrue(classifier.decisive("refusal", "No momento não tenho interesse\nMuito obrigado"))
+
 
 if __name__ == "__main__":
     unittest.main()

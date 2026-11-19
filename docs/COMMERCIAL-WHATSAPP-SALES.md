@@ -12,7 +12,7 @@ and the journal in [WhatsApp Web](COMMERCIAL-WHATSAPP.md); there is no second se
 | First contact | One-to-one prospecting, only to numbers from a list the owner approved. No broadcast. |
 | Lead source | A CSV the owner builds by reviewing Google Maps. No scraping, no Places API. |
 | Replies | OpenCode Go free models first in rotation, then `deepseek-v4.1-flash` → `muse-spark-1.3-contributor` (updated the same evening). |
-| Daily limit | 10 first contacts per day. |
+| Daily limit | 50 first contacts per day. |
 
 ## Files
 
@@ -181,7 +181,7 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   opening to someone already in conversation. `activate --all` re-enables older leads,
   `pause --lead <id>` stops automatic replies and sends the message to "Precisa de você". `sales leads` and the
   Central show `reply: ativo` or `pausado`.
-- Openings stay one number at a time, in import order, up to 10/day and only in the opening
+- Openings stay one number at a time, in import order, up to 50/day and only in the opening
   window. Use `--limit 1` to start exactly one number per invocation or `--limit 10` for the
   daily batch; the existing pacing, journal and repeat fences apply to both.
 - The owner's selected list may be kept in
@@ -302,6 +302,7 @@ the model using only the facts.
 | Photo, video, document, location | `media` | handoff | Fixed ack; owner notified. A caption is read as the message text |
 | Sticker or GIF only | `sticker` | ignore | Nothing |
 | "Já temos site" | `already_has_site` | close | Thanks; available later |
+| "Irei encaminhar para o responsável!!", "vou encaminhar para a diretoria/marketing", "já encaminhei" | `forwarded_to_decider` | close | Fixed: "Entendido, muito obrigado! Fico no aguardo do retorno." (no hand-off; chat reopens automatically if the decider writes back) |
 | "Vou pensar", "mais pra frente" | `later` | close | Available whenever they want |
 | "Tudo bem e você?" | `greeting_reply` | reply | Short answer and an open question |
 | "Obrigado", "ok" | `thanks` | ignore | Nothing |
@@ -313,6 +314,10 @@ the model using only the facts.
 ## Staff, referral, closing and end states (owner, 2026-11-17)
 
 ```text
+Someone says they will forward the proposal ("Irei encaminhar para o responsável!!", "vou encaminhar para o marketing")
+  └─▶ forwarded_to_decider · fixed thanks + wait ("Entendido, muito obrigado! Fico no aguardo do retorno.") → state closed
+      (no second contact request, no owner hand-off; chat reopens to engaged automatically if the decider writes back)
+
 A staff member answers ("sou funcionária", "o dono não está", "vou passar pro dono")
   └─▶ gatekeeper · state gatekeeper (the bot keeps the chat)
       "Muito obrigado pelo retorno!"
@@ -465,13 +470,18 @@ When the agent opens a chat to answer, it reads every bubble since its last mess
 
 ## Typing safety
 
-Before typing, the composer gets focus by a click (8 s) or, when something covers it (a new
-message banner while the chat scrolls), by focusing the element itself; a leftover draft is
-cleared. After typing, the composer must contain the text, or it is cleared and the send fails
-before Send is pressed. Any failure is journaled with the full error and a private screenshot
-in `.local/commercial/whatsapp/sales/debug/`, the lead becomes `unconfirmed` and the run stops.
-After checking the chat, `sales resolve --state engaged|qualifying` hands it back; messages that
-arrived meanwhile are answered on the next cycle.
+Before typing, `_open_by_phone` waits until the composer is visible (1.5 s hydration grace plus
+the open-chat pause). Before typing a message, the composer gets focus by a click (8 s) or, when
+something covers it (a new message banner while the chat scrolls), by focusing the element itself;
+a leftover draft is cleared. After typing, and again right after the pacing wait before clicking Send,
+the composer must still contain the text (if chat hydration cleared the draft once during the wait,
+it re-types once before Send; otherwise it fails cleanly with nothing sent). Bubble confirmation
+polls for 12 s matching either the raw prefix or normalized `text_key`. Any failure or `unconfirmed`
+outcome is journaled with a private screenshot in `.local/commercial/whatsapp/sales/debug/`, and the
+lead becomes `unconfirmed`: a failed reply/follow-up (or `--once` / `queue send`) stops the run,
+while a failed cold opening in continuous `run --live --prospect` pauses further openings and keeps
+reply monitoring active. After checking the chat, `sales resolve --state engaged|qualifying|opened`
+hands it back; messages that arrived meanwhile are answered on the next cycle.
 
 ## Owner test reset
 
@@ -569,10 +579,16 @@ live in `[opening]` and `[pacing]` of the rules file.
 - `--live` is required to send; the default prints the plan.
 - Refusal or opt-out → salted hash in `do-not-contact.json`, removal from the `rules.json`
   allow list, and no message ever again, including follow-ups and re-imports.
-- At most 10 first contacts per day (America/Cuiaba), weekdays 07:00–17:00 (replies also 07:00–17:00).
+- At most 50 first contacts per day (America/Cuiaba), weekdays 07:00–17:00 (replies also 07:00–17:00).
 - The opening is recorded before the browser acts and its journal keys are per lead, so it is
   never repeated, even after a crash.
 - One follow-up after 72 h without an answer; `no-response` 96 h later, then silence.
+- Answers wait `pacing.reply_debounce_seconds` (30 s) after the newest incoming bubble, so a
+  person splitting a thought into two or three messages is read as one turn and never answered
+  mid-thought by a machine. The live loop enables it; direct unit calls do not.
+- `referral_ask.messages` holds the owner's indication request as five short bubbles. It ships
+  disabled: a refusal is a permanent do-not-contact entry, so sending after one needs the
+  owner's explicit override.
 - At most 12 automated replies per lead per day; then the owner takes over.
 - Every message is journaled `started` before typing; an `unconfirmed`, `error` or dangling
   `started` key is never retried and the run stops.

@@ -19,6 +19,7 @@ UPLOAD_ACCOUNTS = {
     "reflection": "reflection",
     "midnight-tales": "midnight",
     "sepia-atlas": "sepia",
+    "bathylora": "bathylora",
 }
 
 
