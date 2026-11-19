@@ -192,7 +192,7 @@ def render(run_dir: Path, rows: list[dict]) -> Path:
         if index % 10 == 0:
             log(f"clip {index + 1}/{len(rows)}")
     listing = run_dir / "clips.txt"
-    listing.write_text("".join(f"file '{clip}'\n" for clip in clips), encoding="utf-8")
+    listing.write_text("".join(f"file '{clip.resolve()}'\n" for clip in clips), encoding="utf-8")
     silent = run_dir / "silent.mp4"
     subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
                     "-c", "copy", str(silent)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
