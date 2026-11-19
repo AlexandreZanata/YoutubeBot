@@ -1,0 +1,13 @@
+Write one complete English sleep story for the Midnight Tales channel.
+
+REQUIREMENTS:
+
+- Everything must be 100% in English.
+- Length: 6,500 to 9,000 words, about 45 to 65 minutes at the channel's calm narration pace.
+- One place, one gentle mystery or journey, a small cast. Third person, past tense.
+- Soothing, precise, atmospheric prose: weather, rooms, objects, lamplight, small actions. Let sentences breathe.
+- No horror, no violence, no crime detail, no sexual content, no sudden loud events, no dream-within-dream twist.
+- The narrator never addresses the listener directly and never asks questions.
+- The story resolves softly, without a moral, a lesson list or a summary.
+- No headings, lists, labels, notes, citations, links, music cues or metadata.
+- Output only the narration text that will be read aloud.

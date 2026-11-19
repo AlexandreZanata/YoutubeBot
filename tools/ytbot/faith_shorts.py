@@ -100,6 +100,79 @@ CHANNELS = {
             "When Your Faith Is Small but Real",
         ),
     },
+    "fallem-prince": {
+        "upload": "legacy",
+        "hours": (21,),
+        "hashtags": "#shorts #fantasy #darkfantasy #story #audiobook",
+        "tags": "dark fantasy, story, audiobook, short, fiction, folklore",
+        "topics": (
+            "The Bell That Rings Only for the Dead",
+            "A Knight Who Forgot His Own Name",
+            "The Mirror in the Abandoned Chapel",
+            "The Cartographer of a Forest That Moves",
+            "The King Who Traded His Shadow",
+            "The Last Lantern on the Northern Road",
+            "A Debt Collected at Midnight",
+            "The Castle That Remembers Its Guests",
+            "The Smith Who Forged a Silence",
+            "The Wolf at the Edge of the Feast",
+        ),
+    },
+    "infinite-random-worlds": {
+        "upload": "infinite",
+        "hours": (9,),
+        "hashtags": "#shorts #scifi #story #worldbuilding #audiobook",
+        "tags": "speculative fiction, science fiction, story, audiobook, short, worldbuilding",
+        "topics": (
+            "On a World of Endless Stairs, One City Learns to Climb",
+            "The Ocean That Falls Upward",
+            "A Library Where Books Age Instead of People",
+            "The Last Rain on a Planet of Dust",
+            "A City That Only Exists at Low Tide",
+            "The Boy Who Delivers Messages Between Two Moons",
+            "The Garden That Grows Memories",
+            "The Train That Never Reaches the Station",
+            "A World Where Night Lasts a Generation",
+            "The Map That Redraws Itself Every Morning",
+        ),
+    },
+    "vocal-pages": {
+        "upload": "vocal",
+        "hours": (21,),
+        "hashtags": "#shorts #essay #reflection #story #audiobook",
+        "tags": "reflective essay, story, audiobook, short, psychology, humanity",
+        "topics": (
+            "The Chair Left Empty at Dinner",
+            "What We Keep in the Drawer",
+            "The Kindness We Do Not Remember",
+            "A Stranger Who Knew Your Name",
+            "The House That Feels Smaller",
+            "Why We Tell the Same Story",
+            "The Cost of Always Being Fine",
+            "A Letter You Never Sent",
+            "The Quiet After the Argument",
+            "What the Hands Remember",
+        ),
+    },
+    "midnight-tales": {
+        "upload": "midnight",
+        "hours": (9,),
+        "interval_days": 2,
+        "hashtags": "#shorts #sleepstory #fiction #bedtimestory #audiobook",
+        "tags": "sleep story, fiction, audiobook, short, bedtime story, cozy",
+        "topics": (
+            "The Lamplighter Who Waited for One Last Window",
+            "The Library That Returns Lost Things",
+            "A Night Train to a Town Without a Name",
+            "The Keeper of the Frozen Clock",
+            "The Harbor Where Ships Arrive at Dawn",
+            "The Inn at the Edge of the Snow",
+            "The Gardener of the Moonlit Greenhouse",
+            "The Postman of the Sleeping Village",
+            "The Star That Only Appears in Winter",
+            "The Door That Opens on Quiet Nights",
+        ),
+    },
 }
 
 
@@ -122,7 +195,8 @@ def occupied_slots(root: Path) -> set[tuple[int, int, int, int]]:
 
 def short_slots(count: int, hours: tuple[int, ...], start: date,
                 skip: int = 0,
-                occupied: set[tuple[int, int, int, int]] | None = None) -> list[datetime]:
+                occupied: set[tuple[int, int, int, int]] | None = None,
+                interval_days: int = 1) -> list[datetime]:
     slots = []
     day = start
     index = 0
@@ -134,7 +208,7 @@ def short_slots(count: int, hours: tuple[int, ...], start: date,
                 slots.append(slot)
                 if len(slots) == count + skip:
                     return slots[skip:]
-        day += timedelta(days=1)
+        day += timedelta(days=interval_days)
         index += 1
     return slots
 
@@ -212,7 +286,8 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
     topics = list(spec["topics"])[start_index:start_index + count]
     slots = short_slots(len(topics), spec["hours"],
                         start or (date.today() + timedelta(days=1)), skip_slots,
-                        occupied_slots(config.DATA_DIR / "shorts"))
+                        occupied_slots(config.DATA_DIR / "shorts"),
+                        spec.get("interval_days", 1))
     failures = []
     with sync_playwright() as playwright:
         gen_browser, gen = runtime.connect_hidden(playwright)

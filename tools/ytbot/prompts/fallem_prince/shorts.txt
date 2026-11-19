@@ -1,0 +1,11 @@
+Write one complete English YouTube Short for fallem prince, a channel of dark cinematic fantasy.
+
+REQUIREMENTS:
+
+- Everything must be 100% in English.
+- Length: 90 to 140 words, about 40 to 60 seconds.
+- One self-contained dark fantasy moment: a lone figure, a cursed place, a bargain, a door that should stay shut.
+- Dense, atmospheric prose with a clear image and a quiet turn at the end.
+- No graphic violence, gore, cruelty, horror shock, headings, lists, citations or links.
+- Do not reuse the same character or scene from another Short.
+- Output only the narration text.
