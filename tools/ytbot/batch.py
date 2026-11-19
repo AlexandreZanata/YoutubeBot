@@ -8,7 +8,7 @@ from datetime import datetime
 
 from playwright.sync_api import sync_playwright
 
-from . import account, catalog, community, config, logic, pipeline, runtime
+from . import account, catalog, comments, community, config, logic, pipeline, runtime
 from .topics import prepare_topics
 
 
@@ -101,6 +101,10 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
         runtime.configure_downloads(browser)
         runtime.configure_extension(context)
         upload_context = _upload_context(playwright, context, upload_cdp)
+        try:
+            comments.answer(upload_context)
+        except Exception as error:
+            log(f"comments check warning: {error}")
         _refresh_catalog(upload_context)
         studio_payload = catalog.fetch_creator_videos(upload_context)
         local_occupied, local_titles = _local_state()

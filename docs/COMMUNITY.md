@@ -21,6 +21,33 @@ python3 -m tools.ytbot community --channel fallem-prince --topic "An exact topic
 The channel must be explicit. The same check runs automatically inside
 `python3 -m tools.ytbot run`.
 
+## Comment answers
+
+Before creating a video, the bot visits every channel's Studio comments inbox and answers the
+unanswered comments. The inbox uses the owner's filter: unanswered comments, most relevant
+first, across videos, Shorts and Community posts. The flow is: open the reply box and write
+the answer, then give the comment a like and the creator heart, then send the reply. The
+reply comes first because liking a comment removes it from the unanswered filter.
+
+Each answer is polite, enthusiastic, uses emojis and returns to the channel's theme. The
+language follows the comment, not the channel: an English comment gets an English answer and
+a Portuguese comment gets a Portuguese answer, including on Zaflas. Criticism is answered
+with respect and thanks for the honesty, never with a defensive tone, and the bot never
+invents facts, prices or promises.
+
+The journal `.local/ytbot/comments/<channel>.json`, keyed by Studio comment ID, records
+`engaged`, `started`, `unconfirmed` and `replied`. A comment that was started or unconfirmed
+is never retried blindly; inspect it in Studio first. The automatic visit runs before every
+`run`, `distribute` and `distribute-shorts`; a failure only logs a warning so a changed
+Studio UI never stops production. Each visit answers at most 25 comments per channel and
+reports the ones left for the next visit.
+
+```bash
+python3 -m tools.ytbot comments
+python3 -m tools.ytbot comments --dry-run
+python3 -m tools.ytbot comments --channel zanata --limit 10
+```
+
 ## Language
 
 Community text follows the channel language without exception: English on Fallem Prince,

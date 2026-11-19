@@ -7,7 +7,7 @@ import contextlib
 import json
 from datetime import datetime
 
-from . import account, catalog, channels, community, config, flow_profiles, logic, runtime
+from . import account, catalog, channels, comments, community, config, flow_profiles, logic, runtime
 
 
 def command_setup(_args) -> None:
@@ -56,6 +56,14 @@ def command_community(args) -> None:
         if not topics and config.TOPICS.is_file():
             topics = [config.TOPICS.read_text(encoding="utf-8").splitlines()[0].strip()]
         community.ensure_post(context, topics or ["What do you think?"])
+
+
+def command_comments(args) -> None:
+    from .comments import answer_all
+    slugs = [args.channel] if args.channel else None
+    results = answer_all(slugs=slugs, limit=args.limit, dry_run=args.dry_run)
+    if not results:
+        raise SystemExit("no channel comments were checked")
 
 
 def command_distribute_shorts(args) -> None:
@@ -188,6 +196,12 @@ def build_parser() -> argparse.ArgumentParser:
     clean = sub.add_parser("cleanup", help="free trash, staging and already scheduled media")
     clean.add_argument("--dry-run", action="store_true")
     clean.set_defaults(func=command_cleanup)
+    comments_parser = sub.add_parser(
+        "comments", help="like, heart and answer unanswered comments on the channels")
+    comments_parser.add_argument("--channel", choices=sorted(channels.CHANNELS), default="")
+    comments_parser.add_argument("--limit", type=int, default=25)
+    comments_parser.add_argument("--dry-run", action="store_true")
+    comments_parser.set_defaults(func=command_comments)
     distribute = sub.add_parser("distribute",
                                 help="spread new videos over the channels with fewer scheduled")
     distribute.add_argument("--count", type=int, default=20)
