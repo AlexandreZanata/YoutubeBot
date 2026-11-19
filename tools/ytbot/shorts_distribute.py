@@ -19,6 +19,7 @@ SHORTS_CHANNELS = {
     "infinite-random-worlds": {"command": "faith-shorts", "extra": []},
     "vocal-pages": {"command": "faith-shorts", "extra": []},
     "midnight-tales": {"command": "faith-shorts", "extra": []},
+    "sepia-atlas": {"command": "faith-shorts", "extra": []},
 }
 
 

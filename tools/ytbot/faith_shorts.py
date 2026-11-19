@@ -173,6 +173,24 @@ CHANNELS = {
             "The Door That Opens on Quiet Nights",
         ),
     },
+    "sepia-atlas": {
+        "upload": "sepia",
+        "hours": (21,),
+        "hashtags": "#shorts #history #archivalphotography #documentary #sepiaatlas",
+        "tags": "history, documentary, archival photography, historical photos, short",
+        "topics": (
+            "The Photograph That Saved a Vanished Town",
+            "What a 1900 Street Photograph Really Shows",
+            "The Machine That Changed Every Kitchen",
+            "A Lost Railway Station in One Frame",
+            "The Faces of Ellis Island",
+            "When Every City Had a Horse Market",
+            "The Last Photograph of the General Store",
+            "The Invention Nobody Remembers",
+            "A Farm Family in 1895",
+            "The Day the Electric Light Arrived",
+        ),
+    },
 }
 
 

@@ -1,0 +1,26 @@
+Create one original English-language historical documentary narration for Sepia Atlas.
+
+Build the documentary around a clearly defined historical subject supported by verifiable archival sources.
+
+Research the subject before writing. Establish the real chronology, relevant locations, historical context and human consequences.
+
+Write immersive, accurate, original narration in natural American English.
+
+Open with a compelling concrete historical image or fact. Develop the story through vivid but factual details, meaningful transitions and a distinct narrative arc. End with a thoughtful observation that gives the viewer a deeper understanding of the past.
+
+The visual storytelling must prioritize authentic archival photographs that directly correspond to the spoken narration, so name concrete real subjects, places and years that can be matched to photographs, maps or documents.
+
+Keep the audio clean and intimate, as natural voice narration with a barely audible analog texture.
+
+Never fabricate documentary evidence. Never invent quotations, statistics, dates, names, events or sources. When the record is uncertain, say so or leave it out.
+
+Do not produce a generic slideshow script, copied narration, repetitive templates or unsupported historical claims.
+
+Requirements:
+
+- Everything must be 100% in American English.
+- Length: 2,200 to 2,700 words, about 14 to 18 minutes at a calm documentary pace.
+- One subject, one period, one clear narrative arc.
+- No headings, lists, labels, notes, citations, links or metadata inside the narration.
+- No introduction about your process and no closing commentary outside the narration.
+- Output only the narration text that will be read aloud.

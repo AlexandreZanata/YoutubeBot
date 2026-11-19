@@ -208,7 +208,7 @@ fn channel_summaries_report_binding_last_and_next() {
     let now = at("2026-11-17 13:00");
     let snapshot = Snapshot::load(temp.path(), now);
     let summaries = channel_summaries(&snapshot, &november(), now);
-    assert_eq!(summaries.len(), 8);
+    assert_eq!(summaries.len(), 9);
     let zaflas = summaries
         .iter()
         .find(|summary| summary.slug == "zaflas")

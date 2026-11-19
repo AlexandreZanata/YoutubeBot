@@ -20,7 +20,8 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   the owner. Operator/browser interface language never changes content language.
 - `tools/ytbot` keeps channel prompts, deduplication, resumable stage records and sequential
   upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`,
-  `infinite-random-worlds`, `vocal-pages`, `zanata`, `reflection` and `midnight-tales`.
+  `infinite-random-worlds`, `vocal-pages`, `zanata`, `reflection`, `midnight-tales` and
+  `sepia-atlas`.
   Whispers uses 2,400 to 2,800 words (15 to 17 minutes), Sacred Brown Engraving thumbnails,
   brown stippling background and the metadata/tag patterns in
   [its channel profile](docs/channels/whispers-from-heaven.md). Zaflas uses Brazilian
@@ -30,6 +31,12 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   12:00 America/Cuiaba. Its dedicated profile is upload-only; generation stays in legacy.
   Zaflas articles target 4,000 to 4,800 words (26,000 to 34,000 characters) with one bounded
   rewrite above the ceiling.
+- Sepia Atlas is English-only, American English, premium historical documentaries built on
+  authentic archival photography: 14 to 18 minutes (2,200 to 2,700 words), one video every two
+  days at 21:00, Cinematic Archival Minimalism (Archival Black, Aged Gold, Antique Ivory) and a
+  photographer's eye for the Atlas Frame emblem. Never fabricate a historical photograph or
+  present a generated image as documentary evidence. The first episode stays private for owner
+  review and is never auto-published. See [its channel profile](docs/channels/sepia-atlas.md).
 - Midnight Tales is English-only long-form sleep stories for adults, 6,500 to 9,000 words
   (45 to 65 minutes), one video every two days at 21:00 and one Short every two days at 09:00.
   Thumbnails are painterly cinematic scenes with no text, and the thumbnail is the still video
@@ -122,7 +129,8 @@ custom thumbnail. Every Short must have its own image tied to its story; never r
 another Short, and a near-duplicate background is replaced once. Each channel keeps its own art
 style, topic queue and slot hours: Zaflas
 09:00/18:00, reflection 08:00/20:00, Whispers 09:00/21:00, zanata 09:00, Fallem Prince 21:00,
-Infinite Random Worlds 09:00, Vocal Pages 21:00 and Midnight Tales one every two days at 09:00.
+Infinite Random Worlds 09:00, Vocal Pages 21:00, Midnight Tales one every two days at 09:00 and
+Sepia Atlas 21:00.
 The Zaflas `shorts` command remains for legacy batches; new Shorts go through `faith-shorts`.
 Generation uses the legacy ChatGPT profile and only the upload touches the channel profile. Do
 not route Shorts through the long-form batch. See [Shorts](docs/SHORTS.md).

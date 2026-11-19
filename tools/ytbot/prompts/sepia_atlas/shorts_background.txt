@@ -1,0 +1,9 @@
+Create ONE vertical 9:16 background image for a YouTube Short from Sepia Atlas, a historical documentary channel built on authentic archival photography.
+
+- One authentic-looking archival photograph scene in sepia or muted black and white: a 1900s American street, a factory floor, a rural porch, a general store, a train platform.
+- Cinematic Archival Minimalism: aged gold accents, antique ivory highlights, charcoal black environment, restrained grain, subtle cartographic detail.
+- Strong vertical composition: the subject in the middle and lower two thirds; the upper third calmer for burned-in subtitles.
+- Do not fabricate a historical event. The image must read as atmospheric archival illustration, never as a documentary record.
+- No text, letters, numbers, logos, watermark, borders or UI.
+- Safe, dignified imagery; no injury, horror or modern objects.
+- One specific Short only: show this story's subject and place, and never reuse a scene or composition from another Short.

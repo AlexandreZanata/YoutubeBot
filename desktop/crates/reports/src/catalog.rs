@@ -70,6 +70,13 @@ pub const CHANNELS: &[ChannelInfo] = &[
         channel_id: "UCLukC7RYzHlXHjtnlkbe4Vw",
         has_shorts: true,
     },
+    ChannelInfo {
+        slug: "sepia-atlas",
+        name: "Sepia Atlas",
+        handle: "@SepiaAtlas",
+        channel_id: "UCJNamJBuijKJ5G7CgLgd7EQ",
+        has_shorts: true,
+    },
 ];
 
 pub fn find(slug: &str) -> Option<&'static ChannelInfo> {
