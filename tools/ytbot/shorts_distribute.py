@@ -11,14 +11,20 @@ from . import config
 from .distribute import allocate, log
 
 SHORTS_CHANNELS = {
-    "zaflas": {"command": "shorts", "extra": ["--per-day", "2"]},
+    "zaflas": {"command": "faith-shorts", "extra": []},
     "reflection": {"command": "faith-shorts", "extra": []},
     "whispers-from-heaven": {"command": "faith-shorts", "extra": []},
     "zanata": {"command": "faith-shorts", "extra": []},
+    "fallem-prince": {"command": "faith-shorts", "extra": []},
+    "infinite-random-worlds": {"command": "faith-shorts", "extra": []},
+    "vocal-pages": {"command": "faith-shorts", "extra": []},
+    "midnight-tales": {"command": "faith-shorts", "extra": []},
 }
 
 
 def shorts_root(slug: str) -> Path:
+    if slug == "fallem-prince":
+        return config.DATA / "shorts"
     return config.DATA / "channels" / slug / "shorts"
 
 

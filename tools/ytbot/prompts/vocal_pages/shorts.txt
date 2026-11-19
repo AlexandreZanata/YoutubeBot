@@ -1,0 +1,11 @@
+Write one complete English YouTube Short for Vocal Pages, a reflective essay channel.
+
+REQUIREMENTS:
+
+- Everything must be 100% in English.
+- Length: 90 to 140 words, about 40 to 60 seconds.
+- One single idea, opened by one concrete image or small human scene.
+- A quiet, precise, compassionate voice. No guru tone, no exclamation, no self-help promises.
+- End on a line that lands softly and reframes the idea.
+- No headings, lists, citations, statistics, dates, links or metadata.
+- Output only the narration text.

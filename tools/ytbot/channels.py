@@ -117,6 +117,23 @@ CHANNELS = {
         max_article_chars=100000,
         slots=(16,),
     ),
+    "midnight-tales": Channel(
+        slug="midnight-tales",
+        name="Midnight Tales",
+        handle="@Midnight1Tales",
+        channel_id="UCLukC7RYzHlXHjtnlkbe4Vw",
+        prompts="midnight_tales",
+        background="thumbnail",
+        language="en",
+        min_article_chars=40000,
+        article_retry=(
+            "Target narration length: 6,500 to 9,000 English words, about 45 to 65 "
+            "minutes at the channel's calm pace. Keep the same characters and place."
+        ),
+        max_article_chars=90000,
+        slots=(21,),
+        interval_days=2,
+    ),
     "whispers-from-heaven": Channel(
         slug="whispers-from-heaven",
         name="Whispers From Heaven",

@@ -15,6 +15,9 @@ UPLOAD_ACCOUNTS = {
     "zaflas": "zaflas",
     "infinite-random-worlds": "infinite",
     "vocal-pages": "vocal",
+    "zanata": "zanata",
+    "reflection": "reflection",
+    "midnight-tales": "midnight",
 }
 
 
