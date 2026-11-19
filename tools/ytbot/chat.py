@@ -61,7 +61,8 @@ def _assistant_response(page) -> str:
     text = body[start + len(marker):] if start != -1 else body
     for stop in ("ChatGPT can make mistakes", "Latest response",
                  "Simple Deep Dive is now a plugin", "Thinking effort",
-                 "Do you like this personality?"):
+                 "Do you like this personality?", "Connection interrupted",
+                 "Use plugin"):
         index = text.find(stop)
         if index != -1:
             text = text[:index]
@@ -77,15 +78,14 @@ def wait_for_assistant(page, timeout: int = 3600) -> None:
     stable = 0
     last_len = 0
     while time.time() < deadline:
-        if page.locator('button[aria-label="Copy"]').count() >= 1:
-            page.wait_for_timeout(2500)
-            return
         body = page.locator("body").inner_text()
         if "Something went wrong" in body or "Error generating" in body:
             raise RuntimeError("ChatGPT reported a generation error")
         length = len(body)
-        streaming = page.locator('[data-testid="stop-button"], button[aria-label="Stop"]').count() > 0
-        if not streaming and length > 2000 and length == last_len:
+        stop = page.locator('[data-testid="stop-button"], button[aria-label="Stop"]')
+        streaming = stop.count() > 0 and stop.first.is_visible()
+        answered = "ChatGPT said:" in body
+        if answered and not streaming and length and length == last_len:
             stable += 1
             if stable >= 2:
                 page.wait_for_timeout(1000)
@@ -339,23 +339,42 @@ def capture_audio(page, context, run_dir: Path, timeout: int = 1800) -> Path:
     raise TimeoutError("audio capture timed out after bounded Read aloud retries")
 
 
+TOPIC_UI = (
+    "conversation helpful", "chatgpt", "thinking effort", "show more", "use plugin",
+    "connection interrupted", "latest response", "you said", "simple deep dive",
+)
+
+
+def topic_lines(raw: str) -> list[str]:
+    topics = []
+    for line in raw.splitlines():
+        line = re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line).strip().strip('"\'')
+        line = re.sub(r"[—–]", ",", line).strip()
+        lowered = line.lower()
+        if any(marker in lowered for marker in TOPIC_UI):
+            continue
+        if 3 <= len(line) <= 140 and len(line.split()) >= 3:
+            topics.append(line)
+    return topics
+
+
 def generate_topics(context, count: int, existing: list[str]) -> list[str]:
-    page = context.new_page()
-    try:
-        page.goto("https://chatgpt.com/", timeout=90000)
-        page.wait_for_timeout(7000)
-        dismiss_notice(page)
-        titles = "\n".join(existing[-120:])
-        request = config.prompt("topics.txt").replace("{titles}", titles)
-        send_text(page, request + f"\n\nRequested number of topics: {count}")
-        wait_for_assistant(page, timeout=600)
-        raw = copy_last(page)
-        topics = []
-        for line in raw.splitlines():
-            line = re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line).strip().strip('"\'')
-            line = re.sub(r"[—–]", ",", line).strip()
-            if 3 <= len(line) <= 140:
-                topics.append(line)
-        return topics[:count]
-    finally:
-        page.close()
+    topics: list[str] = []
+    for _attempt in range(2):
+        page = context.new_page()
+        try:
+            page.goto("https://chatgpt.com/", timeout=90000)
+            page.wait_for_timeout(7000)
+            dismiss_notice(page)
+            titles = "\n".join(existing[-120:])
+            request = config.prompt("topics.txt").replace("{titles}", titles)
+            send_text(page, request + f"\n\nRequested number of topics: {count}"
+                      + "\n\nEach line must be a single topic title of at most 140 characters, "
+                        "with no description.")
+            wait_for_assistant(page, timeout=600)
+            topics = topic_lines(copy_last(page))
+            if len(topics) >= count:
+                return topics[:count]
+        finally:
+            page.close()
+    return topics[:count]
