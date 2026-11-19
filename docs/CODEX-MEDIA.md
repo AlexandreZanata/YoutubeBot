@@ -51,6 +51,17 @@ CI uses synthetic media/coordinator fixtures. Existing supplied `thumbnail.png` 
 legacy ChatGPT media path remains available. If Codex is present but fails, the job stops
 with preserved assets; it does not silently switch providers or coordinator cost tiers.
 
+## Credits exhausted
+
+The one owner-authorized exception is a Codex usage limit. When Codex reports "hit your
+usage limit", the bot logs the reset time, records
+`.local/ytbot-media/codex/codex-usage-limit.json` and sends the next thumbnail or Short background
+to the existing ChatGPT browser image path. Topics and metadata already fall back to the
+ChatGPT browser conversation. The fallback is explicit in the log, writes its own
+`thumbnail-source.json` provider record, and lasts only until the reset time; after that,
+`codex_media.available()` is true again and Codex resumes. An ordinary Codex failure still
+stops with the assets preserved.
+
 Keep `.local/`, Codex login state and private task logs outside GitHub. Installation and
 browser sign-in help: [Linux setup](INSTALL-LINUX.md).
 

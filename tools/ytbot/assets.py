@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import base64
+import io
 import json
 import time
 from pathlib import Path
+
+from PIL import Image, ImageOps
 
 from . import codex_media, config, logic
 from .chat import copy_last, dismiss_notice, log, send_text, wait_for_assistant
@@ -20,7 +23,10 @@ def article_excerpt(run_dir: Path, limit: int = 8000) -> str:
 
 def generate_metadata(context, run_dir: Path, topic: str) -> dict:
     if codex_media.available():
-        return codex_media.generate_metadata(run_dir, topic)
+        try:
+            return codex_media.generate_metadata(run_dir, topic)
+        except codex_media.CodexUsageLimit as error:
+            log(str(error))
     page = context.new_page()
     try:
         page.goto("https://chatgpt.com/", timeout=90000)
@@ -66,6 +72,9 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
         for attempt in range(2):
             try:
                 return codex_media.generate_thumbnail(run_dir, style)
+            except codex_media.CodexUsageLimit as error:
+                log(str(error))
+                break
             except (ValueError, RuntimeError):
                 if attempt:
                     raise
@@ -81,7 +90,8 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
         page.wait_for_timeout(7000)
         dismiss_notice(page)
         prompt_file = {"classic": "thumbnail-classic.txt",
-                       "shorts": "thumbnail-shorts.txt"}.get(style, "thumbnail.txt")
+                       "shorts": "thumbnail-shorts.txt",
+                       "short-background": "shorts_background.txt"}.get(style, "thumbnail.txt")
         request = (config.prompt(prompt_file)
                    + "\n\nARTICLE (excerpt, included below):\n" + article_excerpt(run_dir))
         send_text(page, request)
@@ -92,7 +102,13 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
             data = image_data_url(page)
             if data and data.startswith("data:image/"):
                 destination = run_dir / "thumbnail.png"
-                destination.write_bytes(base64.b64decode(data.split(",", 1)[1]))
+                with Image.open(io.BytesIO(base64.b64decode(data.split(",", 1)[1]))) as master:
+                    size = (1080, 1920) if style in ("shorts", "short-background") else (1280, 720)
+                    exported = ImageOps.fit(master.convert("RGB"), size, Image.Resampling.LANCZOS)
+                    exported.save(destination, format="PNG", optimize=True)
+                (run_dir / "thumbnail-source.json").write_text(
+                    json.dumps({"provider": "chatgpt-browser", "style": style}),
+                    encoding="utf-8")
                 log("thumbnail saved")
                 return destination
             body = page.locator("body").inner_text()

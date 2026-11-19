@@ -34,8 +34,13 @@ def prepare_topics(context, count: int, scheduled_titles: list[str] | None = Non
         if len(chosen) >= count:
             break
         requested = min(count - len(chosen) + 2, 12)
-        generated = (codex_media.generate_topics(requested, existing + chosen) if codex_media.available()
-                     else chat.generate_topics(context, requested, existing + chosen))
+        try:
+            generated = (codex_media.generate_topics(requested, existing + chosen)
+                         if codex_media.available()
+                         else chat.generate_topics(context, requested, existing + chosen))
+        except codex_media.CodexUsageLimit as error:
+            print(f"[topics] {error}", flush=True)
+            generated = chat.generate_topics(context, requested, existing + chosen)
         _add_new_topics(generated, existing, chosen, count)
     if len(chosen) < count:
         raise RuntimeError(f"only {len(chosen)} unique topics available, requested {count}")

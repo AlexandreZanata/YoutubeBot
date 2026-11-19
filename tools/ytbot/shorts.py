@@ -32,6 +32,11 @@ SHORT_TOPICS = (
     "Quando a irrigação compensa o investimento?",
     "Por que o milho safrinha exige planejamento antecipado?",
     "Como o clima afeta a janela de aplicação de defensivos?",
+    "Por que o pH do solo muda depois da calagem?",
+    "Como o milho responde ao nitrogênio em cobertura?",
+    "O que a compactação do solo faz com a raiz?",
+    "Quando o gado precisa de suplementação mineral?",
+    "Por que a colheitadeira perde grãos na barra de corte?",
 )
 
 

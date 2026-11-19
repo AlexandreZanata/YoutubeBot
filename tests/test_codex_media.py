@@ -116,6 +116,24 @@ class CodexMediaContracts(TestCase):
         thumbnail.assert_called_once_with(self.run, 'dense')
         context.new_page.assert_not_called()
 
+    def test_usage_limit_blocks_codex_and_allows_the_chatgpt_browser_fallback(self):
+        stderr = ("ERROR: You've hit your usage limit. Visit https://chatgpt.com/settings/usage "
+                  "to purchase more credits or try again at Nov 20th, 2026 4:34 PM.")
+        failed = subprocess.CompletedProcess([], 1, stderr=stderr)
+        with patch.object(codex_media.shutil, 'which', return_value='/safe/codex'), \
+                patch.object(codex_media.subprocess, 'run', return_value=failed):
+            with self.assertRaisesRegex(codex_media.CodexUsageLimit, 'ChatGPT browser'):
+                codex_media._execute(self.run, 'thumbnail', 'fixed request', {}, images=True)
+            self.assertTrue(codex_media.usage_blocked())
+            self.assertFalse(codex_media.available())
+
+    def test_usage_limit_without_a_date_still_pauses_codex(self):
+        until = codex_media.usage_limit_until('usage limit reached', now=1000)
+        self.assertEqual(until, 4600)
+        parsed = codex_media.usage_limit_until(
+            'try again at Nov 20th, 2026 4:34 PM', now=1000)
+        self.assertGreater(parsed, 1000)
+
     def test_recent_image_recovers_a_missing_codex_path(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
