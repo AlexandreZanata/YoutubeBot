@@ -76,6 +76,19 @@ def stop_hidden_chrome() -> None:
             break
         time.sleep(0.5)
     if _chrome_pids():
+        # Chrome can ignore SIGTERM when a tab is mid-download or showing a native
+        # dialog; the profile then keeps its lock and no visible login window can
+        # open. Force-kill only this dedicated profile's processes.
+        for pid in _chrome_pids():
+            try:
+                os.kill(pid, 9)
+            except OSError:
+                pass
+        for _ in range(20):
+            if not _chrome_pids():
+                break
+            time.sleep(0.5)
+    if _chrome_pids():
         raise RuntimeError("the dedicated browser is still running; profile locks were preserved")
     for name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
         (config.PROFILE / name).unlink(missing_ok=True)
