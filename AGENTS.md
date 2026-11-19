@@ -32,12 +32,15 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   Zaflas articles target 4,000 to 4,800 words (26,000 to 34,000 characters) with one bounded
   rewrite above the ceiling.
 - Sepia Atlas is English-only, American English, premium historical documentaries built on
-  authentic archival photography with no fixed duration until the owner approves the
-  first episode's final format, one video every two
-  days at 21:00, Cinematic Archival Minimalism (Archival Black, Aged Gold, Antique Ivory) and a
-  photographer's eye for the Atlas Frame emblem. Never fabricate a historical photograph or
-  present a generated image as documentary evidence. The first episode stays private for owner
-  review and is never auto-published. See [its channel profile](docs/channels/sepia-atlas.md).
+  authentic archival photography: 15 to 25 minutes average (1,900 to 3,200 words, tolerance up
+  to 40 minutes / ~5,100 words), one video every two days at 21:00, mandatory `0.9x` narration
+  speed (`slow_narration(..., factor=0.9)`), mandatory broadcast documentary voice filter
+  (`DOCUMENTARY_VOICE_FILTER`) with subtle filtered analog room-tone, smooth 1.2s optical
+  cross-dissolves, mandatory narration-to-image synchronization, Cinematic Archival Minimalism
+  (Archival Black, Aged Gold, Antique Ivory) and a photographer's eye for the Atlas Frame emblem.
+  Never fabricate a historical photograph or present a generated image as documentary evidence.
+  The first episode stays private for owner review and is never auto-published. See
+  [its channel profile](docs/channels/sepia-atlas.md).
 - Midnight Tales is English-only long-form sleep stories for adults, 6,500 to 9,000 words
   (45 to 65 minutes), one video every two days at 21:00 and one Short every two days at 09:00.
   Thumbnails are painterly cinematic scenes with no text, and the thumbnail is the still video

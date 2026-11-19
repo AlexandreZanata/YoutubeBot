@@ -127,10 +127,12 @@ CHANNELS = {
         language="en",
         min_article_chars=13000,
         article_retry=(
-            "Keep the same subject, sources and documentary arc. Do not add "
-            "filler to reach a length."
+            "Target narration length: 1,900 to 3,200 English words (15 to 25 minutes "
+            "at the channel's 0.9x documentary pace, tolerance up to 40 minutes / "
+            "~5,100 words). Keep the same subject, sources and documentary arc; "
+            "never pad with filler."
         ),
-        max_article_chars=0,
+        max_article_chars=36000,
         slots=(21,),
         interval_days=2,
     ),

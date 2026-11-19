@@ -8,7 +8,7 @@ Write immersive, accurate, original narration in natural American English.
 
 Open with a compelling concrete historical image or fact. Develop the story through vivid but factual details, meaningful transitions and a distinct narrative arc. End with a thoughtful observation that gives the viewer a deeper understanding of the past.
 
-The visual storytelling must prioritize authentic archival photographs that directly correspond to the spoken narration, so name concrete real subjects, places and years that can be matched to photographs, maps or documents.
+The visual storytelling must prioritize authentic archival photographs that directly correspond to the spoken narration. In every section and scene, explicitly name the concrete real subject, place, building, occupation, or object being shown so the narration always talks directly about the photograph on screen — never write long abstract passages without a concrete visual anchor.
 
 Keep the audio clean and intimate, as natural voice narration with a barely audible analog texture.
 
@@ -19,9 +19,10 @@ Do not produce a generic slideshow script, copied narration, repetitive template
 Requirements:
 
 - Everything must be 100% in American English.
-- Length: no fixed target. The episode ends when the subject is fully covered;
-  never pad with repetition or cut research to fit a duration. The owner sets
-  the final format after reviewing the first episode.
+- Length: target 1,900 to 3,200 words (15 to 25 minutes at the channel's 0.9x
+  documentary pace), with tolerance up to 5,100 words (40 minutes) when the
+  subject warrants deeper coverage; never pad with repetition or cut essential
+  research.
 - One subject, one period, one clear narrative arc.
 - No headings, lists, labels, notes, citations, links or metadata inside the narration.
 - No introduction about your process and no closing commentary outside the narration.
