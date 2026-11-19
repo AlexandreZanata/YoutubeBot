@@ -16,11 +16,21 @@ def log(message: str) -> None:
     print(f"[youtube] {message}", flush=True)
 
 
+def _clear_backdrops(page) -> None:
+    page.keyboard.press("Escape")
+    page.evaluate(
+        "()=>document.querySelectorAll('tp-yt-iron-overlay-backdrop').forEach(e=>e.remove())")
+
+
 def click_text(page, names: list[str]) -> bool:
     for name in names:
         locator = page.get_by_text(name, exact=True)
         if locator.count():
-            locator.first.click()
+            try:
+                locator.first.click(timeout=15000)
+            except Exception:
+                _clear_backdrops(page)
+                locator.first.evaluate("el => el.click()")
             return True
     return False
 
@@ -91,6 +101,7 @@ def lookup_video_id(context, title: str, timeout: int = 90) -> str:
 def open_upload(context, run_dir: Path, meta: dict, require_id: bool = True):
     page = context.new_page()
     page.goto(config.STUDIO_UPLOAD, timeout=90000)
+    _clear_backdrops(page)
     runtime.select_channel(page)
     upload_guard.page_blocked(page)
     opened = False
