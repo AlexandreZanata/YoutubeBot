@@ -38,9 +38,17 @@ def license_allowed(value: str) -> bool:
 
 
 def period_ok(title: str, date: str) -> bool:
-    """Reject modern photographs that merely mention the historical period."""
-    years = [int(year) for year in __import__("re").findall(r"(?:18|19|20)\d{2}", f"{title} {date}")]
-    return not years or all(1880 <= year <= 1915 for year in years)
+    """Reject modern photographs; a title year must be from the period."""
+    import re
+
+    def years(text: str) -> list[int]:
+        return [int(year) for year in re.findall(r"(?:18|19|20)\d{2}", text or "")]
+
+    title_years = years(title)
+    if title_years:
+        return all(1880 <= year <= 1915 for year in title_years)
+    date_years = years(date)
+    return bool(date_years) and 1880 <= min(date_years) <= 1915
 
 
 def photo_candidates(query: str, limit: int = 4) -> list[dict]:
@@ -209,5 +217,11 @@ def thumbnail(run_dir: Path, photo: Path, title: str) -> Path:
     draw = ImageDraw.Draw(canvas)
     font = ImageFont.truetype(str(config.ROOT / "assets/fonts/Playfair.ttf"), 92)
     draw.text((60, 470), title, font=font, fill=(241, 231, 212))
+    mark = config.ROOT / "assets" / "brand" / "sepia_atlas" / "watermark-e.png"
+    if mark.is_file():
+        with Image.open(mark) as logo:
+            badge = logo.copy()
+            badge.thumbnail((86, 86), Image.Resampling.LANCZOS)
+            canvas.paste(badge, (1280 - badge.width - 34, 30), badge)
     canvas.save(destination, format="PNG", optimize=True)
     return destination
