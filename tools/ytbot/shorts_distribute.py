@@ -41,7 +41,10 @@ def scheduled_shorts(slug: str) -> int:
 
 
 def used_topics(slug: str) -> int:
-    return sum(1 for entry in shorts_root(slug).iterdir()
+    root = shorts_root(slug)
+    if not root.is_dir():
+        return 0
+    return sum(1 for entry in root.iterdir()
                if entry.is_dir() and (entry / "topic.txt").is_file())
 
 
