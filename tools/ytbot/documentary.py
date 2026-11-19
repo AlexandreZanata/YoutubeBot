@@ -986,6 +986,41 @@ def render(run_dir: Path, rows: list[dict], narration: Path | None = None,
                      voice_filter=voice_filter, analog_texture=analog_texture)
 
 
+def _fit_title_lines(draw: ImageDraw.ImageDraw, text: str, font_path: str,
+                     start_size: int = 88, max_width: int = 1152,
+                     max_lines: int = 3, min_size: int = 56) -> tuple:
+    """Wrap a thumbnail title so no line ever leaves the canvas.
+
+    Greedy word-wrap at the largest size that fits, shrinking down to
+    ``min_size`` before allowing an extra line. Returns (font, lines, line_h).
+    """
+    words = " ".join(text.replace("\n", " ").split()).upper().split(" ")
+    size = start_size
+    while size >= min_size:
+        font = ImageFont.truetype(str(font_path), size)
+        widths = [draw.textlength(word, font=font) for word in words]
+        space = draw.textlength(" ", font=font)
+        lines: list[str] = []
+        current_words: list[str] = []
+        current_width = 0.0
+        for word, width in zip(words, widths):
+            extra = width if not current_words else space + width
+            if current_words and current_width + extra > max_width:
+                lines.append(" ".join(current_words))
+                current_words = [word]
+                current_width = width
+            else:
+                current_words.append(word)
+                current_width += extra
+        if current_words:
+            lines.append(" ".join(current_words))
+        if len(lines) <= max_lines:
+            return font, lines, int(size * 1.09)
+        size -= 4
+    font = ImageFont.truetype(str(font_path), min_size)
+    return font, lines[:max_lines], int(min_size * 1.09)
+
+
 def thumbnail(run_dir: Path, photo: Path, title: str, *,
               style: str = "sepia", template: str = "encounter",
               subtitle: str = "", output_name: str = "thumbnail.png") -> Path:
@@ -1011,10 +1046,9 @@ def thumbnail(run_dir: Path, photo: Path, title: str, *,
                 draw.rectangle([0, 720 - 410 + i, 1280, 721 - 410 + i], fill=(3, 11, 18, alpha))
         canvas = Image.alpha_composite(canvas.convert("RGBA"), overlay).convert("RGB")
         draw = ImageDraw.Draw(canvas)
-        title_font = ImageFont.truetype(str(config.ROOT / "assets/fonts/Inter.ttf"), 88)
+        title_font, lines, line_h = _fit_title_lines(
+            draw, title, config.ROOT / "assets" / "fonts" / "Inter.ttf")
         sub_font = ImageFont.truetype(str(config.ROOT / "assets/fonts/Inter.ttf"), 26)
-        lines = [line.strip().upper() for line in title.split("\n") if line.strip()]
-        line_h = 96
         block_h = line_h * len(lines)
         tx = 64
         ty = (536 if template != "unknown" else 490) - max(len(lines) - 1, 0) * line_h
@@ -1041,8 +1075,13 @@ def thumbnail(run_dir: Path, photo: Path, title: str, *,
         draw.rectangle([0, 720 - 430 + i, 1280, 721 - 430 + i], fill=(20, 17, 14, alpha))
     canvas = Image.alpha_composite(canvas.convert("RGBA"), overlay).convert("RGB")
     draw = ImageDraw.Draw(canvas)
-    font = ImageFont.truetype(str(config.ROOT / "assets/fonts/Playfair.ttf"), 92)
-    draw.text((60, 470), title, font=font, fill=(241, 231, 212))
+    font, lines, line_h = _fit_title_lines(
+        draw, title, config.ROOT / "assets" / "fonts" / "Playfair.ttf",
+        start_size=92, min_size=60)
+    y = 500 - max(len(lines) - 1, 0) * line_h // 2
+    for line in lines:
+        draw.text((60, y), line, font=font, fill=(241, 231, 212))
+        y += line_h
     mark = config.ROOT / "assets" / "brand" / "sepia_atlas" / "watermark-e.png"
     if mark.is_file():
         with Image.open(mark) as logo:

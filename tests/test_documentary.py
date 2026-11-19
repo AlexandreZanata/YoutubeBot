@@ -198,6 +198,22 @@ class DocumentaryTests(unittest.TestCase):
         self.assertEqual(summary["generated"], 1)
         self.assertEqual(summary["generated_ids"], ["?"])
 
+    def test_thumbnail_title_never_leaves_the_canvas(self):
+        import tempfile
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            photo = run / 'photo.jpg'
+            Image.new('RGB', (1600, 900), 'navy').save(photo)
+            dest = documentary.thumbnail(run, photo, 'The Strange World of the Bigfin Squid',
+                                         style='abyssal', template='encounter')
+            with Image.open(dest) as image:
+                self.assertEqual(image.size, (1280, 720))
+                px = image.convert('RGB').load()
+                right = [px[x, y] for x in range(1220, 1280, 4) for y in range(420, 700, 8)]
+                bright = sum(1 for r, g, b in right if r + g + b > 540)
+                self.assertEqual(bright, 0, 'title text reaches the right edge')
+
     def test_illustration_label_is_channel_voiced_and_empty_when_absent(self):
         self.assertIn('historical photograph', documentary.illustration_label_for('sepia-atlas'))
         self.assertIn('real observation', documentary.illustration_label_for('bathylora'))
