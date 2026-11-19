@@ -208,7 +208,7 @@ python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --l
   `send_sequence`: the lead becomes `opening` with `opened_at` before the browser acts, the
   journal fences every bubble, and a lead is `sent` only when `open_lead` returns `opened`. It
   stops at the first `unconfirmed` or `error` and retries nothing by itself. The opening window
-  (08:30 to 17:30, Monday to Friday), the 10/day limit, pacing, do-not-contact and invalid
+  (07:00 to 17:00, Monday to Friday), the 10/day limit, pacing, do-not-contact and invalid
   numbers apply exactly as in `run --prospect`; a blocked run prints the reason.
 - **One sender at a time.** `queue send --live` and `run` share the lock, so one refuses while
   the other runs. Stop the `run` loop (SIGTERM ends it between two steps), send, then start it
@@ -293,7 +293,7 @@ the model using only the facts.
 | "Tudo bem e você?" | `greeting_reply` | reply | Short answer and an open question |
 | "Obrigado", "ok" | `thanks` | ignore | Nothing |
 | Anything not in the facts: city, invoice, contract, technology, e-mail, ambiguous text | `unknown` | handoff | Fixed: "Certo! Vou verificar direitinho e já te respondo."; owner notified |
-| Message outside 07:00–21:00 | — | — | Stored; answered at the start of the next reply window |
+| Message outside 07:00–17:00 | — | — | Stored; answered at the start of the next reply window |
 | The owner typed in the chat | — | — | Any message the bot did not send, after the bot's latest message in that chat (older personal or archived-cycle messages do not count), found when the chat opens to answer or to follow up; state `owner`, automation pauses |
 | A refused contact writes again | — | — | No automated answer; owner notified |
 
@@ -556,7 +556,7 @@ live in `[opening]` and `[pacing]` of the rules file.
 - `--live` is required to send; the default prints the plan.
 - Refusal or opt-out → salted hash in `do-not-contact.json`, removal from the `rules.json`
   allow list, and no message ever again, including follow-ups and re-imports.
-- At most 10 first contacts per day (America/Cuiaba), weekdays 08:30–17:30.
+- At most 10 first contacts per day (America/Cuiaba), weekdays 07:00–17:00 (replies also 07:00–17:00).
 - The opening is recorded before the browser acts and its journal keys are per lead, so it is
   never repeated, even after a crash.
 - One follow-up after 72 h without an answer; `no-response` 96 h later, then silence.

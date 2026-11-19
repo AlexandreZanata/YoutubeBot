@@ -29,12 +29,12 @@ no_response_after_followup_hours = 96
 [hours]
 # Weekday numbers: 0 = Monday ... 6 = Sunday. Times are local (America/Cuiaba).
 opening_days = [0, 1, 2, 3, 4]
-opening_start = "08:30"
-opening_end = "17:30"
+opening_start = "07:00"
+opening_end = "17:00"
 # People who wrote are answered in this window; later messages wait for the next window.
 reply_days = [0, 1, 2, 3, 4, 5, 6]
 reply_start = "07:00"
-reply_end = "21:00"
+reply_end = "17:00"
 
 [pacing]
 # Interval between two messages of a reply = typing time of the message (+ reading time of the
