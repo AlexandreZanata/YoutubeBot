@@ -174,7 +174,11 @@ def ocean_photo_candidates(query: str, limit: int = 12,
     data = _get(API + "?" + urllib.parse.urlencode(params))
     pages = (data.get("query") or {}).get("pages") or {}
     excluded = ("logo", "icon", "seal", "flag", "cartoon", "drawing", "sketch",
-                "stamp", "poster", "cover", "chart", "graph", "svg")
+                "stamp", "poster", "cover", "chart", "graph", "svg",
+                "diagram", "reproduction", "watercolor", "watercolour",
+                "painting", "skeleton", "magazine", "illustration",
+                "engraving", "newspaper", "book ", "replica", "diorama",
+                "fossil", "statue", "sculpture")
     rows = []
     for page in pages.values():
         info = (page.get("imageinfo") or [{}])[0]
@@ -195,6 +199,13 @@ def ocean_photo_candidates(query: str, limit: int = 12,
         description = _clean_html(meta.get("ImageDescription", {}).get("value", ""))
         date = _clean_html(meta.get("DateTimeOriginal", {}).get("value", ""))
         blob = f"{title} {artist} {credit} {description}".lower()
+        # The record itself must mention the searched subject: file titles alone
+        # drift toward loosely related material (museum skeletons, magazine scans).
+        wanted = [word for word in query.lower().split()
+                  if len(word) > 4 and word not in
+                  {"deep", "ocean", "black", "water", "large", "great", "white"}]
+        if wanted and not any(word in blob for word in wanted):
+            continue
         is_noaa = "noaa" in blob or "okeanos" in blob or "ocean exploration" in blob or "mbnms" in blob
         is_pd = "public domain" in license_name.lower() or "pd-" in license_name.lower() or "cc0" in license_name.lower()
         rows.append({
