@@ -54,6 +54,16 @@ class CommunityPostTests(unittest.TestCase):
                 self.assertEqual(image.size, (1080, 1080))
                 self.assertEqual(image.mode, "RGB")
 
+    def test_a_post_labelled_one_day_is_outside_the_rolling_window(self):
+        page = mock.Mock()
+        page.locator.return_value.count.return_value = 1
+        page.locator.return_value.first.locator.return_value.count.return_value = 1
+        page.locator.return_value.first.locator.return_value.first.inner_text.return_value = "há 1 dia"
+        with mock.patch.object(community, "latest_post_label", return_value="há 1 dia"):
+            self.assertFalse(community.posted_recently(page))
+        with mock.patch.object(community, "latest_post_label", return_value="há 23 horas"):
+            self.assertTrue(community.posted_recently(page))
+
     def test_relative_post_time_crosses_midnight(self):
         now = datetime(2026, 11, 15, 0, 30)
         for label in ("há 40 minutos", "40 minutes ago"):

@@ -168,7 +168,8 @@ def posted_recently(page, now: datetime | None = None, hours: int = 24) -> bool:
         if entry.get("state") == "posted" and entry.get("at"):
             return current - datetime.fromisoformat(entry["at"]) < timedelta(hours=hours)
         return False
-    return minutes <= hours * 60
+    # YouTube shows "1 day" only after a full 24 hours, so the boundary is not recent.
+    return minutes < hours * 60
 
 
 def has_posts(page) -> bool:
