@@ -89,6 +89,13 @@ class CommunityPostTests(unittest.TestCase):
             self.assertEqual([entry["state"] for entry in history], ["started", "posted"])
             self.assertTrue(all(entry["channel"] == "zaflas" for entry in history))
 
+    def test_safe_art_prompt_avoids_people_and_biblical_figures(self):
+        prompt = community._safe_art_prompt(
+            "full-bleed cinematic biblical scene with warm golden light", "Paul on a ship")
+        self.assertIn("no people", prompt)
+        self.assertIn("atmospheric landscape", prompt)
+        self.assertNotIn("biblical scene", prompt)
+
     def test_post_type_catalog_covers_the_community_options(self):
         self.assertEqual(set(community.POST_TYPES), {
             "text", "image", "gif", "poll-text", "poll-image", "quiz", "video", "playlist",
