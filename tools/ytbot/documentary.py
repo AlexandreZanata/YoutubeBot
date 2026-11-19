@@ -513,6 +513,124 @@ def timeline_aligned(article: str, duration: float, sources: list[dict],
     return rows
 
 
+def short_source(source: dict) -> str:
+    """Compact per-image credit for chapter lines (keeps descriptions under limits)."""
+    if source.get("generated"):
+        return "AI illustration"
+    institution = (source.get("institution") or "").strip()
+    mapping = (
+        ("NOAA Office of Ocean Exploration and Research", "NOAA Ocean Exploration"),
+        ("NOAA", "NOAA"),
+        ("Library of Congress", "Library of Congress"),
+        ("National Archives", "NARA"),
+        ("Smithsonian", "Smithsonian"),
+        ("U.S. Geological Survey", "USGS"),
+        ("USGS", "USGS"),
+        ("Wikimedia Commons", "Wikimedia"),
+    )
+    for long, short in mapping:
+        if long.lower() in institution.lower():
+            return short
+    return institution[:40] if institution else "Archive"
+
+
+def _chapter_stamp(seconds: float) -> str:
+    total = max(int(seconds), 0)
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
+
+
+def _clean_caption(text: str) -> str:
+    import re
+
+    text = re.sub(r"\s+", " ", (text or "").strip())
+    text = re.sub(r"^(File:|Image:?)\s*", "", text, flags=re.I)
+    return text
+
+
+def chapters_block(rows: list[dict], sources: list[dict],
+                   min_seconds: float = 10.0, title_len: int = 56) -> str:
+    """YouTube chapter list with one line per image and its source.
+
+    Windows shorter than ``min_seconds`` merge into the next chapter so
+    YouTube actually enables chapters (it ignores lists with <10s chapters).
+    """
+    by_file = {s.get("file", ""): s for s in sources}
+    groups: list[list[dict]] = []
+    pending: list[dict] = []
+    for row in rows:
+        pending.append(row)
+        span = row.get("end", 0) - pending[0].get("start", 0)
+        if span >= min_seconds:
+            groups.append(pending)
+            pending = []
+    if pending:
+        if groups:
+            # A short tail would disable all chapters, so it stays covered
+            # by the previous chapter instead of getting its own start point.
+            groups[-1].extend(pending)
+        else:
+            groups.append(pending)
+    lines: list[str] = []
+    for group in groups:
+        first = group[0]
+        caption = _clean_caption(str(first.get("caption", "")))[:title_len].rstrip()
+        source = by_file.get(first.get("photo", ""), {})
+        line = f"{_chapter_stamp(first.get('start', 0))} {caption} — {short_source(source)}"
+        if not source.get("generated") and any(
+                by_file.get(row.get("photo", ""), {}).get("generated") for row in group):
+            # A generated illustration covered by this chapter still gets named.
+            line += " (+ AI illustration)"
+        lines.append(line.rstrip(" —"))
+    return "\n".join(lines)
+
+
+def apply_description_chapters(run_dir: Path, rows: list[dict],
+                               channel_slug: str = "",
+                               max_total: int = 4900) -> str:
+    """Rewrite the episode description with a chapter time map per image.
+
+    Keeps the base paragraph, hashtags and disclosures; replaces any previous
+    credits/chapters block. Shrinks chapter titles until the whole description
+    fits YouTube's 5000-character limit. Returns the final description.
+    """
+    meta_path = run_dir / "metadata.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    sources = json.loads((run_dir / "sources.json").read_text(encoding="utf-8"))
+    base = meta.get("description", "")
+    for marker in ("VIDEO CHAPTERS", "ARCHIVAL PHOTOGRAPHS:", "IMAGE CREDITS"):
+        cut = base.find(marker)
+        if cut != -1:
+            base = base[:cut]
+    base = base.rstrip()
+    disclaimer = ""
+    if channel_slug == "bathylora":
+        disclaimer = (
+            "Bathylora is an independent educational channel and is not "
+            "affiliated with NOAA or other research institutions.")
+        if disclaimer in base:
+            base = base.replace(disclaimer, "").rstrip()
+    title_len = 56
+    while True:
+        block = chapters_block(rows, sources, title_len=title_len)
+        text = base + "\n\nVIDEO CHAPTERS — every image with its source:\n" + block
+        if disclaimer:
+            text += "\n\n" + disclaimer
+        if len(text) <= max_total or title_len <= 20:
+            break
+        title_len -= 8
+    meta["description"] = text
+    meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+    (run_dir / "chapters.txt").write_text(block + "\n", encoding="utf-8")
+    summary = summarize_sources(sources)
+    log(f"chapters: {len(block.splitlines())} entries, "
+        f"{summary['generated']} generated, {len(text)} chars")
+    return text
+
+
 def summarize_sources(sources: list[dict]) -> dict:
     """Split verified records from generated illustrations for human review."""
     generated = [s.get("id", "?") for s in sources if s.get("generated")]

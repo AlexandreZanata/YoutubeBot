@@ -215,5 +215,42 @@ class DocumentaryTests(unittest.TestCase):
                 self.assertEqual(image.size, (1280, 720))
 
 
+    def test_chapters_merge_short_windows_and_name_sources(self):
+        rows = [
+            {'photo': 'a.jpg', 'start': 0.0, 'end': 30.0, 'caption': 'Mulberry Street'},
+            {'photo': 'b.jpg', 'start': 30.0, 'end': 34.0, 'caption': 'A kitchen'},
+            {'photo': 'c.jpg', 'start': 34.0, 'end': 90.0, 'caption': 'A mill'},
+        ]
+        sources = [
+            {'file': 'a.jpg', 'institution': 'Library of Congress'},
+            {'file': 'b.jpg', 'institution': 'Wikimedia Commons'},
+            {'file': 'c.jpg', 'institution': '', 'generated': True},
+        ]
+        block = documentary.chapters_block(rows, sources)
+        lines = block.splitlines()
+        self.assertTrue(lines[0].startswith('0:00 Mulberry Street'))
+        self.assertIn('Library of Congress', lines[0])
+        self.assertIn('AI illustration', block)
+        # short 4s window merged: every chapter start is >=10s apart
+        starts = [line.split(' ')[0] for line in lines]
+        self.assertEqual(len(starts), 2)
+
+    def test_description_chapters_fit_youtube_limit(self):
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            rows = [{'photo': f'p{i}.jpg', 'start': float(i * 30), 'end': float(i * 30 + 30),
+                     'caption': f'Scene number {i} with a very long descriptive title here'}
+                    for i in range(40)]
+            sources = [{'file': f'p{i}.jpg', 'institution': 'Wikimedia Commons'} for i in range(40)]
+            (run / 'metadata.json').write_text(json.dumps({'description': 'Base paragraph. ' * 20}), encoding='utf-8')
+            (run / 'sources.json').write_text(json.dumps(sources), encoding='utf-8')
+            text = documentary.apply_description_chapters(run, rows, 'sepia-atlas')
+            self.assertLessEqual(len(text), 4900)
+            self.assertIn('0:00', text)
+            self.assertIn('VIDEO CHAPTERS', text)
+
+
 if __name__ == "__main__":
     unittest.main()

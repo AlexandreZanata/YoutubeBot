@@ -127,6 +127,11 @@ resolution, original description, narration segment, start/end time and verifica
 - Visual fallback when no authentic photograph exists: widen archive search, use verified
   scientific maps or clearly labelled original explanatory diagrams, or rewrite/cut the passage.
 
+## Description chapters
+
+Every episode description carries a chapter time map with one line per image and its
+source institution (AI illustrations named as such). See [video chapters](../VIDEO-CHAPTERS.md).
+
 ## YouTube Studio configuration
 
 - Official description (English, includes NOAA non-affiliation disclosure).
@@ -148,7 +153,11 @@ real scientific field photograph) and no custom thumbnail.
 ## Status
 
 Profile, prompts, channel entry, Abyssal Cinema visual identity, Depth Mark brand assets,
-scientific archive collector (`documentary.collect_ocean`) and documentary renderer (`0.9x`
-speed, `DOCUMENTARY_VOICE_FILTER`, subtle analog room-tone, `1.2s` cross-dissolves, parallel
-`h264_nvenc`) are integrated in YoutubeBot. The pilot episode package is prepared under
-`.local/ytbot/channels/bathylora/runs/` for owner review; nothing is published automatically.
+scientific archive collector (`documentary.collect_ocean`), deterministic CLI pipeline
+(`python3 -m tools.ytbot documentary init|collect|audit|narrate|render|qc`) and documentary
+renderer (`0.9x` speed, `DOCUMENTARY_VOICE_FILTER`, subtle analog room-tone, `1.2s`
+cross-dissolves, parallel `h264_nvenc`) are integrated in YoutubeBot. For exact step-by-step
+episode production instructions usable by any agent, see
+[the Bathylora production pipeline runbook](bathylora-pipeline.md). The pilot episode package
+is prepared under `.local/ytbot/channels/bathylora/runs/` for owner review; nothing is
+published automatically.

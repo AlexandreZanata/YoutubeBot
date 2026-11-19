@@ -74,6 +74,11 @@ context photograph, historical map, original document, contemporary illustration
 illustrative, or an original explanatory diagram. The viewer must never be misled into thinking a
 reconstruction is an authentic record.
 
+## Description chapters
+
+Every episode description carries a chapter time map with one line per image and its
+source institution (AI illustrations named as such). See [video chapters](../VIDEO-CHAPTERS.md).
+
 ## Publication
 
 The first episode, **What Life Really Looked Like in America in 1900**, stays private for owner
