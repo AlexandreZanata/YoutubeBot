@@ -219,7 +219,7 @@ def timeline_aligned(article: str, duration: float, sources: list[dict]) -> list
         else:
             positions.sort()
             anchors.append(max(positions[len(positions) // 2], cursor))
-        cursor = anchors[-1]
+        cursor = anchors[-1] + 1
     rows = []
     for index, source in enumerate(sources):
         prev_anchor = anchors[index - 1] if index > 0 else 0
