@@ -297,6 +297,38 @@ class WhatsAppSenderTests(unittest.TestCase):
             self.assertEqual(shot.parent, debug_dir)
 
 
+    def test_phone_number_to_opens_by_url_not_by_fuzzy_search(self):
+        self.assertTrue(sender.looks_like_phone("+5565999723793"))
+        self.assertTrue(sender.looks_like_phone("(65) 99972-3793"))
+        self.assertFalse(sender.looks_like_phone("Motorista Frotas"))
+        self.assertFalse(sender.looks_like_phone(""))
+        opened = []
+        used = []
+
+        class Composer:
+            count = lambda self: 1
+            first = property(lambda self: self)
+
+        class UrlPage:
+            def goto(self, url, timeout=None):
+                opened.append(url)
+
+            def locator(self, selector):
+                used.append(selector)
+                assert "Search or start a new chat" not in selector, \
+                    "name search must not run for a number"
+                node = Composer()
+                node.inner_text = lambda: ""
+                return node
+
+            def wait_for_timeout(self, ms):
+                pass
+
+        with patch.object(sender.time, "sleep", lambda s: None):
+            sender.open_chat(UrlPage(), "+5565999723793", sender.Pacing(0, 0))
+        self.assertEqual(opened, ["https://web.whatsapp.com/send?phone=5565999723793"])
+        self.assertNotIn("Search or start a new chat", " ".join(used))
+
     def test_ai_notice_modal_is_dismissed_on_chat_open(self):
         class Node:
             def __init__(self, page, selector):

@@ -239,10 +239,21 @@ def dismiss_ai_notice(page) -> bool:
     return False
 
 
+def looks_like_phone(value: str) -> bool:
+    """A contact field holding a phone number instead of a saved name."""
+    digits = re.sub(r"\D", "", value or "")
+    return len(digits) >= 10 and len(digits) <= 15
+
+
 def open_chat(page, to: str, pacing: Pacing, phone: str | None = None) -> None:
-    """Open the conversation by saved name (search) or by number (click-to-chat URL)."""
-    if phone:
-        _open_by_phone(page, phone, pacing)
+    """Open the conversation by saved name (search) or by number (click-to-chat URL).
+
+    A `to` holding a phone number always takes the deterministic
+    `send?phone=` URL: name search is fuzzy and once opened the
+    Motorista Frotss chat for a similar-digit number.
+    """
+    if phone or looks_like_phone(to):
+        _open_by_phone(page, phone or to, pacing)
         dismiss_ai_notice(page)
         return
     page.goto(LOGIN_URL, timeout=90000)
