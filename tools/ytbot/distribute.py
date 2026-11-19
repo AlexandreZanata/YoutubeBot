@@ -18,6 +18,7 @@ UPLOAD_ACCOUNTS = {
     "zanata": "zanata",
     "reflection": "reflection",
     "midnight-tales": "midnight",
+    "sepia-atlas": "sepia",
 }
 
 

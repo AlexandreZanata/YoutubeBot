@@ -7,3 +7,5 @@ Create ONE vertical 9:16 background image for a YouTube Short from zanata, a boo
   calmer for burned-in subtitles.
 - No text, no letters, no numbers, no logos, no watermark, no borders, no UI.
 - Safe, contemplative imagery; no injury, no horror, no modern branded objects.
+
+- One specific Short only: show this story's subject and place, and never reuse a scene, character or composition from another Short.

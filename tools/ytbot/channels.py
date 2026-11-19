@@ -117,6 +117,23 @@ CHANNELS = {
         max_article_chars=100000,
         slots=(16,),
     ),
+    "sepia-atlas": Channel(
+        slug="sepia-atlas",
+        name="Sepia Atlas",
+        handle="@SepiaAtlas",
+        channel_id="UCJNamJBuijKJ5G7CgLgd7EQ",
+        prompts="sepia_atlas",
+        background="thumbnail",
+        language="en",
+        min_article_chars=13000,
+        article_retry=(
+            "Target narration length: 2,200 to 2,700 English words, about 14 to 18 "
+            "minutes at the channel's calm documentary pace. Keep the same subject and sources."
+        ),
+        max_article_chars=22000,
+        slots=(21,),
+        interval_days=2,
+    ),
     "midnight-tales": Channel(
         slug="midnight-tales",
         name="Midnight Tales",

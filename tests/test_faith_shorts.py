@@ -41,6 +41,29 @@ class FaithShortsTests(unittest.TestCase):
         self.assertEqual(channel.slots, (21,))
         self.assertEqual(channel.channel_id, "UCLukC7RYzHlXHjtnlkbe4Vw")
 
+    def test_a_copied_background_is_detected_against_other_shorts(self):
+        import tempfile
+        from pathlib import Path
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = root / "first"
+            second = root / "second"
+            first.mkdir()
+            second.mkdir()
+            image = Image.new("RGB", (108, 192), "black")
+            image.paste("white", (0, 0, 108, 96))
+            image.save(first / "thumbnail.png")
+            image.save(second / "thumbnail.png")
+            self.assertEqual(faith_shorts.background_signature(first / "thumbnail.png"),
+                             faith_shorts.background_signature(second / "thumbnail.png"))
+            self.assertIsNotNone(faith_shorts.similar_background(root, first))
+            image2 = Image.new("RGB", (108, 192), "gray")
+            image2.paste("white", (0, 96, 108, 192))
+            image2.save(second / "thumbnail.png")
+            self.assertIsNone(faith_shorts.similar_background(root, first))
+
     def test_each_channel_has_a_topic_queue(self):
         for spec in faith_shorts.CHANNELS.values():
             self.assertGreaterEqual(len(spec["topics"]), 5)

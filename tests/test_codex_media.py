@@ -113,7 +113,7 @@ class CodexMediaContracts(TestCase):
             assets.generate_metadata(context, self.run, 'Topic')
             assets.generate_thumbnail(context, self.run)
         metadata.assert_called_once_with(self.run, 'Topic')
-        thumbnail.assert_called_once_with(self.run, 'dense')
+        thumbnail.assert_called_once_with(self.run, 'dense', '')
         context.new_page.assert_not_called()
 
     def test_usage_limit_blocks_codex_and_allows_the_chatgpt_browser_fallback(self):
