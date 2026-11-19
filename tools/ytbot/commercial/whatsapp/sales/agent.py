@@ -822,8 +822,9 @@ class SalesAgent:
         elif decision.intent == "refusal" and lead.get("interest"):
             decision.action, decision.priority = "lose", "needed"
             decision.owner_reason = "Desistiu da compra: você decide se retoma"
-        elif decision.intent == "gatekeeper" or (lead["state"] == "gatekeeper"
-                                                and decision.intent != "referral"):
+        elif decision.intent == "gatekeeper" or (
+                lead["state"] == "gatekeeper"
+                and decision.intent not in ("referral", "forwarded_to_decider")):
             decision = self._gatekeeper(lead, decision, text)
         return decision
 
@@ -912,8 +913,9 @@ class SalesAgent:
 
     def _check_progress(self, lead: dict, decision: Decision) -> Decision:
         """Hand off when the bot is not moving the conversation toward a quote."""
-        if decision.action not in ("reply", "qualify", "close") or decision.intent == "gatekeeper":
-            return decision  # the staff flow has its own kind close
+        if decision.action not in ("reply", "qualify", "close") \
+                or decision.intent in ("gatekeeper", "forwarded_to_decider"):
+            return decision  # staff and forwarding flows have their own kind close
         intents = lead.get("intents") or []
         if intents and intents[-1] == decision.intent:
             return stuck(self.rules, decision.hint, "pergunta repetida")

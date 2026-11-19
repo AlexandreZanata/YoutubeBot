@@ -16,7 +16,7 @@ language = "pt-BR"
 timezone = "America/Cuiaba"
 
 [limits]
-daily_openings = 10                 # owner decision 2026-11-17
+daily_openings = 50                 # owner decision 2026-11-19 (was 30 earlier today, 10 on 2026-11-17)
 max_replies_per_lead_per_day = 12   # stops loops with other bots; the owner takes over
 max_bot_replies_before_owner = 8    # a long chat that has not reached a quote goes to the owner
 owner_reminder_minutes = 30         # new messages in a chat that is with the owner: one reminder
@@ -254,7 +254,7 @@ gave_up = "Sem problema! Fico à disposição: se a pessoa responsável quiser c
 thanks = "Muito obrigado, {staff}! Vou falar com {who} agora."
 thanks_unnamed = "Muito obrigado! Vou falar com {who} agora."
 who_unnamed = "a pessoa responsável"
-daily_limit = 10                    # referral openings, apart from the 10 cold ones
+daily_limit = 10                    # referral openings, apart from the cold ones
 opening = [
   "{greeting}",
   "Tudo bem?",
@@ -505,6 +505,25 @@ reason = "Indicou outro número para falar"
 when = "Manda o número de outra pessoa para conversar (o dono, o gerente ou o responsável)."
 patterns = ['(?<!\d)(\+?55[\s.-]*)?\(?\d{2}\)?[\s.-]*9?[\s.-]*\d{4}[\s.-]*\d{4}(?!\d)']
 messages = ["Muito obrigado! Vou falar com a pessoa responsável agora."]
+
+[[intents]]
+id = "forwarded_to_decider"
+action = "close"
+fixed = true
+when = "Diz que vai encaminhar, repassar ou enviar a mensagem/proposta para o responsável, dono, gerência, diretoria ou setor responsável ('Irei encaminhar para o responsável!!', 'vou encaminhar para o marketing', 'já encaminhei pro dono'). Agradece e avisa que fica no aguardo do retorno, sem pedir o contato de novo e sem acionar o dono."
+patterns = [
+  '(vou|irei|vamos|iremos|estou|to|estarei|ja|vo|posso) (encaminhar|encaminhando|repassar|repassando)\b.{0,35}\b(responsavel|dono|dona|proprietari[oa]|gerent[ea]|gerencia|diretor(a|ia)?|chefe|patra[oa]|soci[oa]|gestor(a)?|gestao|coordenador(a)?|supervisor(a)?|administrativ[oa]|administracao|financeiro|marketing|comercial|setor|departamento|equipe|doutor(a)?|dr\.?|dra\.?|analise|avaliacao|internamente|ele|ela|eles|elas|quem (decide|cuida|resolve))',
+  '(vou|irei|vamos|iremos|estou|to|estarei|ja|vo|posso) (enviar|enviando)\b.{0,25}\b(pro|pra|para( [oa])?|ao|a) (setor |departamento |equipe )?(responsavel|dono|dona|proprietari[oa]|gerent[ea]|gerencia|diretor(a|ia)?|chefe|patra[oa]|soci[oa]|gestor(a)?|gestao|administrativ[oa]|administracao|financeiro|marketing|comercial|doutor(a)?|dr\.?|dra\.?)',
+  '(irei|iremos|estarei|estou|to|ja) (passar|passando|mostrar|mostrando)\b.{0,20}\b(pro|pra|para( [oa])?|ao|a) (setor |departamento |equipe )?(responsavel|dono|dona|proprietari[oa]|gerent[ea]|gerencia|diretor(a|ia)?|chefe|patra[oa]|soci[oa]|gestor(a)?|gestao|administrativ[oa]|administracao|financeiro|marketing|comercial|doutor(a)?|dr\.?|dra\.?)',
+  '\bvou (passar|mostrar)\b.{0,20}\b(pro|pra|para( [oa])?|ao|a) (setor |departamento |equipe )?(responsavel|gerencia|diretoria|marketing|financeiro|administrativ[oa]|administracao|setor|departamento)\b',
+  '\b(encaminhei|encaminho|encaminhando|encaminhado|encaminharemos|repassei|repasso|repassando|repassado|repassaremos)\b.{0,35}\b(responsavel|dono|dona|proprietari[oa]|gerent[ea]|gerencia|diretor(a|ia)?|chefe|patra[oa]|soci[oa]|gestor(a)?|gestao|coordenador(a)?|supervisor(a)?|administrativ[oa]|administracao|financeiro|marketing|comercial|setor|departamento|equipe|doutor(a)?|dr\.?|dra\.?|analise|avaliacao|internamente|ele|ela|eles|elas|quem (decide|cuida|resolve))',
+  '\b(passei|enviei)\b.{0,20}\b(pro|pra|para( [oa])?|ao|a) (setor |departamento |equipe )?(responsavel|dono|dona|proprietari[oa]|gerent[ea]|gerencia|diretor(a|ia)?|chefe|patra[oa]|soci[oa]|gestor(a)?|gestao|administrativ[oa]|administracao|financeiro|marketing|comercial|doutor(a)?|dr\.?|dra\.?)',
+  '\b(vou|irei|vamos|iremos|estou|to|estarei) (encaminhar|encaminhando|repassar|repassando)( (a |essa |sua |as )?(mensagem|proposta|informac\w*|contato|exemplos?|links?))?[!. ]*$',
+  '^(ja )?(encaminhei|encaminhado|encaminhando|repassei|repassado)( aqui| agora| sim)?[!. ]*$',
+]
+messages = [
+  "Entendido, muito obrigado! Fico no aguardo do retorno.",
+]
 
 [[intents]]
 id = "gatekeeper"

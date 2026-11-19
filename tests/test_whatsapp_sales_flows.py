@@ -107,12 +107,35 @@ class SalesFlowTests(unittest.TestCase):
         self.assertEqual(self.sent()[-1], self.rules.raw["referral"]["gave_up"])
         self.assertEqual(self.state(), "closed")
 
+    def test_forwarding_to_responsible_acknowledges_waits_and_reopens_when_decider_replies(self):
+        expected = self.rules.intent("forwarded_to_decider").messages[0]
+        self.say("Irei encaminhar para o responsável!!")
+        self.assertEqual(self.sent()[-1], expected)
+        self.assertEqual(self.state(), "closed")
+        self.assertEqual(self.notes, [])
+        self.say("Já encaminhei aqui!")
+        self.assertEqual(self.sent()[-1], expected)
+        self.assertEqual(self.state(), "closed")
+        self.assertEqual(self.notes, [])
+        self.say("Oi, aqui é o responsável, quanto custa um site?")
+        self.assertEqual(self.state(), "engaged")
+        self.assertTrue(any("R$ 500" in msg for msg in self.sent()))
+
+    def test_gatekeeper_then_forwarding_closes_kindly_with_waiting_reply(self):
+        self.say("Sou funcionária, o dono não está")
+        self.assertEqual(self.state(), "gatekeeper")
+        self.say("Irei encaminhar para o responsável!!")
+        self.assertEqual(self.sent()[-1], self.rules.intent("forwarded_to_decider").messages[0])
+        self.assertEqual(self.state(), "closed")
+        self.assertEqual(self.notes, [])
+
     def test_referral_opens_even_after_the_cold_limit(self):
+        limit = int(self.rules.limits["daily_openings"])
         self.store.update_lead(self.lead["id"], interest="")
-        for index in range(10):
+        for index in range(limit):
             self.store.import_rows([{"name": f"Outra {index}", "phone": PHONES[10 + index]}], MONDAY)
         self.agent.prospect()
-        self.assertEqual(self.agent.openings_today("cold"), 10)
+        self.assertEqual(self.agent.openings_today("cold"), limit)
         self.say("Fala com o dono no 65 90000-0009")
         self.assertEqual(self.agent.openings_today("referral"), 1)
 
