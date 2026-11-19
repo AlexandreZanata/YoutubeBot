@@ -156,6 +156,11 @@ class SalesClassifierTests(unittest.TestCase):
         self.check("Vou passar pra doutora ver", "gatekeeper")
         self.check("Vou passar pro dono, ele te chama", "gatekeeper")
         self.check("Quero falar com o responsável", "human_request")
+        for msg in ("Muito obrigado", "Muito obrigada!"):
+            self.check(msg, "thanks")
+            self.assertTrue(classifier.decisive("thanks", msg))
+        self.check("No momento não tenho interesse\nMuito obrigado", "refusal")
+        self.assertTrue(classifier.decisive("refusal", "No momento não tenho interesse\nMuito obrigado"))
 
 
 if __name__ == "__main__":

@@ -152,8 +152,10 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   caps the total openings of that run while keeping the reply loop alive afterward. Pass
   `--only-csv <path>` or `--only-leads <id1,id2>` to restrict `run` strictly to a target batch
   (and any referral created by those leads), leaving all other leads and personal chats untouched.
-  It stops immediately on the first `unconfirmed` or failed send (including inside `reply_pending`
-  and `referral_opening`) without touching further chats. An edited `sales_rules.toml` is reloaded
+  It pauses further cold prospecting immediately if an `unconfirmed` cold opening occurs while
+  keeping the reply listener alive so already-opened companies continue receiving answers; an
+  `unconfirmed` or failed reply/follow-up (or any failure in `--once` / `queue send`) stops the run
+  immediately without touching further chats. An edited `sales_rules.toml` is reloaded
   before the next cycle; an invalid edit is reported and the previous rules stay in use. When the
   browser page or the CDP connection closes outside a send (including before typing inside
   `_open_chat`; the computer slept, Chrome restarted; seen on 2026-11-18 as `TargetClosedError`
@@ -463,13 +465,18 @@ When the agent opens a chat to answer, it reads every bubble since its last mess
 
 ## Typing safety
 
-Before typing, the composer gets focus by a click (8 s) or, when something covers it (a new
-message banner while the chat scrolls), by focusing the element itself; a leftover draft is
-cleared. After typing, the composer must contain the text, or it is cleared and the send fails
-before Send is pressed. Any failure is journaled with the full error and a private screenshot
-in `.local/commercial/whatsapp/sales/debug/`, the lead becomes `unconfirmed` and the run stops.
-After checking the chat, `sales resolve --state engaged|qualifying` hands it back; messages that
-arrived meanwhile are answered on the next cycle.
+Before typing, `_open_by_phone` waits until the composer is visible (1.5 s hydration grace plus
+the open-chat pause). Before typing a message, the composer gets focus by a click (8 s) or, when
+something covers it (a new message banner while the chat scrolls), by focusing the element itself;
+a leftover draft is cleared. After typing, and again right after the pacing wait before clicking Send,
+the composer must still contain the text (if chat hydration cleared the draft once during the wait,
+it re-types once before Send; otherwise it fails cleanly with nothing sent). Bubble confirmation
+polls for 12 s matching either the raw prefix or normalized `text_key`. Any failure or `unconfirmed`
+outcome is journaled with a private screenshot in `.local/commercial/whatsapp/sales/debug/`, and the
+lead becomes `unconfirmed`: a failed reply/follow-up (or `--once` / `queue send`) stops the run,
+while a failed cold opening in continuous `run --live --prospect` pauses further openings and keeps
+reply monitoring active. After checking the chat, `sales resolve --state engaged|qualifying|opened`
+hands it back; messages that arrived meanwhile are answered on the next cycle.
 
 ## Owner test reset
 

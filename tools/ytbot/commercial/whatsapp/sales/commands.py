@@ -380,6 +380,7 @@ def run_cycles(agent, session, args, listen=None, out=None, stopped=None) -> Non
     rules_seen = rules_path.stat().st_mtime
     cycles = failures = 0
     remaining = args.limit
+    prospecting_paused = False
 
     def recover(error: BaseException) -> None:
         nonlocal failures
@@ -395,7 +396,8 @@ def run_cycles(agent, session, args, listen=None, out=None, stopped=None) -> Non
         rules_seen = reload_if_changed(agent, rules_path, rules_seen)
         try:
             events = listen(session.page, agent.store.base, once=True, limit=args.max_chats)
-            prospect_now = bool(args.prospect) and (remaining is None or remaining > 0)
+            prospect_now = (bool(args.prospect) and not prospecting_paused
+                            and (remaining is None or remaining > 0))
             summary = agent.cycle(events, prospect=prospect_now, limit=remaining)
         except Exception as error:
             recover(error)
@@ -406,10 +408,17 @@ def run_cycles(agent, session, args, listen=None, out=None, stopped=None) -> Non
         if remaining is not None:
             remaining -= sum(1 for item in summary["openings"]
                              if item.get("state") in ("opened", "unconfirmed", "planned"))
-        if any(_failed_outcome(item) for group in ("replies", "followups", "openings")
+        if any(_failed_outcome(item) for group in ("replies", "followups")
                for item in summary[group]):
             raise SystemExit("[sales] a send was not confirmed; stopping. Check the chat, "
                              "then `commercial sales resolve`.")
+        if any(_failed_outcome(item) for item in summary["openings"]):
+            if args.once:
+                raise SystemExit("[sales] an opening was not confirmed; stopping. Check the chat, "
+                                 "then `commercial sales resolve`.")
+            prospecting_paused = True
+            out("[sales] an opening was not confirmed; pausing new openings while keeping "
+                "reply monitoring active. Check the fenced lead, then `commercial sales resolve`.")
         if args.once or (args.max_cycles and cycles >= args.max_cycles):
             return
         try:

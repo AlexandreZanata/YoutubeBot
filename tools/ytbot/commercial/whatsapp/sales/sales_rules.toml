@@ -800,7 +800,7 @@ action = "ignore"
 fixed = true
 when = "Só agradece, acusa recebimento ou se despede, sem pergunta: 'obrigado', 'obg', 'valeu', 'ok', 'entendi', '👍'."
 patterns = [
-  '^(obrigad[oa]|obg|obgd|agradeco|valeu|vlw|ok|oks|beleza|blz|show|certo|tmj|entendi|entendido|anotado|ta bom|ta certo|bom trabalho|sucesso|igualmente|deus abencoe|kk+|haha+|rs+)[!. ]*$',
+  '^((muito |mt )?obrigad[oa]|obg|obgd|agradeco|valeu|vlw|ok|oks|beleza|blz|show|certo|tmj|entendi|entendido|anotado|ta bom|ta certo|bom trabalho|sucesso|igualmente|deus abencoe|kk+|haha+|rs+)[!. ]*$',
   '^\W+$',
 ]
 messages = []
