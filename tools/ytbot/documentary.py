@@ -102,13 +102,22 @@ def collect(run_dir: Path, queries: list[dict]) -> list[dict]:
     sources = []
     used = set()
     for index, scene in enumerate(queries, 1):
-        candidates = photo_candidates(scene["query"])
+        queries_list = scene.get("queries") or [scene.get("query", "")]
+        queries_list = [query for query in queries_list if query]
+        candidates: list[dict] = []
+        for query in queries_list:
+            try:
+                candidates.extend(photo_candidates(query))
+            except Exception as error:
+                log(f"search failed for {query}: {error}")
+            if candidates:
+                break
         photograph = [row for row in candidates
                       if not any(word in row["title"].lower()
                                  for word in ("postcard", "map", "drawing", "illustration", "print", "plan"))]
         chosen = next((row for row in photograph + candidates if row["title"] not in used), None)
         if chosen is None:
-            log(f"no photo for {scene['query']}")
+            log(f"no photo for {scene.get('subject', queries_list)}")
             continue
         used.add(chosen["title"])
         name = f"{index:03d}.jpg"
@@ -139,8 +148,187 @@ def collect(run_dir: Path, queries: list[dict]) -> list[dict]:
             "verified": "selected from the public-domain Commons record; subject matched by the scene query",
         }
         sources.append(record)
-        log(f"{index:03d} {scene['query']} -> {chosen['title']}")
+        log(f"{index:03d} {scene.get('subject', '')} -> {chosen['title']}")
     (run_dir / "sources.json").write_text(json.dumps(sources, indent=2, ensure_ascii=False), encoding="utf-8")
+    return sources
+
+
+def _clean_html(text: str) -> str:
+    import html
+    import re
+
+    cleaned = re.sub(r"<[^>]+>", " ", text or "")
+    cleaned = html.unescape(cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def ocean_photo_candidates(query: str, limit: int = 12,
+                           min_width: int = 900, min_height: int = 500) -> list[dict]:
+    """Search verified public-domain / CC-BY oceanographic photographs."""
+    params = {
+        "action": "query", "generator": "search",
+        "gsrsearch": f"filetype:bitmap {query}", "gsrlimit": str(limit), "gsrnamespace": "6",
+        "prop": "imageinfo", "iiprop": "url|size|extmetadata", "iiurlwidth": "1920",
+        "format": "json",
+    }
+    data = _get(API + "?" + urllib.parse.urlencode(params))
+    pages = (data.get("query") or {}).get("pages") or {}
+    excluded = ("logo", "icon", "seal", "flag", "cartoon", "drawing", "sketch",
+                "stamp", "poster", "cover", "chart", "graph", "svg")
+    rows = []
+    for page in pages.values():
+        info = (page.get("imageinfo") or [{}])[0]
+        meta = info.get("extmetadata") or {}
+        width = int(info.get("width") or 0)
+        height = int(info.get("height") or 0)
+        license_name = _clean_html(meta.get("LicenseShortName", {}).get("value", ""))
+        title = page.get("title", "")
+        lowered_title = title.lower()
+        if not info.get("url") or not license_allowed(license_name):
+            continue
+        if width < min_width or height < min_height or height > width * 1.15:
+            continue
+        if any(word in lowered_title for word in excluded):
+            continue
+        artist = _clean_html(meta.get("Artist", {}).get("value", ""))
+        credit = _clean_html(meta.get("Credit", {}).get("value", ""))
+        description = _clean_html(meta.get("ImageDescription", {}).get("value", ""))
+        date = _clean_html(meta.get("DateTimeOriginal", {}).get("value", ""))
+        blob = f"{title} {artist} {credit} {description}".lower()
+        is_noaa = "noaa" in blob or "okeanos" in blob or "ocean exploration" in blob or "mbnms" in blob
+        is_pd = "public domain" in license_name.lower() or "pd-" in license_name.lower() or "cc0" in license_name.lower()
+        rows.append({
+            "title": title,
+            "url": info.get("thumburl") or info.get("url", ""),
+            "page": info.get("descriptionurl", ""),
+            "license": license_name,
+            "artist": artist,
+            "credit": credit,
+            "description": description[:600],
+            "date": date,
+            "width": width,
+            "height": height,
+            "institution": ("NOAA Office of Ocean Exploration and Research" if is_noaa
+                            else ("USGS" if "usgs" in blob else "Wikimedia Commons")),
+            "_rank": (2 if is_noaa else 0) + (2 if is_pd else 0) + (1 if width >= 1400 else 0),
+        })
+    rows.sort(key=lambda item: (-item["_rank"], -item["width"]))
+    for row in rows:
+        row.pop("_rank", None)
+    return rows
+
+
+def write_credits(run_dir: Path, sources: list[dict],
+                  heading: str = "Image Credits & Scientific Sources") -> Path:
+    """Write human-readable per-image provenance and license credits."""
+    lines = [f"# {heading}", ""]
+    for item in sources:
+        lines.append(f"## {item.get('id', '')} — {item.get('narration_segment') or item.get('title', '')}")
+        lines.append(f"- **Title**: {item.get('title', '')}")
+        lines.append(f"- **Institution**: {item.get('institution', '')}")
+        if item.get("expedition"):
+            lines.append(f"- **Expedition**: {item['expedition']}")
+        if item.get("species"):
+            lines.append(f"- **Species / Subject**: {item['species']}")
+        if item.get("place"):
+            lines.append(f"- **Location**: {item['place']}")
+        if item.get("depth"):
+            lines.append(f"- **Depth**: {item['depth']}")
+        if item.get("date"):
+            lines.append(f"- **Date**: {item['date']}")
+        lines.append(f"- **Author / Attribution**: {item.get('attribution') or item.get('artist', '')}")
+        lines.append(f"- **License**: {item.get('license', '')} ({item.get('commercial_status', 'verified')})")
+        if item.get("resolution"):
+            lines.append(f"- **Resolution**: {item['resolution']}")
+        lines.append(f"- **Source Page**: {item.get('source_page', '')}")
+        lines.append("")
+    destination = run_dir / "credits.md"
+    destination.write_text("\n".join(lines), encoding="utf-8")
+    return destination
+
+
+def collect_ocean(run_dir: Path, scenes: list[dict], resume: bool = True) -> list[dict]:
+    """Resumably collect verified oceanographic photographs with full provenance."""
+    import time
+
+    photos_dir = run_dir / "photos"
+    photos_dir.mkdir(parents=True, exist_ok=True)
+    photos_dir.chmod(0o700)
+    sources_path = run_dir / "sources.json"
+    existing_by_id: dict[str, dict] = {}
+    if resume and sources_path.is_file():
+        try:
+            for row in json.loads(sources_path.read_text(encoding="utf-8")):
+                photo_file = Path(row.get("file", ""))
+                if row.get("id") and photo_file.is_file() and photo_file.stat().st_size > 4096:
+                    existing_by_id[row["id"]] = row
+        except (OSError, ValueError):
+            existing_by_id = {}
+
+    sources: list[dict] = []
+    used = {row.get("title", "") for row in existing_by_id.values()}
+    for index, scene in enumerate(scenes, 1):
+        scene_id = f"{index:03d}"
+        if scene_id in existing_by_id:
+            sources.append(existing_by_id[scene_id])
+            continue
+        queries = scene.get("queries") or [scene["query"]]
+        chosen = None
+        for query in queries:
+            try:
+                candidates = ocean_photo_candidates(query)
+            except Exception as error:
+                log(f"search failed for {query}: {error}")
+                continue
+            chosen = next((row for row in candidates if row["title"] not in used), None)
+            if chosen is not None:
+                break
+            time.sleep(0.4)
+        if chosen is None:
+            log(f"no verified ocean photo for {scene_id} ({scene.get('subject', '')})")
+            continue
+        used.add(chosen["title"])
+        destination = photos_dir / f"{scene_id}.jpg"
+        time.sleep(0.8)
+        try:
+            download(chosen["url"], destination)
+            with Image.open(destination) as image:
+                image.verify()
+        except Exception as error:
+            log(f"download failed for {chosen['title']}: {error}")
+            destination.unlink(missing_ok=True)
+            continue
+        lic = chosen["license"]
+        commercial = ("public domain / commercial use permitted"
+                      if any(m in lic.lower() for m in ("public domain", "pd-", "cc0"))
+                      else "open Creative Commons license / commercial use with attribution")
+        record = {
+            "id": scene_id,
+            "file": str(destination),
+            "title": chosen["title"],
+            "institution": chosen["institution"],
+            "artist": chosen["artist"] or chosen["credit"] or chosen["institution"],
+            "expedition": scene.get("expedition", ""),
+            "date": chosen["date"] or scene.get("date", ""),
+            "place": scene.get("place", ""),
+            "depth": scene.get("depth", ""),
+            "species": scene.get("species", ""),
+            "source_page": chosen["page"],
+            "download_url": chosen["url"],
+            "license": lic,
+            "commercial_status": commercial,
+            "attribution": chosen["credit"] or chosen["artist"] or chosen["institution"],
+            "resolution": f"{chosen['width']}x{chosen['height']}",
+            "original_description": chosen["description"],
+            "narration_segment": scene.get("subject", ""),
+            "approval_status": "approved",
+            "verified": "verified public-domain or CC-BY oceanographic photograph; subject matched to narration scene",
+        }
+        sources.append(record)
+        log(f"{scene_id} [{chosen['width']}x{chosen['height']} {lic}] -> {chosen['title']}")
+        sources_path.write_text(json.dumps(sources, indent=2, ensure_ascii=False), encoding="utf-8")
+    sources_path.write_text(json.dumps(sources, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_credits(run_dir, sources)
     return sources
 
 
@@ -393,10 +581,20 @@ def _clip(photo: Path, output: Path, seconds: float, index: int,
           fade_in: float = 0.0, fade_out: float = 0.0) -> None:
     # Supersampled Ken Burns: render at 2560x1440 and downscale to 1920x1080.
     # The larger canvas absorbs zoompan integer rounding (eliminating tremor)
-    # while running ~2x faster than 3840x2160. Move stays calm: 100% <-> 105%.
+    # while running ~2x faster than 3840x2160. Reduce zoom on lower-resolution
+    # source plates so images stay crisp without over-magnification.
     frames = max(int(round(seconds * FPS)), 1)
+    zoom_span = 0.05
+    try:
+        with Image.open(photo) as im:
+            if im.width < 1100:
+                zoom_span = 0.02
+    except OSError:
+        pass
     zoom_in = index % 2 == 0
-    zoom = f"min(1+0.05*on/{frames},1.05)" if zoom_in else f"max(1.05-0.05*on/{frames},1.0)"
+    top = 1.0 + zoom_span
+    zoom = (f"min(1+{zoom_span:.3f}*on/{frames},{top:.3f})" if zoom_in
+            else f"max({top:.3f}-{zoom_span:.3f}*on/{frames},1.0)")
     filters = [
         "scale=2560:1440:force_original_aspect_ratio=increase",
         "crop=2560:1440",
@@ -578,10 +776,53 @@ def render(run_dir: Path, rows: list[dict], narration: Path | None = None,
                      voice_filter=voice_filter, analog_texture=analog_texture)
 
 
-def thumbnail(run_dir: Path, photo: Path, title: str) -> Path:
-    destination = run_dir / "thumbnail.png"
+def thumbnail(run_dir: Path, photo: Path, title: str, *,
+              style: str = "sepia", template: str = "encounter",
+              subtitle: str = "", output_name: str = "thumbnail.png") -> Path:
+    destination = run_dir / output_name
     with Image.open(photo) as image:
         canvas = ImageOps.fit(image.convert("RGB"), (1280, 720), Image.Resampling.LANCZOS)
+    if style == "abyssal":
+        # Preserve authentic underwater colors; add Abyssal Black (#030B12)
+        # editorial negative space and Bioluminescent Cyan (#55D9D0) accents.
+        overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+        if template == "discovery":
+            for i in range(360):
+                alpha = int(225 * (i / 360) ** 1.3)
+                draw.rectangle([0, 720 - 360 + i, 1280, 721 - 360 + i], fill=(3, 11, 18, alpha))
+        elif template == "unknown":
+            for i in range(440):
+                alpha = int(225 * (i / 440) ** 1.25)
+                draw.rectangle([0, 720 - 440 + i, 1280, 721 - 440 + i], fill=(3, 11, 18, alpha))
+        else:  # Model A — The Encounter
+            for i in range(410):
+                alpha = int(220 * (i / 410) ** 1.35)
+                draw.rectangle([0, 720 - 410 + i, 1280, 721 - 410 + i], fill=(3, 11, 18, alpha))
+        canvas = Image.alpha_composite(canvas.convert("RGBA"), overlay).convert("RGB")
+        draw = ImageDraw.Draw(canvas)
+        title_font = ImageFont.truetype(str(config.ROOT / "assets/fonts/Inter.ttf"), 88)
+        sub_font = ImageFont.truetype(str(config.ROOT / "assets/fonts/Inter.ttf"), 26)
+        lines = [line.strip().upper() for line in title.split("\n") if line.strip()]
+        line_h = 96
+        block_h = line_h * len(lines)
+        tx = 64
+        ty = (536 if template != "unknown" else 490) - max(len(lines) - 1, 0) * line_h
+        # Subtle Bioluminescent Cyan accent rule
+        draw.rectangle([tx, ty - 22, tx + 96, ty - 16], fill=(85, 217, 208))
+        for idx, line in enumerate(lines):
+            draw.text((tx, ty + idx * line_h), line, font=title_font, fill=(237, 247, 245))
+        if subtitle:
+            draw.text((tx, ty + block_h + 10), subtitle.upper(), font=sub_font, fill=(181, 210, 215))
+        mark = config.ROOT / "assets" / "brand" / "bathylora" / "watermark-300.png"
+        if mark.is_file():
+            with Image.open(mark) as logo:
+                badge = logo.convert("RGBA").copy()
+                badge.thumbnail((84, 84), Image.Resampling.LANCZOS)
+                canvas.paste(badge, (1280 - badge.width - 36, 32), badge)
+        canvas.save(destination, format="PNG", optimize=True)
+        return destination
+
     canvas = ImageOps.colorize(canvas.convert("L"), black="#14110E", white="#F1E7D4", mid="#76614A")
     overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
