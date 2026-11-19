@@ -46,6 +46,19 @@ class DocumentaryTests(unittest.TestCase):
         # The mill photo must not cover the opening street passage.
         self.assertGreater(rows[2]["start"], 30.0)
 
+    def test_generic_subjects_share_dense_passages_evenly(self):
+        article = " ".join(["street"] * 40 + ["market"] * 40 + ["school"] * 40)
+        sources = [
+            {"file": f"{name}.jpg", "title": name, "narration_segment": name,
+             "place": "United States"}
+            for name in ("street", "market", "school")
+        ]
+        rows = documentary.timeline_aligned(article, 90.0, sources, min_seconds=6.0)
+        for row in rows:
+            self.assertGreaterEqual(row["end"] - row["start"], 6.0)
+        for previous, current in zip(rows, rows[1:]):
+            self.assertAlmostEqual(previous["end"], current["start"], places=2)
+
     def test_thumbnail_is_a_1280x720_episode_specific_title(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)

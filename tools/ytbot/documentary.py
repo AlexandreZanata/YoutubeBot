@@ -166,6 +166,12 @@ STOPWORDS = {
     "their", "there", "which", "when", "where", "what", "about", "into",
     "over", "under", "after", "before", "between", "through", "during",
     "street", "united", "states", "american", "america", "file", "circa",
+    "city", "cities", "town", "towns", "people", "time", "life",
+    "home", "house", "work", "workers", "day", "daily", "year", "years",
+    "century", "early", "old", "small", "large", "big", "great", "men",
+    "women", "children", "family", "families", "man", "woman", "child",
+    "road", "roads", "place", "places", "group", "view", "general",
+    "national", "historic", "historical", "york", "new",
 }
 
 
@@ -181,27 +187,37 @@ def _keywords(text: str) -> list[str]:
     return seen[:12]
 
 
-def timeline_aligned(article: str, duration: float, sources: list[dict]) -> list[dict]:
+def timeline_aligned(article: str, duration: float, sources: list[dict],
+                      min_seconds: float = 6.0, max_seconds: float = 60.0) -> list[dict]:
     """Place each photograph where its own subject is actually narrated.
 
     Each source keeps its outline order, but its window is anchored to the
-    word position where its keywords (subject + archival title + place)
-    best match the narration. Boundaries are the midpoints between anchors,
-    so every photo covers the passage that talks about it.
+    word position where its rarest keywords (subject + archival title +
+    place) best match the narration. Every window lasts between
+    ``min_seconds`` and ``max_seconds`` and windows partition the audio
+    sequentially, so every photo covers the passage that talks about it
+    without gaps or overlaps.
     """
+    from collections import Counter
+
     words = article.split()
     total = max(len(words), 1)
     lowered = [word.strip(".,;:!?\"'()[]").lower() for word in words]
+    counts = Counter(token for token in lowered if token)
     anchors: list[int] = []
     cursor = 0
     for index, source in enumerate(sources):
         keywords = _keywords(
             f"{source.get('narration_segment', '')} {source.get('title', '')} "
             f"{source.get('place', '')}")
+        # Rarest first: distinctive subjects anchor precisely, generic ones
+        # fall back to an even spread instead of piling onto one passage.
+        keywords.sort(key=lambda keyword: (counts.get(keyword, 0), len(keyword)))
+        keywords = keywords[:8]
         fallback = int(index * total / max(len(sources), 1))
         if not keywords:
             anchors.append(max(fallback, cursor))
-            cursor = anchors[-1]
+            cursor = anchors[-1] + 1
             continue
         positions: list[int] = []
         for keyword in keywords:
@@ -220,31 +236,112 @@ def timeline_aligned(article: str, duration: float, sources: list[dict]) -> list
             positions.sort()
             anchors.append(max(positions[len(positions) // 2], cursor))
         cursor = anchors[-1] + 1
+    min_words = max(1, int(total * min_seconds / duration))
+    max_words = max(min_words, int(total * max_seconds / duration))
+    if min_words * len(sources) > total:
+        min_words = max(1, total // len(sources))
+        max_words = max(min_words, max_words)
+    gaps = ([anchors[index + 1] - anchors[index] for index in range(len(anchors) - 1)]
+            + [total - anchors[-1]])
+    base = [max(gap, min_words) for gap in gaps]
+    # Bounded proportional fit: f_i = clip(base_i * s, min_words, max_words)
+    # with s bisected so the word spans add up to exactly `total`.
+    low, high = 0.0, 1.0
+    while sum(min(base_i * high, max_words) for base_i in base) < total:
+        high *= 2.0
+    for _ in range(80):
+        mid = (low + high) / 2.0
+        if sum(min(base_i * mid, max_words) for base_i in base) < total:
+            low = mid
+        else:
+            high = mid
+    spans = [0] * len(base)
+    fractions: list[tuple[float, int]] = []
+    for index, base_i in enumerate(base):
+        exact = min(max(base_i * high, min_words), max_words)
+        whole = int(exact)
+        spans[index] = whole
+        fractions.append((exact - whole, index))
+    remainder = total - sum(spans)
+    fractions.sort(key=lambda item: (-item[0], item[1]))
+    for _, index in fractions:
+        if remainder <= 0:
+            break
+        if spans[index] < max_words:
+            spans[index] += 1
+            remainder -= 1
+    if remainder > 0:
+        # Only when every window already hit the cap; keep the exact total.
+        spans[-1] += remainder
     rows = []
+    cursor_word = 0
     for index, source in enumerate(sources):
-        prev_anchor = anchors[index - 1] if index > 0 else 0
-        next_anchor = anchors[index + 1] if index + 1 < len(anchors) else total
-        start_word = (anchors[index] + prev_anchor) // 2 if index > 0 else 0
-        end_word = (anchors[index] + next_anchor) // 2 if index + 1 < len(anchors) else total
+        start_word = cursor_word
+        end_word = total if index == len(sources) - 1 else min(total, cursor_word + spans[index])
         if end_word <= start_word:
-            end_word = min(total, start_word + 20)
+            end_word = min(total, start_word + 1)
         start = duration * start_word / total
         end = duration * end_word / total
         rows.append({"photo": source["file"], "source": source.get("title", ""),
                      "start": round(start, 2), "end": round(end, 2),
                      "caption": source.get("narration_segment", "")})
+        cursor_word = end_word
     return rows
 
 
+def exact_duration(path: Path) -> float:
+    """True audio length in seconds, decoded rather than trusting the container.
+
+    Captured AAC files can carry timestamp gaps that make the container
+    duration wrong (seen: 1225 s reported for 1147 s of samples), so measure
+    the decoded PCM instead.
+    """
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp:
+        command = ["ffmpeg", "-y", "-v", "error", "-i", str(path),
+                   "-c:a", "pcm_s16le", "-ar", "24000", tmp.name]
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "stream=duration",
+             "-of", "default=nw=1:nk=1", tmp.name],
+            capture_output=True, text=True, check=True)
+    return float(probe.stdout.strip())
+
+
 def slow_narration(run_dir: Path, factor: float = 0.8) -> Path:
-    """Render a slower, calmer narration track without touching the original."""
+    """Render a slower, calmer narration track without touching the original.
+
+    The slowdown runs on decoded PCM so the result is exactly
+    ``1 / factor`` times the true sample count, regardless of container
+    timestamp gaps in the captured audio.
+    """
     destination = run_dir / f"narration-{int(factor * 100):02d}x.aac"
     if destination.is_file():
         return destination
-    command = ["ffmpeg", "-y", "-i", str(run_dir / "narration.aac"),
-               "-filter:a", f"atempo={factor}",
-               "-c:a", "aac", "-b:a", "192k", str(destination)]
-    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    import tempfile
+
+    source = run_dir / "narration.aac"
+    with tempfile.TemporaryDirectory() as tmp:
+        raw = Path(tmp) / "raw.wav"
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(source),
+                        "-c:a", "pcm_s16le", "-ar", "24000", str(raw)],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        slowed = Path(tmp) / "slowed.wav"
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(raw),
+                        "-filter:a", f"atempo={factor}",
+                        "-c:a", "pcm_s16le", "-ar", "24000", str(slowed)],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "stream=duration",
+             "-of", "default=nw=1:nk=1", str(slowed)],
+            capture_output=True, text=True, check=True)
+        ratio = float(probe.stdout.strip()) / exact_duration(source)
+        if abs(ratio - 1 / factor) > 0.02:
+            raise RuntimeError(f"slowdown ratio {ratio:.3f} is not 1/{factor}")
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(slowed),
+                        "-c:a", "aac", "-b:a", "192k", str(destination)],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     destination.chmod(0o600)
     return destination
 
