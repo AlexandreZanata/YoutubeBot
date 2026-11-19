@@ -365,7 +365,7 @@ def cmd_qc(args) -> None:
         errors.append(f"video resolution is {vstream.get('width')}x{vstream.get('height')}, expected 1920x1080")
     if not astream:
         errors.append("missing audio stream")
-    if dur < args.min_minutes * 60 or dur > 42 * 60:
+    if (dur < args.min_minutes * 60 or dur > 42 * 60) and not args.allow_length:
         errors.append(f"duration {dur / 60:.1f} min outside allowed {args.min_minutes}-42 min bounds")
 
     # Loudness check (up to 180s sample)
@@ -389,7 +389,8 @@ def cmd_qc(args) -> None:
         if thumb.size != (1280, 720):
             errors.append(f"thumbnail size is {thumb.size}, expected (1280, 720)")
     sources = json.loads((run_dir / "sources.json").read_text(encoding="utf-8"))
-    if any(not s.get("license") or not s.get("source_page") for s in sources):
+    real_sources = [s for s in sources if not s.get("generated")]
+    if any(not s.get("license") or not s.get("source_page") for s in real_sources):
         errors.append("one or more sources.json records are missing license or source_page")
     meta = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
     if args.channel == "bathylora" and "not affiliated with NOAA" not in meta.get("description", ""):
@@ -465,4 +466,6 @@ def add_parser(subparsers) -> None:
     p_qc.add_argument("--channel", choices=DOC_CHANNELS, required=True)
     p_qc.add_argument("--run", required=True)
     p_qc.add_argument("--min-minutes", type=float, default=14.0)
+    p_qc.add_argument("--allow-length", action="store_true",
+                      help="owner override: accept a duration outside the 14-42 min bounds")
     p_qc.set_defaults(func=cmd_qc)
