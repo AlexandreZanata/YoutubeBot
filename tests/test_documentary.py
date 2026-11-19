@@ -24,6 +24,28 @@ class DocumentaryTests(unittest.TestCase):
         for previous, current in zip(rows, rows[1:]):
             self.assertAlmostEqual(previous["end"], current["start"], places=2)
 
+    def test_aligned_timeline_puts_each_photo_where_it_is_narrated(self):
+        article = ("Mulberry Street crowded with immigrants. "
+                   "The tenement kitchen was small. "
+                   "The steel mill roared with workers.")
+        sources = [
+            {"file": "a.jpg", "title": "Mulberry Street New York",
+             "narration_segment": "A crowded immigrant street", "place": "New York"},
+            {"file": "b.jpg", "title": "Tenement kitchen interior",
+             "narration_segment": "A tenement kitchen", "place": "New York"},
+            {"file": "c.jpg", "title": "Steel mill workers",
+             "narration_segment": "Steel mill", "place": "United States"},
+        ]
+        rows = documentary.timeline_aligned(article, 90.0, sources)
+        self.assertEqual(len(rows), 3)
+        self.assertAlmostEqual(rows[0]["start"], 0.0)
+        self.assertAlmostEqual(rows[-1]["end"], 90.0)
+        for previous, current in zip(rows, rows[1:]):
+            self.assertAlmostEqual(previous["end"], current["start"], places=2)
+            self.assertLess(previous["start"], current["start"])
+        # The mill photo must not cover the opening street passage.
+        self.assertGreater(rows[2]["start"], 30.0)
+
     def test_thumbnail_is_a_1280x720_episode_specific_title(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)

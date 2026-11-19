@@ -150,7 +150,6 @@ def timeline(article: str, duration: float, sources: list[dict]) -> list[dict]:
     total = max(len(words), 1)
     per_photo = total / max(len(sources), 1)
     rows = []
-    cursor = 0
     for index, source in enumerate(sources):
         start_word = int(index * per_photo)
         end_word = int((index + 1) * per_photo) if index < len(sources) - 1 else total
@@ -159,20 +158,112 @@ def timeline(article: str, duration: float, sources: list[dict]) -> list[dict]:
         rows.append({"photo": source["file"], "source": source.get("title", ""),
                      "start": round(start, 2), "end": round(end, 2),
                      "caption": source.get("narration_segment", "")})
-        cursor = end_word
     return rows
 
 
+STOPWORDS = {
+    "with", "from", "that", "this", "these", "those", "have", "were", "been",
+    "their", "there", "which", "when", "where", "what", "about", "into",
+    "over", "under", "after", "before", "between", "through", "during",
+    "street", "united", "states", "american", "america", "file", "circa",
+}
+
+
+def _keywords(text: str) -> list[str]:
+    import re
+
+    tokens = re.findall(r"[a-z]{4,}", (text or "").lower())
+    seen: list[str] = []
+    for token in tokens:
+        if token in STOPWORDS or token in seen:
+            continue
+        seen.append(token)
+    return seen[:12]
+
+
+def timeline_aligned(article: str, duration: float, sources: list[dict]) -> list[dict]:
+    """Place each photograph where its own subject is actually narrated.
+
+    Each source keeps its outline order, but its window is anchored to the
+    word position where its keywords (subject + archival title + place)
+    best match the narration. Boundaries are the midpoints between anchors,
+    so every photo covers the passage that talks about it.
+    """
+    words = article.split()
+    total = max(len(words), 1)
+    lowered = [word.strip(".,;:!?\"'()[]").lower() for word in words]
+    anchors: list[int] = []
+    cursor = 0
+    for index, source in enumerate(sources):
+        keywords = _keywords(
+            f"{source.get('narration_segment', '')} {source.get('title', '')} "
+            f"{source.get('place', '')}")
+        fallback = int(index * total / max(len(sources), 1))
+        if not keywords:
+            anchors.append(max(fallback, cursor))
+            cursor = anchors[-1]
+            continue
+        positions: list[int] = []
+        for keyword in keywords:
+            for pos in range(cursor, total):
+                token = lowered[pos]
+                if not token:
+                    continue
+                if (keyword == token
+                        or (len(keyword) > 5 and keyword in token)
+                        or (len(token) > 5 and token in keyword)):
+                    positions.append(pos)
+                    break
+        if not positions:
+            anchors.append(max(fallback, cursor))
+        else:
+            positions.sort()
+            anchors.append(max(positions[len(positions) // 2], cursor))
+        cursor = anchors[-1]
+    rows = []
+    for index, source in enumerate(sources):
+        prev_anchor = anchors[index - 1] if index > 0 else 0
+        next_anchor = anchors[index + 1] if index + 1 < len(anchors) else total
+        start_word = (anchors[index] + prev_anchor) // 2 if index > 0 else 0
+        end_word = (anchors[index] + next_anchor) // 2 if index + 1 < len(anchors) else total
+        if end_word <= start_word:
+            end_word = min(total, start_word + 20)
+        start = duration * start_word / total
+        end = duration * end_word / total
+        rows.append({"photo": source["file"], "source": source.get("title", ""),
+                     "start": round(start, 2), "end": round(end, 2),
+                     "caption": source.get("narration_segment", "")})
+    return rows
+
+
+def slow_narration(run_dir: Path, factor: float = 0.8) -> Path:
+    """Render a slower, calmer narration track without touching the original."""
+    destination = run_dir / f"narration-{int(factor * 100):02d}x.aac"
+    if destination.is_file():
+        return destination
+    command = ["ffmpeg", "-y", "-i", str(run_dir / "narration.aac"),
+               "-filter:a", f"atempo={factor}",
+               "-c:a", "aac", "-b:a", "192k", str(destination)]
+    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    destination.chmod(0o600)
+    return destination
+
+
 def _clip(photo: Path, output: Path, seconds: float, index: int) -> None:
+    # Supersampled Ken Burns: render the move at 3840x2160 and downscale to
+    # 1920x1080. The larger canvas absorbs the integer rounding of zoompan,
+    # which is what reads as a "tremor" at 1080p. The move itself stays slow:
+    # 100% -> 105% over the whole clip, alternating in and out.
     frames = max(int(seconds * FPS), 1)
     zoom_in = index % 2 == 0
     zoom = f"min(1+0.05*on/{frames},1.05)" if zoom_in else f"max(1.05-0.05*on/{frames},1.0)"
     vf = (
-        f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
-        f"crop={WIDTH}:{HEIGHT},"
+        "scale=3840:2160:force_original_aspect_ratio=increase,"
+        "crop=3840:2160,"
         f"zoompan=z='{zoom}':d={frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-        f":s={WIDTH}x{HEIGHT}:fps={FPS},"
-        f"fade=t=in:st=0:d=0.4,fade=t=out:st={max(seconds - 0.4, 0):.2f}:d=0.4"
+        f":s=3840x2160:fps={FPS},"
+        "scale=1920:1080,"
+        f"fade=t=in:st=0:d=0.5,fade=t=out:st={max(seconds - 0.5, 0):.2f}:d=0.5"
     )
     command = ["ffmpeg", "-y", "-loop", "1", "-i", str(photo), "-t", f"{seconds:.2f}",
                "-vf", vf, "-r", str(FPS), "-c:v", "libx264", "-preset", "veryfast",
@@ -180,7 +271,8 @@ def _clip(photo: Path, output: Path, seconds: float, index: int) -> None:
     subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
 
-def render(run_dir: Path, rows: list[dict]) -> Path:
+def render(run_dir: Path, rows: list[dict], narration: Path | None = None,
+           output_name: str = "video.mp4") -> Path:
     clips = []
     clips_dir = run_dir / "clips"
     clips_dir.mkdir(exist_ok=True)
@@ -196,8 +288,9 @@ def render(run_dir: Path, rows: list[dict]) -> Path:
     silent = run_dir / "silent.mp4"
     subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
                     "-c", "copy", str(silent)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-    output = run_dir / "video.mp4"
-    subprocess.run(["ffmpeg", "-y", "-i", str(silent), "-i", str(run_dir / "narration.aac"),
+    output = run_dir / output_name
+    narration = narration or (run_dir / "narration.aac")
+    subprocess.run(["ffmpeg", "-y", "-i", str(silent), "-i", str(narration),
                     "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", str(output)],
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     return output
