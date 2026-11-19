@@ -245,7 +245,8 @@ python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --l
 new ──opening──▶ opened ──72 h without answer──▶ followed-up ──96 h──▶ no-response
                    │                                  │
                    └────────── incoming ──────────────┴──▶ engaged ◀──▶ qualifying ──▶ quote-requested
-engaged ──refusal / opt-out──▶ do-not-contact     engaged ──unknown / call / media──▶ needs-owner
+engaged ──refusal──▶ needs-owner (indication ask sent)
+engaged ──opt-out (parar, spam)──▶ do-not-contact     engaged ──unknown / call / media──▶ needs-owner
 engaged ──already has a site / later──▶ closed    send not confirmed ──▶ unconfirmed
 owner typed in the chat ──▶ owner                 number without WhatsApp ──▶ invalid-number
 ```
@@ -271,7 +272,7 @@ the model using only the facts.
 | Case | Intent | Action | Answer |
 | --- | --- | --- | --- |
 | First contact | opening | — | "Bom dia" (Boa tarde/Boa noite by hour) → "Tudo bem?" → introduction naming the business ("…a empresa {company} ainda não tem site.") → "Nós temos alguns exemplos…" → four links, one per message |
-| "Nesse momento não estou precisando", "não, obrigado", "agora não", "não" after the quote offer | `refusal` | block | Fixed thanks, then never contact again |
+| "Nesse momento não estou precisando", "não, obrigado", "agora não", "não" after the quote offer | `refusal` | ask_referral | Sends the five-bubble indication request, then hands the chat to the owner (owner decision 2026-11-19) |
 | "Para de mandar", "spam", "vou denunciar" | `opt_out` | block | Fixed apology, never contact again |
 | Business auto-reply (absence, hours, menu) | `auto_reply` | ignore | Nothing, avoids bot loops |
 | "É robô?", "é automático?" | `bot_question` | reply | Fixed honest answer: an automated assistant helps; the owner follows every chat |
@@ -586,9 +587,10 @@ live in `[opening]` and `[pacing]` of the rules file.
 - Answers wait `pacing.reply_debounce_seconds` (30 s) after the newest incoming bubble, so a
   person splitting a thought into two or three messages is read as one turn and never answered
   mid-thought by a machine. The live loop enables it; direct unit calls do not.
-- `referral_ask.messages` holds the owner's indication request as five short bubbles. It ships
-  disabled: a refusal is a permanent do-not-contact entry, so sending after one needs the
-  owner's explicit override.
+- `referral_ask.messages` holds the owner's indication request as five short bubbles, sent when
+  the lead refuses. Right after it the chat moves to `needs-owner` and the bot stops answering
+  there: the owner takes over. A true opt-out ("para de me mandar", "spam", "me remove") still
+  goes to the permanent do-not-contact list with its fixed apology.
 - At most 12 automated replies per lead per day; then the owner takes over.
 - Every message is journaled `started` before typing; an `unconfirmed`, `error` or dangling
   `started` key is never retried and the run stops.

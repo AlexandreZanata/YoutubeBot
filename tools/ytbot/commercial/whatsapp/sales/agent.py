@@ -42,8 +42,9 @@ REFERRAL_KEEPS = ("owner", "quote-requested", "won", "buying", "unconfirmed", "o
                   "invalid-number", "do-not-contact")
 NEXT_STATE = {"qualify": "qualifying", "collect": "qualifying", "quote": "quote-requested",
               "close": "closed", "block": "do-not-contact", "handoff": "needs-owner",
-              "won": "won", "buy": "buying", "lose": "lost", "refer": "referred"}
-OWNER_ACTIONS = ("handoff", "quote", "won", "buy", "lose")
+              "won": "won", "buy": "buying", "lose": "lost", "refer": "referred",
+              "ask_referral": "needs-owner"}
+OWNER_ACTIONS = ("handoff", "quote", "won", "buy", "lose", "ask_referral")
 # An app or system already offered (the offer question was asked once): when the client keeps
 # describing it, the requirements interview starts instead of offering again.
 SYSTEM_OFFERS = ("system_request", "system_price", "app_at_site_price")
@@ -842,8 +843,8 @@ class SalesAgent:
         elif decision.intent == "ready_to_buy" and interest != "system":
             decision.owner_reason = "Quer fechar, mas não ficou claro se é site ou sistema"
         elif decision.intent == "refusal" and lead.get("interest"):
-            decision.action, decision.priority = "lose", "needed"
-            decision.owner_reason = "Desistiu da compra: você decide se retoma"
+            decision.action, decision.priority = "ask_referral", "needed"
+            decision.owner_reason = "Recusou depois de se interessar: pedido de indicação enviado"
         elif decision.intent == "gatekeeper" or (
                 lead["state"] == "gatekeeper"
                 and decision.intent not in ("referral", "forwarded_to_decider")):
@@ -873,6 +874,13 @@ class SalesAgent:
             decision.messages = list(decision.messages) + [texts["ask_name"]]
         decision.intent = decision.intent if decision.intent != "gatekeeper" else "gatekeeper"
         return decision
+
+    def _referral_ask(self) -> list[str]:
+        """The owner's indication request, always in short bubbles and only after a refusal."""
+        ask = self.rules.raw.get("referral_ask") or {}
+        if not ask.get("enabled"):
+            return []
+        return list(ask.get("messages") or [])
 
     def _refer(self, lead: dict, decision: Decision, text: str) -> Decision:
         """Save the number a staff member passed on as a new lead and thank them."""
@@ -951,6 +959,8 @@ class SalesAgent:
         if decision.action == "refer":
             decision = self._refer(lead, decision, text)
             lead = self.store.lead(lead["id"])
+        if decision.action == "ask_referral":
+            decision.messages = self._referral_ask()
         if decision.messages:
             items = self._items(lead, f"reply#{lead['awaiting']}", decision.messages, text)
             results = self.channel.send(lead, items, {"kind": "sales-reply", "lead": lead["id"],

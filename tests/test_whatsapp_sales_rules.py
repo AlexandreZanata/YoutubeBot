@@ -115,8 +115,7 @@ class SalesRulesTests(unittest.TestCase):
     def test_reply_debounce_and_referral_ask_are_versioned_data(self):
         self.assertEqual(float(self.rules.pacing["reply_debounce_seconds"]), 30.0)
         ask = self.rules.raw["referral_ask"]
-        self.assertFalse(ask["enabled"],
-                         "asking again after a refusal still needs the owner's override")
+        self.assertTrue(ask["enabled"], "owner decision 2026-11-19: ask after a refusal")
         self.assertEqual(len(ask["messages"]), 5)
         self.assertTrue(all(len(text) < 400 for text in ask["messages"]),
                         "each bubble stays short; never one wall of text")

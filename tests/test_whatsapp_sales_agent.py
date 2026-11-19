@@ -334,22 +334,26 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(agent.reply_pending(), [])
         self.assertEqual(len(channel.sent), 8)
 
-    def test_refusal_blocks_forever(self):
+    def test_refusal_sends_the_referral_ask_and_hands_to_the_owner(self):
         lead, agent, channel = self.opened_lead()
         agent.ingest([self.event("Nesse momento não estou precisando")])
         agent.reply_pending()
-        self.assertEqual(channel.sent[-1]["text"], "Entendo, obrigado pela atenção! Tenha um ótimo dia.")
-        self.assertEqual(self.store.lead(lead["id"])["state"], "do-not-contact")
-        self.assertTrue(self.store.is_dnc(lead["phone"]))
-        rules = listener.load_rules(self.store.contact_rules_path)
-        self.assertFalse(listener.contact_allowed("+55 65 90000-0001", rules))
+        ask = list(self.rules.raw["referral_ask"]["messages"])
+        self.assertEqual([item["text"] for item in channel.sent[-len(ask):]], ask)
+        self.assertEqual(self.store.lead(lead["id"])["state"], "needs-owner")
+        self.assertFalse(self.store.is_dnc(lead["phone"]))
+        self.assertEqual(self.notes[-1]["reason"],
+                         "Recusou: pedido de indicação enviado")
         sent = len(channel.sent)
         agent.ingest([self.event("Oi de novo", event_id="e2")])
-        self.assertEqual(agent.reply_pending(), [])
+        self.assertEqual(agent.reply_pending(), [],
+                         "after the ask the owner takes over; the bot stops answering")
+        self.assertEqual(len(channel.sent), sent)
         self.clock.now = MONDAY + timedelta(days=10)
         agent.followups()
         self.assertEqual(len(channel.sent), sent)
-        self.assertTrue(any("bloqueado" in note["reason"] for note in self.notes))
+        self.assertFalse(any("bloqueado" in note["reason"] for note in self.notes))
+        self.assertTrue(any("indicação" in note["reason"] for note in self.notes))
 
     def test_quote_flow_goes_to_the_owner(self):
         lead, agent, channel = self.opened_lead()

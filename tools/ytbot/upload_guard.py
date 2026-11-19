@@ -36,11 +36,18 @@ def preflight(run_dir: Path, meta: dict) -> None:
         raise UploadBlocked(f"thumbnail.png is not a valid image: {error}") from error
 
 
+LOGIN_MARKERS = ("Fazer login", "Sign in", "Verifique se é você", "Verify it’s you",
+                 "Verify it's you", "confirme sua identidade")
+
+
+def login_required(body: str) -> bool:
+    """True when the page is the signed-out / challenge screen, never a retry case."""
+    return any(marker in (body or "") for marker in LOGIN_MARKERS)
+
+
 def page_blocked(page) -> None:
     body = page.locator("body").inner_text()
-    expired = ("Fazer login", "Sign in", "Verifique se é você", "Verify it’s you",
-               "Verify it's you", "confirme sua identidade")
-    if any(marker in body for marker in expired):
+    if login_required(body):
         from . import runtime
         runtime.request_login("https://studio.youtube.com/",
                               "YouTube session expired or needs a manual verification")

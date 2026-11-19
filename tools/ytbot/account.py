@@ -20,6 +20,8 @@ def log(message: str) -> None:
 
 def ensure_channel(context, name: str | None = None) -> None:
     name = name or config.CHANNEL_NAME
+    from . import upload_guard
+
     page = context.new_page()
     try:
         page.goto("https://www.youtube.com/", timeout=90000)
@@ -27,7 +29,21 @@ def ensure_channel(context, name: str | None = None) -> None:
         page.keyboard.press("Escape")
         page.evaluate(
             "()=>document.querySelectorAll('tp-yt-iron-overlay-backdrop').forEach(e=>e.remove())")
-        page.locator("#avatar-btn").click()
+        body = page.locator("body").inner_text()
+        if upload_guard.login_required(body):
+            from . import runtime
+            runtime.request_login("https://www.youtube.com/",
+                                  "YouTube session expired or needs a manual verification")
+            raise upload_guard.UploadBlocked(
+                "YouTube session expired; finish the sign-in in the window that opened")
+        avatar = page.locator("#avatar-btn")
+        try:
+            avatar.wait_for(state="visible", timeout=15000)
+        except Exception as error:
+            raise upload_guard.UploadBlocked(
+                "YouTube home did not show the signed-in avatar; the profile session "
+                "needs a manual check in a visible window") from error
+        avatar.click()
         page.wait_for_timeout(2000)
         active = page.evaluate(
             "()=>document.querySelector('ytd-active-account-header-renderer #account-name')"

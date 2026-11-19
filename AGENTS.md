@@ -90,6 +90,9 @@ are private `.local/` state. Never log tokens/cookies or put them in Git. Google
 uses the owner's visible browser and consent; do not bypass challenges or copy another
 profile while in use. Browser automation remains the upload path; optional OAuth only
 helps discover and verify account/channel identity. Never silently switch channels.
+Every entry point follows the [session contract](docs/SESSION-CONTRACT.md): a signed-out
+profile records `needs-login.json`, opens one visible window and stops; it never clicks the
+avatar blindly or retries.
 
 When a session actually expires, the bot records `.local/ytbot/needs-login.json`, notifies the
 desktop, opens the profile in a visible window on the sign-in page and stops the batch. The
@@ -176,7 +179,9 @@ sends at most one follow-up. It answers funnel leads by
 first (zero price in the live catalog, rotating, paused on timeout or no credits), then only
 `deepseek-v4.1-flash` and `muse-spark-1.3-contributor` as paid fallback; a price, deadline, link
 or promise outside that file falls back to
-its fixed text or goes to the owner. A refusal is a permanent do-not-contact entry, the robot
+its fixed text or goes to the owner. A refusal sends the owner's five-bubble indication ask and then the chat goes to the owner
+(owner decision 2026-11-19); a true opt-out ("para de me mandar", "spam", "me remove") is the
+permanent do-not-contact entry. The robot
 question gets an honest answer, the OpenCode key stays in `.local/`, and `--live` stays
 required. Imported numbers start with replies active: the agent answers a lead that writes even before
 an opening, `sales activate|pause` toggles that per lead, and `run --live --prospect --limit`

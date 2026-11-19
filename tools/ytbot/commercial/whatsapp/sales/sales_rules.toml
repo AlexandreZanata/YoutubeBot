@@ -117,7 +117,7 @@ links = [
 # Not wired to the refusal intent yet: a refusal is a permanent do-not-contact entry
 # (see docs/COMMERCIAL-WHATSAPP-SALES.md), so sending after one needs the owner's
 # explicit override. Never sent as a single wall of text.
-enabled = false
+enabled = true
 messages = [
   "Aproveitando o contato, queria te pedir uma gentileza.",
   "Caso conheça algum empresário ou alguém que esteja precisando de um site, sistema ou aplicativo, ficaria muito agradecido se pudesse indicar nosso trabalho.",
@@ -325,8 +325,9 @@ messages = ["Desculpe o incômodo! Não vou mais entrar em contato. Obrigado pel
 
 [[intents]]
 id = "refusal"
-action = "block"
+action = "ask_referral"
 fixed = true
+reason = "Recusou: pedido de indicação enviado"
 when = "Recusa: 'nesse momento não estou precisando', 'não, obrigado', 'agora não', 'não tenho interesse', 'não preciso', ou 'não' em resposta à oferta de orçamento. 'Agora não posso, me chama amanhã' NÃO é recusa (é callback_later)."
 patterns = [
   'nao,? obrigad', 'nao (estou|to|estamos|tamo|tamos) precisando', 'nao (preciso|precisamos)( de site| disso| nao)?[,.! ]*(obrigad[oa])?[.!]*$',
@@ -335,7 +336,7 @@ patterns = [
   'n(esse|este|o) momento nao (estou |to |estamos )?(precis|quero|tenho interesse|temos interesse)',
   'nao me interessa', 'dispenso', 'obrigad[oa],? mas nao', 'nao,? valeu', 'nao e (do nosso|o nosso) interesse',
 ]
-messages = ["Entendo, obrigado pela atenção! Tenha um ótimo dia."]
+messages = []
 
 [[intents]]
 id = "auto_reply"

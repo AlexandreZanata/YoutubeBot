@@ -515,9 +515,9 @@ class CampaignEndToEndTests(unittest.TestCase):
         ref_id = c3["referred_to"]
         self.assertEqual(self.store.lead(ref_id)["state"], "opened")
         self.assertIn(ref_id, agent.allowed_leads)
-        # Clinic #4: refused -> do-not-contact + revoked from rules.json
-        self.assertEqual(self.store.lead(clinics[3]["id"])["state"], "do-not-contact")
-        self.assertTrue(self.store.is_dnc(clinics[3]["phone"]))
+        # Clinic #4: refused -> indication ask, then the owner takes over
+        self.assertEqual(self.store.lead(clinics[3]["id"])["state"], "needs-owner")
+        self.assertFalse(self.store.is_dnc(clinics[3]["phone"]))
         # Clinic #5: links_not_opening + domain (registro.br)
         c5_texts = [s["text"] for s in channel.sent if s["lead"] == clinics[4]["id"]]
         self.assertTrue(any("salvar meu contato" in t for t in c5_texts))
@@ -594,7 +594,7 @@ class CampaignEndToEndTests(unittest.TestCase):
         self.assertEqual(self.store.lead(five[0]["id"])["state"], "engaged")
         self.assertEqual(self.store.lead(five[1]["id"])["state"], "engaged")
         self.assertEqual(self.store.lead(five[2]["id"])["state"], "engaged")
-        self.assertEqual(self.store.lead(five[3]["id"])["state"], "do-not-contact")
+        self.assertEqual(self.store.lead(five[3]["id"])["state"], "needs-owner")
         self.assertEqual(self.store.lead(five[4]["id"])["state"], "needs-owner")
 
     def test_transient_browser_close_during_opening_and_reply_reconnects_without_duplicate(self):
@@ -883,9 +883,9 @@ class TypingStateTests(unittest.TestCase):
         channel.push_incoming(self.lead["id"], ["No momento não temos interesse"])
         summary2 = agent.cycle([self._ev("No momento não temos interesse", "e2")])
         self.assertEqual(summary2["replies"][0]["intent"], "refusal")
-        self.assertEqual(self.store.lead(self.lead["id"])["state"], "do-not-contact")
+        self.assertEqual(self.store.lead(self.lead["id"])["state"], "needs-owner")
         self.assertEqual([item["text"] for item in channel.sent],
-                         ["Entendo, obrigado pela atenção! Tenha um ótimo dia."])
+                         list(self.rules.raw["referral_ask"]["messages"]))
 
     def test_contact_stops_typing_without_sending_second_message_still_gets_answered(self):
         channel = SimulatedWhatsApp(self.store.journal_path, self.clock)

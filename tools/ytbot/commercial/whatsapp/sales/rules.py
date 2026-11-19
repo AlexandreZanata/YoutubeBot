@@ -14,7 +14,7 @@ RULES_PATH = Path(__file__).with_name("sales_rules.toml")
 # these paid models as fallback.
 ALLOWED_MODELS = ("deepseek-v4.1-flash", "muse-spark-1.3-contributor")
 ACTIONS = ("reply", "qualify", "quote", "collect", "close", "block", "handoff", "ignore", "won",
-           "buy", "refer")
+           "buy", "refer", "ask_referral")
 REQUIRED_INTENTS = ("opt_out", "refusal", "auto_reply", "bot_question", "unknown",
                     "quote_accept", "quote_details", "custom_platform", "system_request",
                     "site_institutional", "domain", "human_request", "stuck", "ready_to_buy",
@@ -325,7 +325,7 @@ def build(raw: dict) -> SalesRules:
         if item.get("action") not in ACTIONS:
             raise RulesError(f"intent {intent_id}: action must be one of {', '.join(ACTIONS)}")
         messages = tuple(item.get("messages", []))
-        if item["action"] not in ("ignore",) and not messages:
+        if item["action"] not in ("ignore", "ask_referral") and not messages:
             raise RulesError(f"intent {intent_id}: action {item['action']} needs messages")
         try:
             patterns = tuple(re.compile(pattern) for pattern in item.get("patterns", []))
@@ -342,9 +342,11 @@ def build(raw: dict) -> SalesRules:
     missing = [intent for intent in REQUIRED_INTENTS if intent not in seen]
     if missing:
         raise RulesError(f"missing intents: {', '.join(missing)}")
-    for intent_id in ("opt_out", "refusal"):
-        if next(i for i in intents if i.id == intent_id).action != "block":
-            raise RulesError(f"intent {intent_id} must use action block")
+    if next(i for i in intents if i.id == "opt_out").action != "block":
+        raise RulesError("intent opt_out must use action block")
+    refusal = next(i for i in intents if i.id == "refusal").action
+    if refusal not in ("block", "ask_referral"):
+        raise RulesError("intent refusal must use action block or ask_referral")
     texts = _texts(raw)
     money = set()
     numbers = set()
