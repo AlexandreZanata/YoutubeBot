@@ -250,11 +250,21 @@ def verify_key(url: str) -> str:
 
 
 def verify_run(page, run: Run, rules: MapsRules, log=print,
-               sleep=time.sleep, rng=random, fetcher=verify.fetch) -> dict:
-    """Confirmation Google searches in the same tab, then the bounded own-site checks."""
-    pending = [listing for listing in run.pending_checks()
-               if score.city_matches(listing, run.city)
-               and not score.category_exclusion(listing, rules)]
+               sleep=time.sleep, rng=random, fetcher=verify.fetch,
+               recheck: bool = False, limit: int | None = None,
+               mobile_only: bool = False) -> dict:
+    """Confirmation Google searches in the same tab, then the bounded own-site checks.
+
+    `recheck` repeats the ones already marked `no-site`, best provisional score first, so the
+    owner can confirm a shortlist that was only checked by direct probes.
+    """
+    pending = verify.select_pending(run, rules, recheck=recheck, mobile_only=mobile_only)
+    if recheck:
+        checks = {listing_identity(entry): entry for entry in run.checks()}
+        pending = [listing for listing in pending
+                   if not verify.confirmed_by_browser(checks, listing)]
+    if limit is not None:
+        pending = pending[:max(0, int(limit))]
     page.set_default_timeout(float(rules.pacing["page_timeout_seconds"]) * 1000)
     first = True
     done = 0
@@ -285,6 +295,7 @@ def verify_run(page, run: Run, rules: MapsRules, log=print,
         check.update({
             "identity": listing["identity"], "name": listing.get("name", ""),
             "maps_url": listing.get("maps_url", ""),
+            "method": "browser",
             "at": datetime.now(ZoneInfo(rules.timezone)).isoformat(timespec="seconds"),
         })
         run.append_check(check)

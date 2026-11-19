@@ -14,7 +14,7 @@ ZONE = ZoneInfo("America/Cuiaba")
 # Monday 2026-11-16 09:00 local, inside the opening and reply windows.
 MONDAY = datetime(2026, 11, 16, 9, 0, tzinfo=ZONE)
 # Synthetic numbers only (never real contacts).
-PHONES = [f"(65) 90000-{index:04d}" for index in range(1, 30)]
+PHONES = [f"(65) 90000-{index:04d}" for index in range(1, 70)]
 
 
 def write_csv(path: Path, rows: list[dict]) -> Path:

@@ -406,9 +406,17 @@ def run_cycles(agent, session, args, listen=None, out=None, stopped=None) -> Non
         if remaining is not None:
             remaining -= sum(1 for item in summary["openings"]
                              if item.get("state") in ("opened", "unconfirmed", "planned"))
-        if any(_failed_outcome(item) for group in ("replies", "followups", "openings")
+        if any(_failed_outcome(item) for group in ("replies", "followups")
                for item in summary[group]):
             raise SystemExit("[sales] a send was not confirmed; stopping. Check the chat, "
+                             "then `commercial sales resolve`.")
+        unconfirmed_opening = any(
+            item.get("state") == "unconfirmed"
+            or (isinstance(item.get("referral_opening"), dict)
+                and item["referral_opening"].get("state") == "unconfirmed")
+            for item in summary["openings"])
+        if unconfirmed_opening and args.once:
+            raise SystemExit("[sales] an opening was not confirmed; stopping. Check the chat, "
                              "then `commercial sales resolve`.")
         if args.once or (args.max_cycles and cycles >= args.max_cycles):
             return
@@ -515,8 +523,8 @@ def command_queue(args, store_factory, page_factory) -> None:
         central.write(store, agent.now())
         _print({"sent": results, "queue": [row for row in sales_queue.items(store)
                                            if row["lead"] in {item["lead"] for item in results}]})
-        if any(item["state"] in ("unconfirmed", "error") for item in results):
-            raise SystemExit("[sales] the queue stopped: a send was not confirmed or failed. "
+        if any(item["state"] == "unconfirmed" for item in results):
+            raise SystemExit("[sales] the queue stopped: a send was not confirmed. "
                              "Check the chat; nothing is retried automatically.")
     finally:
         if session is not None:

@@ -12,9 +12,11 @@ version = 1
 timezone = "America/Cuiaba"
 
 [limits]
-daily_businesses = 120          # businesses read per day, across runs (owner-tunable)
+daily_businesses = 360         # businesses read per day, across runs (owner-tunable; raised
+                               # from 120 to 240 and then 360 on 2026-11-19 for more cities)
 max_results_per_query = 40      # stop scrolling a feed after this many place links
 max_scrolls = 8
+nearby_cities = ["Várzea Grande"]  # owner decision 2026-11-19: Cuiabá metro
 
 [pacing]
 between_businesses_min_seconds = 4.0
@@ -110,6 +112,16 @@ ignore_domains = [
   "boaconsulta.com", "mechamenozap.com.br", "b2bseg.com.br", "loqal.com.br",
   "studioadamas.com.br", "guiafacil.com", "cylex.com.br", "dentistas.net.br",
   "waze.com", "encontramatogrosso.com.br",
+  "maiscnpj.com.br", "cadastroempresa.com.br", "locaisdobrasil.com.br",
+  "consultacnpj.com", "cnpj.info", "situacaocadastral.com.br", "guiaempresas.com.br",
+  "empresaqui.com.br", "informecnpj.com.br", "cnpjagora.com.br",
+  "worldorgs.com", "globuya.com", "cnpj.in", "efirma.com.br", "nortaomt.com.br",
+  "fornecedoresdoagro.com.br", "cnpjcheck.com.br", "guiadestri.com.br",
+  "revistaportal.com.br", "tudoparaseuanimal.com.br", "farmby.com.br",
+  "agbrasilagro.com.br", "oficialdata.com.br", "cnpjdobrasil.com.br",
+  "guiacidade.com.br", "toreva.com.br", "dunsguide.com", "popagro.com.br",
+  "skylinq.com.br", "todosnegocios.com", "zoominfo.com", "portaldacidade.com",
+  "b2bleads.com.br", "applocal.com.br", "findglocal.com", "raizlegal.com.br",
 ]
 parking_markers = [
   "dominio a venda", "dominio esta a venda", "this domain is for sale",
@@ -120,6 +132,23 @@ name_stopwords = [
   "de", "da", "do", "das", "dos", "e", "em", "a", "o", "os", "as", "para", "com",
   "ltda", "me", "eireli", "sa", "s/a", "microempresa",
 ]
+
+[websearch]
+# Free search used by `verify --source web` to confirm a missing site without Google.
+ddg_url = "https://lite.duckduckgo.com/lite/?q={query}"
+bing_url = "https://www.bing.com/search?q={query}&mkt=pt-BR"
+between_queries_min_seconds = 2.0
+between_queries_max_seconds = 5.0
+
+[places]
+# Paid Google Places API (New) path (`research --source places`). The key is the owner's and
+# lives outside Git: a private file or an environment variable, never a log line.
+endpoint = "https://places.googleapis.com/v1/places:searchText"
+key_file = ".local/commercial/maps/places.key"
+key_env = "GOOGLE_MAPS_API_KEY"
+page_size = 20                  # API maximum
+max_pages = 3                   # 60 places per search at most
+timeout_seconds = 15.0
 
 [offers]
 adjust = "Ajuste do Google Maps"
@@ -232,11 +261,11 @@ short = "reservas"
 # Search order is the priority order: the run walks this list until the daily limit.
 [[searches]]
 group = "saude"
-query = "dentista"
+query = "academia"
 
 [[searches]]
 group = "saude"
-query = "clínica odontológica"
+query = "studio de pilates"
 
 [[searches]]
 group = "saude"
@@ -248,11 +277,27 @@ query = "fisioterapia"
 
 [[searches]]
 group = "saude"
-query = "psicólogo"
+query = "nutricionista"
 
 [[searches]]
 group = "saude"
-query = "nutricionista"
+query = "crossfit"
+
+[[searches]]
+group = "saude"
+query = "treinamento funcional"
+
+[[searches]]
+group = "saude"
+query = "dentista"
+
+[[searches]]
+group = "saude"
+query = "clínica odontológica"
+
+[[searches]]
+group = "saude"
+query = "psicólogo"
 
 [[searches]]
 group = "saude"
@@ -265,14 +310,6 @@ query = "salão de beleza"
 [[searches]]
 group = "saude"
 query = "barbearia"
-
-[[searches]]
-group = "saude"
-query = "studio de pilates"
-
-[[searches]]
-group = "saude"
-query = "academia"
 
 [[searches]]
 group = "agro"
@@ -475,4 +512,6 @@ name_terms = [
   "movida", "unidas", "bradesco", "itau", "santander", "caixa economica",
   "banco do brasil", "sicredi", "sicoob", "correios", "rappi", "betano", "bet365",
   "sportingbet", "pixbet", "rident", "orthodentic", "orthodontic",
+  "smart fit", "smartfit", "bluefit", "selfit", "alpha fitness", "bodytech", "ironberg",
+  "espacolaser", "emagrecentro", "sobracelhas", "depilacao laser",
 ]

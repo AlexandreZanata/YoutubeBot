@@ -1052,7 +1052,7 @@ class SalesAgent:
             if self._next_opening_at is not None and self.now() < self._next_opening_at:
                 return []
         results = self.prospect(1)
-        if self.live and any(item["state"] == "opened" for item in results):
+        if self.live and any(item["state"] in ("opened", "error") for item in results):
             wait = self.pacing.between_openings(self.rng)
             self._next_opening_at = self.now() + timedelta(seconds=wait)
             self.log(f"next opening in {wait:.0f}s (at {self._next_opening_at.strftime('%H:%M:%S')})")
@@ -1071,11 +1071,15 @@ class SalesAgent:
                 "referral": int(self.rules.raw["referral"]["daily_limit"])
                 - self.openings_today("referral")}
         # Referred numbers first: someone at the business asked us to talk to them. Maps
-        # leads keep the owner's CSV order (`queue_position`).
+        # leads keep the owner's CSV order (`queue_position`). A lead whose chat failed
+        # to open (`open_error`, nothing was typed) is skipped by the automatic run and
+        # left for an explicit manual `queue send`; only an `unconfirmed` send (something
+        # was typed) stops the line.
         candidates = sorted((lead for lead in self.store.leads().values()
                              if lead["state"] == "new" and not lead.get("opened_at")
                              and self._in_scope(lead["id"])
-                             and (in_queue(lead) or not queue_only)),
+                             and (in_queue(lead) or not queue_only)
+                             and (queue_only or not lead.get("open_error"))),
                             key=lambda lead: (not lead.get("referral"), *order_key(lead)))
         results = []
         for lead in candidates:
@@ -1090,9 +1094,43 @@ class SalesAgent:
             results.append(outcome)
             if outcome["state"] in ("opened", "unconfirmed", "planned"):
                 left[kind] -= 1
-            if outcome["state"] in ("error", "unconfirmed"):
-                break
+            if outcome["state"] in ("unconfirmed", "error"):
+                # Never retried: unconfirmed stays fenced, error stays new with open_error.
+                # A replacement goes to the end of the queue. The automatic run moves on;
+                # an explicit manual `queue send` stops at the first unconfirmed instead.
+                if not queue_only:
+                    self._backfill(lead, outcome["state"])
+                if outcome["state"] == "unconfirmed":
+                    self.log(f"opening unconfirmed for {lead.get('name', lead['id'])}; "
+                             "fenced, never retried"
+                             + (", moving on" if not queue_only else ""))
+                    if queue_only:
+                        break
+                else:
+                    self.log(f"opening failed for {lead.get('name', lead['id'])} before "
+                             f"typing ({outcome.get('error', 'error')}); skipping to the next")
         return results
+
+    def _backfill(self, failed: dict, reason: str) -> None:
+        """Replace a failed opening with the next owner-approved reserve lead."""
+        try:
+            rows = self.store.take_reserve(city=failed.get("city", "") or "", limit=1)
+        except Exception as error:
+            self.log(f"backfill indisponível: {error}")
+            return
+        if not rows:
+            self.log(f"sem reserva para repor {failed.get('name', failed.get('id'))}; "
+                     "o dono precisa aprovar mais empresas")
+            return
+        report = self.store.import_rows(rows, self.now(), "google-maps-manual")
+        if report.get("imported"):
+            added = rows[0].get("name", "?")
+            self.log(f"backfill: {added} entrou no fim da fila no lugar de "
+                     f"{failed.get('name', failed.get('id'))} ({reason})")
+        else:
+            self.log(f"backfill: reserva {rows[0].get('name', '?')} já era lead/DNC: "
+                     f"{report.get('duplicates', 0)} duplicada(s), "
+                     f"{len(report.get('rejected', []))} rejeitada(s)")
 
     def open_lead(self, lead: dict) -> dict:
         result = {"lead": lead["id"], "name": lead["name"]}

@@ -94,14 +94,31 @@ def probe_domain(url: str, rules: MapsRules, fetcher=fetch) -> Fetched:
 
 def ignored(url: str, rules: MapsRules) -> bool:
     host = host_of(url)
-    return not host or any(host == item or host.endswith("." + item)
-                           for item in rules.confirmation["ignore_domains"])
+    if not host:
+        return True
+    # A social profile, marketplace or free builder is never the business's own site.
+    if score.website_class(url, rules) != "own":
+        return True
+    return any(host == item or host.endswith("." + item)
+               for item in rules.confirmation["ignore_domains"])
 
 
 def _tokens(name: str, rules: MapsRules) -> list[str]:
     stopwords = {normalize(item) for item in rules.confirmation["name_stopwords"]}
     return [token for token in re.split(r"[^a-z0-9]+", normalize(name))
             if len(token) > 2 and token not in stopwords]
+
+
+def _host_signal(name: str, url: str, rules: MapsRules) -> bool:
+    """A real site carries the brand in its own domain; a directory only in the path."""
+    host = normalize(host_of(url)).replace("-", "")
+    tokens = _tokens(name, rules)
+    if not host or not tokens:
+        return False
+    hits = [token for token in tokens if token in host]
+    if len(tokens) == 1:
+        return bool(hits) and len(tokens[0]) >= 4
+    return len(hits) >= 2 or any(len(token) >= 6 for token in hits)
 
 
 def _name_signal(name: str, fetched: Fetched, url: str, rules: MapsRules) -> bool:
@@ -161,6 +178,7 @@ def evaluate(name: str, city: str, phone: str, maps_website: str,
         fetched = probe_domain(url, rules, fetcher)
         name_signal = _name_signal(name, fetched, url, rules) or source in ("domain", "maps")
         page_signal = _page_signal(city, phone, fetched)
+        host_signal = _host_signal(name, url, rules)
         working = (fetched.status == 200 and not fetched.error and not fetched.parking)
         if source == "maps":
             is_own = working and fetched.https
@@ -170,13 +188,15 @@ def evaluate(name: str, city: str, phone: str, maps_website: str,
             is_own = False
             is_weak = False
         else:
-            is_own = working and fetched.https and name_signal and page_signal
-            is_weak = name_signal and (not is_own and (not working or fetched.parking
-                                                       or (page_signal and not fetched.https)))
+            is_own = working and fetched.https and name_signal and page_signal and host_signal
+            is_weak = host_signal and name_signal and (
+                not is_own and (not working or fetched.parking
+                                or (page_signal and not fetched.https)))
         evidence.append({
             "source": source, "url": url, "final_url": fetched.final_url,
             "status": fetched.status, "https": fetched.https, "title": fetched.title[:200],
             "name_signal": name_signal, "page_signal": page_signal,
+            "host_signal": host_signal,
             "parking": fetched.parking, "error": fetched.error,
         })
         if is_own and not own_url:
@@ -212,6 +232,7 @@ def reclassify(check: dict, rules: MapsRules) -> dict:
         parking = bool(item.get("parking"))
         name_signal = bool(item.get("name_signal"))
         page_signal = bool(item.get("page_signal"))
+        host_signal = _host_signal(check.get("name") or item.get("title", ""), url, rules)
         working = status == 200 and not item.get("error") and not parking
         if source == "maps":
             is_own = working and https
@@ -220,9 +241,9 @@ def reclassify(check: dict, rules: MapsRules) -> dict:
             is_own = False
             is_weak = False
         else:
-            is_own = working and https and name_signal and page_signal
-            is_weak = name_signal and (not is_own and (not working or parking
-                                                       or (page_signal and not https)))
+            is_own = working and https and name_signal and page_signal and host_signal
+            is_weak = host_signal and name_signal and (
+                not is_own and (not working or parking or (page_signal and not https)))
         if is_own and not own_url:
             own_url = item.get("final_url") or url
         if is_weak and not weak_url:
@@ -241,3 +262,35 @@ def confirm(listing: dict, search_results: list[dict], rules: MapsRules,
     return evaluate(listing.get("name", ""), listing.get("city", ""),
                     listing.get("phone", ""), listing.get("website_field", ""),
                     search_results, rules, fetcher=fetcher)
+
+
+def confirmed_by_browser(checks: dict, listing: dict) -> bool:
+    """A stored check from the Google tab wins over the cheaper paths."""
+    from .record import identity
+
+    entry = checks.get(identity(listing))
+    return bool(entry) and entry.get("method", "browser") == "browser"
+
+
+def select_pending(run, rules: MapsRules, recheck: bool = False,
+                   mobile_only: bool = False) -> list[dict]:
+    """Listings still to confirm; `recheck` repeats the ones marked `no-site`, best first."""
+    from .record import identity
+
+    checks = {identity(entry): entry for entry in run.checks()}
+    nearby = tuple(rules.limits.get("nearby_cities") or ())
+    pending = [listing for listing in run.read_listings()
+               if score.city_matches(listing, run.city, nearby)
+               and not score.category_exclusion(listing, rules)]
+    if mobile_only:
+        pending = [listing for listing in pending
+                   if (score.phone_details(listing.get("phone", "")) or {}).get("mobile")]
+    if recheck:
+        pending = [listing for listing in pending
+                   if (checks.get(identity(listing)) or {}).get("outcome") == "no-site"]
+        pending.sort(key=lambda listing: -score.score_listing(
+            {**listing, "outcome": "no-site"}, rules)["total"])
+    else:
+        done = run.checked()
+        pending = [listing for listing in pending if identity(listing) not in done]
+    return pending

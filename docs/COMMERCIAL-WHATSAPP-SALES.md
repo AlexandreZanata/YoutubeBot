@@ -152,8 +152,12 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   caps the total openings of that run while keeping the reply loop alive afterward. Pass
   `--only-csv <path>` or `--only-leads <id1,id2>` to restrict `run` strictly to a target batch
   (and any referral created by those leads), leaving all other leads and personal chats untouched.
-  It stops immediately on the first `unconfirmed` or failed send (including inside `reply_pending`
-  and `referral_opening`) without touching further chats. An edited `sales_rules.toml` is reloaded
+  A failed opening never stops the line and is never retried: `unconfirmed` stays fenced and an
+  `error` keeps its `open_error`, each pulls one owner-approved replacement from
+  `sales/importar/reserva-*.csv` to the end of the queue (same city first), and prospecting
+  moves on with the 2–3 minute pacing. An `unconfirmed` or failed reply/follow-up (or any failure
+  in `--once` / manual `queue send`) still stops the run immediately without touching further
+  chats. An edited `sales_rules.toml` is reloaded
   before the next cycle; an invalid edit is reported and the previous rules stay in use. When the
   browser page or the CDP connection closes outside a send (including before typing inside
   `_open_chat`; the computer slept, Chrome restarted; seen on 2026-11-18 as `TargetClosedError`
@@ -213,8 +217,11 @@ python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --l
   opens the same hidden WhatsApp browser and goes through `prospect` → `open_lead` →
   `send_sequence`: the lead becomes `opening` with `opened_at` before the browser acts, the
   journal fences every bubble, and a lead is `sent` only when `open_lead` returns `opened`. It
-  stops at the first `unconfirmed` or `error` and retries nothing by itself. The opening window
-  (07:00 to 17:00, Monday to Friday), the 10/day limit, pacing, do-not-contact and invalid
+  stops at the first `unconfirmed` and retries nothing by itself; an `error` (chat never opened,
+  nothing typed) is skipped and the next number goes on, keeping the 2–3 minute pacing. A failed
+  opening pulls one owner-approved replacement from `sales/importar/reserva-*.csv` to the end of
+  the queue (same city first) and is never retried. The opening window
+  (07:00 to 17:00, Monday to Friday), the 50/day limit, pacing, do-not-contact and invalid
   numbers apply exactly as in `run --prospect`; a blocked run prints the reason.
 - **One sender at a time.** `queue send --live` and `run` share the lock, so one refuses while
   the other runs. Stop the `run` loop (SIGTERM ends it between two steps), send, then start it

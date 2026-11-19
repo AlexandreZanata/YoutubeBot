@@ -316,6 +316,46 @@ class SalesStore:
         return _read_lines(self.handoff_path)
 
     # Import --------------------------------------------------------------------------
+    RESERVE_GLOB = "importar/reserva-*.csv"
+
+    def reserve_rows(self) -> list[dict]:
+        """Owner-approved reserve pool for automatic backfill, in file order."""
+        rows = []
+        try:
+            paths = sorted(self.root.glob(self.RESERVE_GLOB))
+        except OSError:
+            return []
+        for path in paths:
+            try:
+                with path.open(encoding="utf-8-sig", newline="") as handle:
+                    reader = csv.DictReader(handle)
+                    if not reader.fieldnames or "phone" not in reader.fieldnames \
+                            or "name" not in reader.fieldnames:
+                        continue
+                    for row in reader:
+                        rows.append({key: (value or "").strip()
+                                     for key, value in row.items() if key})
+            except OSError:
+                continue
+        return rows
+
+    def take_reserve(self, city: str = "", limit: int = 1) -> list[dict]:
+        """Next reserve rows not already a lead, refused or invalid, same city first."""
+        leads = self.leads()
+        fresh = []
+        seen = set()
+        for row in self.reserve_rows():
+            phone = canonical_phone(row.get("phone", ""))
+            if not phone or phone in seen:
+                continue
+            seen.add(phone)
+            if lead_id(phone) in leads or self.is_dnc(phone):
+                continue
+            fresh.append(row)
+        same = [row for row in fresh if (row.get("city", "").strip() == city and city)]
+        rest = [row for row in fresh if row not in same]
+        return (same + rest)[:max(1, int(limit))]
+
     def import_csv(self, path: Path, now: datetime, source: str = "google-maps-reviewed") -> dict:
         """Import the owner's reviewed Google Maps list (no scraping, see the docs)."""
         with path.open(encoding="utf-8-sig", newline="") as handle:

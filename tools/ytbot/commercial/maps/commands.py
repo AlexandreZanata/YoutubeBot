@@ -111,6 +111,19 @@ def command_research(args, store_factory) -> None:
               f"{run.day}; rode amanhã ou ajuste limits.daily_businesses")
         return
 
+    if getattr(args, "source", "browser") == "places":
+        from . import places
+
+        try:
+            result = places.research(run, rules, searches, limit, now, log=lambda m: print(
+                m, flush=True))
+        except places.PlacesError as error:
+            raise SystemExit(f"[maps] {error}")
+        _print({"run": run.id, "directory": str(run.path), **result,
+                "next": f"python3 -m tools.ytbot commercial maps verify --run {run.id} "
+                        "--source places"})
+        return
+
     playwright, client, page = _connect(store, rules)
     try:
         state = driver.inspect(page, rules)
@@ -145,6 +158,29 @@ def command_verify(args, store_factory) -> None:
         run = runs.resolve(args.run)
     except ValueError as error:
         raise SystemExit(f"[maps] {error}")
+    if getattr(args, "source", "browser") == "web":
+        from . import websearch
+
+        result = websearch.verify_run(run, rules, log=lambda m: print(m, flush=True),
+                                      recheck=bool(getattr(args, "recheck", False)),
+                                      limit=getattr(args, "limit", None),
+                                      mobile_only=bool(getattr(args, "only_mobile", False)))
+        _print({"run": run.id, **result,
+                "next": f"python3 -m tools.ytbot commercial maps export --run {run.id}"})
+        return
+    if getattr(args, "source", "browser") == "places":
+        from . import places
+
+        try:
+            result = places.verify_run(run, rules, log=lambda m: print(m, flush=True),
+                                       recheck=bool(getattr(args, "recheck", False)),
+                                       limit=getattr(args, "limit", None),
+                                       mobile_only=bool(getattr(args, "only_mobile", False)))
+        except places.PlacesError as error:
+            raise SystemExit(f"[maps] {error}")
+        _print({"run": run.id, **result,
+                "next": f"python3 -m tools.ytbot commercial maps export --run {run.id}"})
+        return
     playwright, client, page = _connect(store, rules)
     try:
         state = driver.inspect(page, rules)
@@ -153,7 +189,10 @@ def command_verify(args, store_factory) -> None:
                 f"Google Maps não está conectado ({state['state']}); rode "
                 "commercial maps login", state)
         result = driver.verify_run(page, run, rules,
-                                   log=lambda message: print(message, flush=True))
+                                   log=lambda message: print(message, flush=True),
+                                   recheck=bool(getattr(args, "recheck", False)),
+                                   limit=getattr(args, "limit", None),
+                                   mobile_only=bool(getattr(args, "only_mobile", False)))
     except driver.ResearchError as error:
         entry = runs.record_attention(run, error.stage, error.reason, error.evidence, _now(rules))
         print(f"[maps] parado: {error.reason}. Registro em {runs.attention_path}")
@@ -182,7 +221,8 @@ def command_export(args, store_factory) -> None:
     sales = SalesStore(store.network("whatsapp"))
     lead_keys = {phone_key(lead.get("phone", "")) for lead in sales.leads().values()}
     lead_keys.discard(None)
-    result = render.export_run(run, rules, _now(rules), lead_keys, set(sales.dnc()))
+    result = render.export_run(run, rules, _now(rules), lead_keys, set(sales.dnc()),
+                               mobile_only=bool(getattr(args, "mobile_only", False)))
     _print(result)
 
 
@@ -207,11 +247,24 @@ def add_parser(actions, store_factory) -> None:
                           help="one category group (repeatable)")
     research.add_argument("--limit", type=int, default=None,
                           help="businesses in this run (default: the daily limit)")
+    research.add_argument("--source", choices=("browser", "places"), default="browser",
+                          help="browser (default) or the paid Google Places API")
     verify_parser = action("verify", "confirmation searches for one run",
                            partial(command_verify, store_factory=store_factory))
     verify_parser.add_argument("--run", required=True,
                                help="<city-slug>/<YYYY-MM-DD> or just the city slug")
+    verify_parser.add_argument("--source", choices=("browser", "places", "web"),
+                               default="browser",
+                               help="browser (default), direct site probes only, or free web search")
+    verify_parser.add_argument("--recheck", action="store_true",
+                               help="repeat the Google search for listings already marked no-site")
+    verify_parser.add_argument("--limit", type=int, default=None,
+                               help="cap the listings checked in this invocation")
+    verify_parser.add_argument("--only-mobile", action="store_true",
+                               help="only mobile numbers (the WhatsApp-capable form)")
     export_parser = action("export", "write candidatos.csv, ajuste-maps.csv and report.md",
                            partial(command_export, store_factory=store_factory))
     export_parser.add_argument("--run", required=True,
                                help="<city-slug>/<YYYY-MM-DD> or just the city slug")
+    export_parser.add_argument("--mobile-only", action="store_true",
+                               help="export only mobile numbers (WhatsApp-capable)")

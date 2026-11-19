@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ...accounts_store import private_directory
-from ..whatsapp.sales.store import CSV_FIELDS
+from ..whatsapp.sales.store import CSV_FIELDS, phone_key
 from .extract import city_from_address
 from . import score, verify
 from .record import Run
@@ -49,12 +49,22 @@ def _report(run: Run, listings: list[dict], excluded: list[dict],
     outcomes = Counter(listing.get("outcome") for listing in listings)
     tiers = Counter(scores[listing["identity"]]["tier"] for listing in listings
                     if listing["identity"] in scores)
+    places_checks = sum(1 for entry in run.checks() if entry.get("method") == "places")
     lines = [
         f"# Pesquisa Google Maps — {run.city} - {run.state} ({run.day})",
         "",
         f"Gerado em {now.isoformat(timespec='seconds')}. Somente dados públicos do anúncio; "
         "nada foi importado ou enviado.",
         "",
+    ]
+    if places_checks:
+        lines += [
+            f"> Confirmação limitada: {places_checks} empresa(s) tiveram só a checagem direta "
+            "de site (Places API), sem busca no Google. Um site próprio fora do Maps pode "
+            "existir; confira os nomes do lote antes de importar.",
+            "",
+        ]
+    lines += [
         "## Etapas",
         "",
         "| Etapa | Quantidade |",
@@ -116,8 +126,24 @@ def _report(run: Run, listings: list[dict], excluded: list[dict],
     return "\n".join(lines)
 
 
+def _dedupe(items: list[dict], scores: dict[str, dict], excluded: list[dict]) -> list[dict]:
+    """One lead per phone: two Maps listings of the same business must not open twice."""
+    best: dict[str, dict] = {}
+    for item in items:
+        key = phone_key(item.get("phone", "")) or item["identity"]
+        if key not in best:
+            best[key] = item
+            continue
+        loser = item
+        if scores[item["identity"]]["total"] > scores[best[key]["identity"]]["total"]:
+            loser, best[key] = best[key], item
+        excluded.append({"name": loser.get("name", ""), "reason": "duplicado (mesmo telefone)",
+                         "identity": loser["identity"]})
+    return list(best.values())
+
+
 def export_run(run: Run, rules: MapsRules, now: datetime, lead_keys: set[str],
-               dnc_keys: set[str]) -> dict:
+               dnc_keys: set[str], mobile_only: bool = False) -> dict:
     """Merge checks, apply filters and score; the only step that produces owner files."""
     checks = {entry["identity"]: verify.reclassify(entry, rules)
               for entry in run.checks()}
@@ -130,7 +156,8 @@ def export_run(run: Run, rules: MapsRules, now: datetime, lead_keys: set[str],
         listing["city"] = (city_from_address(listing.get("address", ""))
                             or listing.get("city") or run.city)
         listing["target_city"] = run.city
-        if not score.city_matches(listing, run.city):
+        if not score.city_matches(listing, run.city,
+                                  tuple(rules.limits.get("nearby_cities") or ())):
             excluded.append({"name": listing.get("name", ""),
                              "reason": f"fora da cidade: {listing['city']}",
                              "identity": listing["identity"]})
@@ -157,6 +184,11 @@ def export_run(run: Run, rules: MapsRules, now: datetime, lead_keys: set[str],
             excluded.append({"name": listing.get("name", ""), "reason": "telefone inválido",
                              "identity": listing["identity"]})
             continue
+        if mobile_only and not details["mobile"]:
+            excluded.append({"name": listing.get("name", ""),
+                             "reason": "telefone fixo (filtro WhatsApp)",
+                             "identity": listing["identity"]})
+            continue
         result = score.score_listing(listing, rules)
         scores[listing["identity"]] = result
         listing["note"] = score.note(listing, result, rules)
@@ -172,6 +204,8 @@ def export_run(run: Run, rules: MapsRules, now: datetime, lead_keys: set[str],
     candidate_path = run.path / "candidatos.csv"
     adjust_path = run.path / "ajuste-maps.csv"
     report_path = run.path / "report.md"
+    candidates = _dedupe(candidates, scores, excluded)
+    adjustments = _dedupe(adjustments, scores, excluded)
     _write_text(candidate_path, _csv_text([_row(listing) for listing in candidates]))
     _write_text(adjust_path,
                 _csv_text([_row(listing, listing["website"]) for listing in adjustments]))
