@@ -149,6 +149,9 @@ class WhatsAppChannel:
     def chat_title(self) -> str:
         return sender.chat_title(self.page)
 
+    def is_typing(self) -> bool:
+        return sender.is_typing(self.page)
+
     def read_recent(self) -> list[dict]:
         return sender.read_bubbles(self.page, 30)
 
@@ -189,11 +192,44 @@ class SalesAgent:
         self._next_opening_at: datetime | None = None
         self._last_blocker = ""
         self._central_mtime: float | None = None
+        self._typing_cycle: set[str] = set()
         self._planned: set[tuple[str, str]] = set()
         if live and channel is None:
             raise ValueError("live mode needs a WhatsApp channel")
 
     # Helpers -------------------------------------------------------------------------
+    def _channel_typing(self) -> bool:
+        """True only when the open WhatsApp chat header shows the contact is typing."""
+        checker = getattr(self.channel, "is_typing", None)
+        if not callable(checker):
+            return False
+        try:
+            return bool(checker())
+        except Exception:
+            return False
+
+    def _typing_timed_out(self, lead: dict) -> bool:
+        since = self._parse(lead.get("typing_since"))
+        if since is None:
+            return False
+        return (self.now() - since).total_seconds() >= self.pacing.max_typing_wait
+
+    def _mark_typing(self, lead: dict) -> dict:
+        """Categorize the lead in the 'typing' wait state without sending any message."""
+        fresh = self.store.lead(lead["id"]) or lead
+        already = bool(fresh.get("typing"))
+        since = fresh.get("typing_since") or stamp(self.now())
+        if not already or not fresh.get("typing_since"):
+            self.store.update_lead(lead["id"], typing=True, typing_since=since)
+            if not already:
+                self.log(f"{fresh['name']}: aguardando (digitando...)")
+        return {"lead": lead["id"], "name": fresh["name"], "state": "typing", "action": "wait"}
+
+    def _clear_typing(self, lead_id: str) -> None:
+        fresh = self.store.lead(lead_id)
+        if fresh and (fresh.get("typing") or fresh.get("typing_since")):
+            self.store.update_lead(lead_id, typing=False, typing_since=None)
+
     def _in_scope(self, lead_id: str) -> bool:
         """When scoped (`--only-leads` / `--only-csv`), ignore leads outside the target batch."""
         return self.allowed_leads is None or lead_id in self.allowed_leads
@@ -334,11 +370,23 @@ class SalesAgent:
 
     # Incoming ------------------------------------------------------------------------
     def ingest(self, events: list[dict]) -> list[str]:
-        """Store listener events of funnel leads; other chats are never touched."""
+        """Store listener events of funnel leads; other chats are never touched.
+
+        A contact showing the live 'digitando...' / 'typing...' indicator is categorized in
+        the `typing` wait state without recording the indicator as an incoming text message.
+        """
         touched = []
+        typing_now: set[str] = set()
         for event in events:
             lead = self.store.find_lead(event.get("chat", ""))
-            if lead is None or not self._in_scope(lead["id"]) or not event.get("text"):
+            if lead is None or not self._in_scope(lead["id"]):
+                continue
+            if (event.get("kind") == "typing" or event.get("typing")
+                    or listener.is_typing_text(event.get("text", ""))):
+                typing_now.add(lead["id"])
+                self._mark_typing(lead)
+                continue
+            if not event.get("text"):
                 continue
             history = self.store.history(lead["id"])
             if any(entry.get("event") == event.get("id") for entry in history):
@@ -354,7 +402,9 @@ class SalesAgent:
                                              "kind": "incoming", "event": event.get("id"),
                                              "message_at": event.get("message_at", ""),
                                              "source": "preview"})
-            changes = {"last_in_at": now, "chat": event.get("chat") or lead.get("chat")}
+            typing_now.discard(lead["id"])
+            changes = {"last_in_at": now, "chat": event.get("chat") or lead.get("chat"),
+                       "typing": False, "typing_since": None}
             if not reply_is_active(lead) and lead["state"] not in ("do-not-contact",
                                                                        "invalid-number"):
                 changes["state"] = "needs-owner"
@@ -393,6 +443,7 @@ class SalesAgent:
                               event["text"], "needed")
             self.store.update_lead(lead["id"], **changes)
             touched.append(lead["id"])
+        self._typing_cycle = typing_now
         return touched
 
     # Replies -------------------------------------------------------------------------
@@ -678,6 +729,8 @@ class SalesAgent:
             self._handoff(lead, "Limite diário de respostas automáticas atingido",
                           priority="needed")
             return {**result, "state": "needs-owner"}
+        if lead["id"] in self._typing_cycle and not self._typing_timed_out(lead):
+            return self._mark_typing(lead)
         if not self.live:
             planned = (lead["id"], str(lead.get("awaiting")))
             if planned in self._planned:
@@ -694,11 +747,15 @@ class SalesAgent:
                 return {**result, "state": "error", "error": str(error)[:300]}
             if status != "ready":
                 self._last_activity_at = self.now()
-                self.store.update_lead(lead["id"], state="invalid-number", awaiting=None)
+                self.store.update_lead(lead["id"], state="invalid-number", awaiting=None,
+                                       typing=False, typing_since=None)
                 return {**result, "state": "invalid-number"}
+            if self._channel_typing() and not self._typing_timed_out(lead):
+                return self._mark_typing(lead)
             owner_text = self._merge_chat(lead, self.channel.read_recent())
             if owner_text is not None:
                 self._last_activity_at = self.now()
+                self._clear_typing(lead["id"])
                 return self._owner_took_over(lead, owner_text, result)
         if lead["state"] in SILENT_STATES:
             if not self.live:
@@ -706,12 +763,13 @@ class SalesAgent:
             status = {"won": "venda fechada: aguardando a entrada"}.get(lead["state"],
                                                                          "orçamento com o dono")
             ficha = self._write_dossier(lead, None, status)
-            self.store.update_lead(lead["id"], awaiting=None, ficha=ficha)
+            self.store.update_lead(lead["id"], awaiting=None, ficha=ficha,
+                                   typing=False, typing_since=None)
             return {**result, "state": lead["state"], "ficha": ficha}
         prior, unanswered = split_pending(self.store.history(lead["id"]))
         text = "\n".join(entry.get("text", "") for entry in unanswered).strip()
         if not text:
-            self.store.update_lead(lead["id"], awaiting=None)
+            self.store.update_lead(lead["id"], awaiting=None, typing=False, typing_since=None)
             return {**result, "state": "nothing-to-answer"}
         decision = decide(self.rules, lead, prior, text, self.llm, self.now(),
                           usage=self.store.log_usage)
@@ -719,6 +777,11 @@ class SalesAgent:
         decision = self._check_progress(lead, decision)
         if decision.action == "collect":
             decision = self._collect(lead, decision, text)
+        if self.live and decision.messages and self._channel_typing() \
+                and not self._typing_timed_out(lead):
+            # The contact started typing again while the model was thinking: wait for the rest.
+            return self._mark_typing(lead)
+        self._clear_typing(lead["id"])
         self.store.log_decision({"at": stamp(self.now()), "lead": lead["id"],
                                  "live": self.live, "text": text, **decision.record()})
         result.update({"intent": decision.intent, "action": decision.action,
@@ -1085,6 +1148,9 @@ class SalesAgent:
         for lead in list(self.store.leads().values()):
             if not self._in_scope(lead["id"]) or lead.get("last_in_at"):
                 continue
+            if (lead["id"] in self._typing_cycle or lead.get("typing")) \
+                    and not self._typing_timed_out(lead):
+                continue
             last_out = self._parse(lead.get("last_out_at"))
             if last_out is None:
                 continue
@@ -1125,6 +1191,8 @@ class SalesAgent:
             self._last_activity_at = self.now()
             self.store.update_lead(lead["id"], state="invalid-number")
             return {**result, "state": "invalid-number"}
+        if self._channel_typing() and not self._typing_timed_out(lead):
+            return self._mark_typing(lead)
         owner_text = self._merge_chat(lead, self.channel.read_recent())
         if owner_text is not None:
             self._last_activity_at = self.now()
@@ -1145,6 +1213,12 @@ class SalesAgent:
         """One pass: store incoming, answer, follow up, then (optionally) open new leads."""
         ingested = self.ingest(events)
         replies = self.reply_pending()
+        still_typing = set(self._typing_cycle) | {
+            item["lead"] for item in replies if item.get("state") == "typing"
+        }
+        for lead in list(self.store.leads().values()):
+            if lead.get("typing") and lead["id"] not in still_typing:
+                self._clear_typing(lead["id"])
         failed = any(_failed_outcome(item) for item in replies)
         followups = [] if failed else self.followups()
         failed = failed or any(_failed_outcome(item) for item in followups)
@@ -1154,7 +1228,8 @@ class SalesAgent:
         else:
             openings = []
         summary = {"ingested": ingested, "replies": replies,
-                   "followups": followups, "openings": openings}
+                   "followups": followups, "openings": openings,
+                   "typing": sorted(still_typing)}
         try:
             leads_mtime = (self.store.leads_path.stat().st_mtime
                            if self.store.leads_path.exists() else None)

@@ -173,7 +173,7 @@ class ScriptedLLM:
             payload = {"intent": "price", "messages": ["Faço por R$ 300 só hoje!"],
                        "handoff": False, "do_not_contact": False, "reason": "bad price"}
             return LlmReply(json.dumps(payload, ensure_ascii=False), "beam-free", 50, 20, 0.0, 10)
-        if "ficha" in system_text.lower() or "json" in system_text.lower() and long:
+        if long:
             is_system = "sistema" in system_text.lower() or "aplicativo" in user_text.lower()
             if is_system:
                 has_details = "dentista" in user_text.lower() or "navegador" in user_text.lower()
@@ -219,10 +219,17 @@ class ScriptedLLM:
         if "staff" in session_id:
             return LlmReply(json.dumps({"staff": "Ana", "decider": "Dra Carla"},
                                        ensure_ascii=False), "beam-free", 30, 10, 0.0, 5)
-        if "domínio" in user_text.lower() or "dominio" in user_text.lower():
+        latest = user_text.rsplit("NOVA MENSAGEM DO CLIENTE:", 1)[-1].strip().lower()
+        if latest in ("sim", "quero sim", "pode fazer"):
+            payload = {"intent": "quote_accept", "messages": [], "handoff": False,
+                       "do_not_contact": False, "reason": "accept"}
+        elif "sistema" in latest or "agendamento" in latest:
+            payload = {"intent": "system_request", "messages": [], "handoff": False,
+                       "do_not_contact": False, "reason": "system"}
+        elif "domínio" in latest or "dominio" in latest:
             payload = {"intent": "domain", "messages": [], "handoff": False,
                        "do_not_contact": False, "reason": "dominio"}
-        elif "quanto custa" in user_text.lower() or "valor" in user_text.lower():
+        elif "quanto custa" in latest or "valor" in latest:
             payload = {
                 "intent": "price",
                 "messages": [
@@ -232,7 +239,7 @@ class ScriptedLLM:
                 ],
                 "handoff": False, "do_not_contact": False, "reason": "price",
             }
-        elif "bom dia" in user_text.lower() or "tudo bem" in user_text.lower():
+        elif "bom dia" in latest or "tudo bem" in latest:
             payload = {
                 "intent": "greeting_reply",
                 "messages": ["Tudo ótimo, obrigado! Ficou com alguma dúvida sobre os exemplos?"],
@@ -762,6 +769,142 @@ class CampaignEndToEndTests(unittest.TestCase):
         for _ in range(50):
             value = pacing.between_openings(rng)
             self.assertTrue(120.0 <= value <= 180.0, value)
+
+
+class TypingStateTests(unittest.TestCase):
+    rules = load()
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.directory.name)
+        self.store = SalesStore(self.root / "whatsapp")
+        self.clock = Clock(MONDAY)
+        self.notes: list[dict] = []
+        self.logs: list[str] = []
+        csv_path = write_csv(self.root / "clinic.csv", CLINIC_ROWS[:1])
+        self.store.import_csv(csv_path, self.clock(), source="google-maps-manual")
+        self.lead = next(iter(self.store.leads().values()))
+        self.store.update_lead(self.lead["id"], state="opened",
+                               opened_at=(self.clock() - timedelta(minutes=10)).isoformat(),
+                               chat="Vitalli Odontologia")
+        listener.allow_contact(self.store.contact_rules_path, "+" + self.lead["phone"])
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def _sleep(self, seconds: float) -> None:
+        self.clock.now += timedelta(seconds=float(seconds))
+
+    def _ev(self, text: str, eid: str) -> dict:
+        return {"id": eid, "at": self.clock().isoformat(timespec="seconds"),
+                "message_at": self.clock().strftime("%H:%M"),
+                "chat": "Vitalli Odontologia", "text": text, "unread": True, "allowed": True}
+
+    def _typing_ev(self) -> dict:
+        return {"id": "typing:Vitalli Odontologia", "kind": "typing", "typing": True,
+                "at": self.clock().isoformat(timespec="seconds"),
+                "message_at": self.clock().strftime("%H:%M"),
+                "chat": "Vitalli Odontologia", "text": "", "unread": True, "allowed": True}
+
+    def test_chat_list_typing_waits_then_answers_all_messages_together(self):
+        channel = SimulatedWhatsApp(self.store.journal_path, self.clock)
+        channel.is_typing = lambda: False
+        llm = ScriptedLLM()
+        agent = SalesAgent(self.rules, self.store, channel, llm, live=True,
+                           clock=self.clock, sleep=self._sleep, notify=self.notes.append,
+                           log=self.logs.append)
+        # Contact sends "Bom dia!" and immediately starts typing the real question.
+        channel.push_incoming(self.lead["id"], ["Bom dia!"])
+        summary1 = agent.cycle([self._ev("Bom dia!", "e1"), self._typing_ev()])
+        self.assertEqual(summary1["typing"], [self.lead["id"]])
+        self.assertEqual(summary1["replies"][0]["state"], "typing")
+        self.assertEqual(channel.sent, [], "must not send while contact is typing")
+        self.assertEqual(llm.calls, [], "must not call model while waiting on typing")
+        self.assertTrue(self.store.lead(self.lead["id"]).get("typing"))
+
+        # Still typing 4 seconds later -> keeps waiting, never records "digitando..." in history.
+        self.clock.now += timedelta(seconds=4)
+        summary2 = agent.cycle([self._typing_ev()])
+        self.assertEqual(summary2["replies"][0]["state"], "typing")
+        self.assertEqual(channel.sent, [])
+        self.assertFalse(any("digitando" in entry.get("text", "").lower()
+                             for entry in self.store.history(self.lead["id"])))
+
+        # Contact finishes typing and sends the full question -> bot answers both in one turn.
+        self.clock.now += timedelta(seconds=6)
+        channel.push_incoming(self.lead["id"], ["Quanto custa um site?"])
+        summary3 = agent.cycle([self._ev("Quanto custa um site?", "e2")])
+        self.assertEqual(summary3["typing"], [])
+        self.assertEqual(summary3["replies"][0]["intent"], "price")
+        self.assertFalse(self.store.lead(self.lead["id"]).get("typing"))
+        self.assertTrue(any("R$ 500" in item["text"] for item in channel.sent))
+
+    def test_header_typing_during_llm_aborts_send_until_contact_finishes(self):
+        channel = SimulatedWhatsApp(self.store.journal_path, self.clock)
+        header_typing = {"active": False}
+        channel.is_typing = lambda: header_typing["active"]
+
+        class SlowLLM(ScriptedLLM):
+            def complete(self, messages, session_id, quick=False, long=False):
+                # Contact starts typing their second message while the model is thinking!
+                header_typing["active"] = True
+                return super().complete(messages, session_id, quick=quick, long=long)
+
+        agent = SalesAgent(self.rules, self.store, channel, SlowLLM(), live=True,
+                           clock=self.clock, sleep=self._sleep, notify=self.notes.append,
+                           log=self.logs.append)
+        channel.push_incoming(self.lead["id"], ["Bom dia!"])
+        summary1 = agent.cycle([self._ev("Bom dia!", "e1")])
+        self.assertEqual(summary1["replies"][0]["state"], "typing")
+        self.assertEqual(channel.sent, [], "pre-send typing check must cancel send")
+        self.assertFalse(self.store.journal_path.exists(), "no journal key written when deferred")
+
+        # Contact finishes typing and sends refusal -> bot handles refusal cleanly, never sent greeting!
+        self.clock.now += timedelta(seconds=5)
+        header_typing["active"] = False
+        channel.push_incoming(self.lead["id"], ["No momento não temos interesse"])
+        summary2 = agent.cycle([self._ev("No momento não temos interesse", "e2")])
+        self.assertEqual(summary2["replies"][0]["intent"], "refusal")
+        self.assertEqual(self.store.lead(self.lead["id"])["state"], "do-not-contact")
+        self.assertEqual([item["text"] for item in channel.sent],
+                         ["Entendo, obrigado pela atenção! Tenha um ótimo dia."])
+
+    def test_contact_stops_typing_without_sending_second_message_still_gets_answered(self):
+        channel = SimulatedWhatsApp(self.store.journal_path, self.clock)
+        header_typing = {"active": True}
+        channel.is_typing = lambda: header_typing["active"]
+        agent = SalesAgent(self.rules, self.store, channel, ScriptedLLM(), live=True,
+                           clock=self.clock, sleep=self._sleep, notify=self.notes.append,
+                           log=self.logs.append)
+        channel.push_incoming(self.lead["id"], ["Quanto custa um site?"])
+        summary1 = agent.cycle([self._ev("Quanto custa um site?", "e1")])
+        self.assertEqual(summary1["replies"][0]["state"], "typing")
+        self.assertEqual(channel.sent, [])
+
+        # Contact clears draft without sending anything else -> answered on next cycle.
+        self.clock.now += timedelta(seconds=4)
+        header_typing["active"] = False
+        summary2 = agent.cycle([])
+        self.assertEqual(summary2["typing"], [])
+        self.assertEqual(summary2["replies"][0]["intent"], "price")
+        self.assertTrue(channel.sent)
+
+    def test_stuck_typing_indicator_respects_max_typing_wait_cap(self):
+        channel = SimulatedWhatsApp(self.store.journal_path, self.clock)
+        channel.is_typing = lambda: True
+        agent = SalesAgent(self.rules, self.store, channel, ScriptedLLM(), live=True,
+                           clock=self.clock, sleep=self._sleep, notify=self.notes.append,
+                           log=self.logs.append)
+        channel.push_incoming(self.lead["id"], ["Quanto custa um site?"])
+        summary1 = agent.cycle([self._ev("Quanto custa um site?", "e1"), self._typing_ev()])
+        self.assertEqual(summary1["replies"][0]["state"], "typing")
+        self.assertEqual(channel.sent, [])
+
+        # After max_typing_wait_seconds (60s), bot stops waiting so a stuck DOM never freezes chat.
+        self.clock.now += timedelta(seconds=61)
+        summary2 = agent.cycle([self._typing_ev()])
+        self.assertEqual(summary2["replies"][0]["intent"], "price")
+        self.assertTrue(channel.sent)
 
 
 if __name__ == "__main__":

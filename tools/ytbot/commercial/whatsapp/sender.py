@@ -243,6 +243,33 @@ def _open_by_phone(page, phone: str, pacing: Pacing, timeout: float = 60.0) -> N
 
 
 CHAT_TITLE = '#main [data-testid="conversation-info-header-chat-title"]'
+TYPING_STATUS = re.compile(r"^(digitando|typing)(?:\.{1,3}|…)?$", re.IGNORECASE)
+READ_HEADER_STATUS = """() => {
+  const header = document.querySelector('#main header');
+  if (!header) return [];
+  const titleEl = header.querySelector('[data-testid="conversation-info-header-chat-title"]');
+  const titleText = titleEl ? (titleEl.innerText || '').trim() : '';
+  const texts = [];
+  for (const node of header.querySelectorAll('span[title], span[dir="auto"], [data-testid*="subtitle"]')) {
+    if (titleEl && (node === titleEl || titleEl.contains(node))) continue;
+    const text = (node.getAttribute('title') || node.innerText || '').replace(/\\u00a0/g, ' ').trim();
+    if (text && text !== titleText) texts.push(text);
+  }
+  for (const line of (header.innerText || '').split('\\n')) {
+    const clean = line.replace(/\\u00a0/g, ' ').trim();
+    if (clean && clean !== titleText) texts.push(clean);
+  }
+  return texts;
+}"""
+
+
+def is_typing(page) -> bool:
+    """True only when the open chat header shows the contact is currently typing."""
+    try:
+        texts = page.evaluate(READ_HEADER_STATUS) or []
+    except Exception:
+        return False
+    return any(TYPING_STATUS.match(str(item or "").strip()) for item in texts)
 
 
 def chat_title(page) -> str:

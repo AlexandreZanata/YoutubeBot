@@ -26,6 +26,7 @@ class SalesPacing:
     between_max: float = 60.0
     between_openings_min: float = 120.0
     between_openings_max: float = 180.0
+    max_typing_wait: float = 60.0
 
     @classmethod
     def from_rules(cls, rules: SalesRules) -> "SalesPacing":
@@ -39,7 +40,8 @@ class SalesPacing:
                    float(raw.get("between_openings_min_seconds",
                                  raw["between_chats_min_seconds"])),
                    float(raw.get("between_openings_max_seconds",
-                                 raw["between_chats_max_seconds"])))
+                                 raw["between_chats_max_seconds"])),
+                   float(raw.get("max_typing_wait_seconds", 60.0)))
 
     def _jittered(self, value: float, rng) -> float:
         return value * rng.uniform(1 - self.jitter, 1 + self.jitter)

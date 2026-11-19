@@ -52,6 +52,7 @@ between_chats_min_seconds = 10.0
 between_chats_max_seconds = 30.0
 between_openings_min_seconds = 120.0
 between_openings_max_seconds = 180.0
+max_typing_wait_seconds = 60.0      # safety cap while waiting for a contact in "digitando..." state
 
 [llm]
 # Owner decision 2026-11-17 (evening): OpenCode Go free models first, in rotation, then the
