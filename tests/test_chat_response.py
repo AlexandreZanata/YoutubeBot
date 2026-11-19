@@ -5,6 +5,21 @@ from tools.ytbot import chat
 
 
 class ChatResponseContracts(TestCase):
+    def test_topic_lines_ignore_chatgpt_ui_text(self):
+        raw = (
+            "1. Why Inequality Was Never Inevitable\n"
+            "Is this conversation helpful so far?\n"
+            "2. The Fear Behind Perfectionism\n"
+            "Connection interrupted. Waiting for the complete answer\n"
+            "3. The Structure of Social Revolutions\n"
+            "Show more\n"
+        )
+        self.assertEqual(chat.topic_lines(raw), [
+            "Why Inequality Was Never Inevitable",
+            "The Fear Behind Perfectionism",
+            "The Structure of Social Revolutions",
+        ])
+
     def test_latest_response_preserves_metadata_and_does_not_read_clipboard(self):
         page = Mock()
         page.locator.return_value.inner_text.return_value = (

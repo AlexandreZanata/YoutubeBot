@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import time
+from datetime import datetime
 from pathlib import Path
 
 from . import config, logic
@@ -15,6 +16,11 @@ from .accounts_store import private_directory, read_private, write_private
 
 MODELS = ("gpt-6.1-terra", "gpt-6-luna")
 DEFAULT_MODEL = MODELS[0]
+USAGE_LIMIT = "codex-usage-limit.json"
+
+
+class CodexUsageLimit(RuntimeError):
+    """Codex has no credits left; media may use the ChatGPT browser path."""
 
 
 def executable() -> str | None:
@@ -23,8 +29,37 @@ def executable() -> str | None:
     return discovered or (str(packaged) if packaged.is_file() and os.access(packaged, os.X_OK) else None)
 
 
+def _usage_limit_path():
+    return config.ROOT / ".local/ytbot-media" / "codex" / USAGE_LIMIT
+
+
+def usage_limit_until(stderr: str, now: float | None = None) -> float:
+    """Turn Codex's 'try again at' message into a local timestamp."""
+    current = time.time() if now is None else now
+    match = re.search(
+        r"try again at ([A-Z][a-z]{2}) (\d{1,2})(?:st|nd|rd|th)?,? (\d{4}) (\d{1,2}):(\d{2}) (AM|PM)",
+        stderr)
+    if not match:
+        return current + 3600
+    month, day, year, hour, minute, meridiem = match.groups()
+    try:
+        moment = datetime.strptime(
+            f"{month} {day} {year} {hour}:{minute} {meridiem}", "%b %d %Y %I:%M %p")
+    except ValueError:
+        return current + 3600
+    return max(moment.timestamp(), current + 60)
+
+
+def usage_blocked() -> bool:
+    try:
+        value = read_private(_usage_limit_path(), {}) or {}
+    except ValueError:
+        return False
+    return float(value.get("until", 0)) > time.time()
+
+
 def available() -> bool:
-    return executable() is not None
+    return executable() is not None and not usage_blocked()
 
 
 def settings() -> dict:
@@ -91,6 +126,12 @@ def _execute(run_dir: Path, task: str, prompt: str, schema: dict, *, images: boo
         log = directory / "stderr.log"
         log.write_text(result.stderr[-32768:], encoding="utf-8")
         log.chmod(0o600)
+        if "hit your usage limit" in result.stderr.lower():
+            until = usage_limit_until(result.stderr)
+            write_private(_usage_limit_path(), {"until": until, "recorded_at": time.time()})
+            raise CodexUsageLimit(
+                "Codex is out of credits; media falls back to the ChatGPT browser until "
+                + time.strftime("%Y-%m-%d %H:%M", time.localtime(until)))
         if result.returncode or not output.is_file():
             raise RuntimeError("Codex did not complete the media task; inspect its private log and login")
         output.chmod(0o600)

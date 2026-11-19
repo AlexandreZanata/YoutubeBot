@@ -35,6 +35,13 @@ class MetadataTests(unittest.TestCase):
         self.assertIn("TAGS: one, two, three, four", parsed["description"])
         self.assertNotIn("—", parsed["description"])
 
+    def test_escaped_list_markers_from_the_chatgpt_browser_are_stripped(self):
+        escaped = META.replace("1. Why", "1\\. Why").replace("#psychology", "\\#psychology")
+        parsed = logic.parse_metadata(escaped)
+        self.assertTrue(parsed["title"].startswith("Why Your Mind Fears Silence"))
+        self.assertNotIn("\\", parsed["title"])
+        self.assertIn("#psychology", parsed["description"])
+
     def test_tags_limit(self):
         parsed = logic.parse_metadata(META)
         self.assertLessEqual(len(parsed["tags"]), 425)

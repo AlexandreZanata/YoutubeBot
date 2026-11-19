@@ -94,8 +94,9 @@ When Codex is installed, use `codex_media.py` for thumbnails, metadata and autom
 article generation and Read aloud only. The coordinator must be `gpt-6.1-terra` with low
 reasoning effort, or owner-selected `gpt-6-luna` with low effort. The native image tool
 renders the thumbnail. An empty or invalid Codex image path is retried once automatically; if it persists,
-stop. Never silently use a more expensive coordinator, API-key fallback,
-or ChatGPT image fallback after a Codex failure. Preserve media-attempt fences and existing
+stop. Never silently use a more expensive coordinator or API-key fallback.
+The only ChatGPT image fallback is the owner-authorized one after Codex reports its usage
+limit: log the reset time, record it privately and resume Codex when credits return. Preserve media-attempt fences and existing
 artifacts. See [Codex media setup](docs/CODEX-MEDIA.md).
 
 Only fallem prince alternates dense and classic thumbnail prompts. Whispers and Zaflas use

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-from . import account, channels, chat, codex_media, config, logic, render, runtime, youtube
+from . import account, assets, channels, chat, config, logic, render, runtime, youtube
 from .accounts_store import AccountStore
 
 CHANNELS = {
@@ -29,6 +29,11 @@ CHANNELS = {
             "Paul's Thorn: When the Answer Is No",
             "The Friends Who Dug Through the Roof",
             "Stephen at the Stones: When Forgiveness Costs Everything",
+            "The Centurion's Faith: When Authority Meets Trust",
+            "Zacchaeus in the Tree: When You Need to See and Be Seen",
+            "The Woman Who Touched His Hem: When Faith Acts Before Words",
+            "Thomas After the Resurrection: When Doubt Becomes a Door",
+            "The Ethiopian Eunuch: When a Stranger Opens the Book",
         ),
     },
     "zaflas": {
@@ -42,6 +47,11 @@ CHANNELS = {
             "O que a umidade do grão faz com o preço?",
             "Por que o bezerro desmama mais leve?",
             "Quando a pulverização perde eficiência?",
+            "Por que o pH do solo muda depois da calagem?",
+            "Como o milho responde ao nitrogênio em cobertura?",
+            "O que a compactação do solo faz com a raiz?",
+            "Quando o gado precisa de suplementação mineral?",
+            "Por que a colheitadeira perde grãos na barra de corte?",
         ),
     },
     "zanata": {
@@ -60,6 +70,11 @@ CHANNELS = {
             "Flow: Csikszentmihalyi on the State of Absorption",
             "Man's Search for Meaning: Frankl in the Camp",
             "The Social Animal: How Groups Shape the Self",
+            "The Crowd: Le Bon on How Groups Think",
+            "Thinking, Fast and Slow: Kahneman on the Two Minds",
+            "The Life of the Mind: Arendt on Thinking",
+            "The Wisdom of Insecurity: Watts on Letting Go",
+            "Escape from Freedom: Fromm on Why We Surrender",
         ),
     },
     "whispers-from-heaven": {
@@ -78,6 +93,11 @@ CHANNELS = {
             "A Lamp for the Darkest Room",
             "The Hands That Hold Tomorrow",
             "Rest for the Ones Who Carry Everyone",
+            "When the Answer Comes Later Than You Hoped",
+            "He Walks With You Through the Valley",
+            "A Prayer for the Ones You Cannot Reach",
+            "The Peace That Holds in the Waiting",
+            "When Your Faith Is Small but Real",
         ),
     },
 }
@@ -224,7 +244,7 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
                 except Exception:
                     pass
             try:
-                codex_media.generate_thumbnail(run_dir, "short-background")
+                assets.generate_thumbnail(gen, run_dir, "short-background")
                 render_short(run_dir)
                 meta = metadata(topic, text, spec)
                 (run_dir / "metadata.json").write_text(

@@ -21,6 +21,28 @@ class CommunityPostTests(unittest.TestCase):
     def test_portuguese_post_text_uses_the_channel_language(self):
         text = community.post_text("Por que obedecemos regras?", "pt-BR")
         self.assertIn("Conte nos comentários.", text)
+        self.assertIn("https://zaflas.com.br/", text)
+
+    def test_post_text_carries_the_related_video_link(self):
+        text = community.post_text("Why do we obey rules?", "en", "https://youtu.be/abc123")
+        self.assertIn("Watch the video: https://youtu.be/abc123", text)
+        self.assertNotIn("zaflas.com.br", text)
+
+    def test_related_video_uses_the_latest_scheduled_slot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runs = Path(directory)
+            for name, slot, video in (("a", "2026-11-20 12:00", "old"),
+                                      ("b", "2026-11-30 12:00", "new")):
+                run = runs / name
+                run.mkdir()
+                (run / "upload.json").write_text(json.dumps(
+                    {"scheduled": True, "slot": slot, "videoId": video}), encoding="utf-8")
+                (run / "metadata.json").write_text(json.dumps(
+                    {"title": name}), encoding="utf-8")
+            with mock.patch.object(community.config, "RUNS", runs):
+                item = community.related_video()
+            self.assertEqual(item["video"], "new")
+            self.assertEqual(item["url"], "https://youtu.be/new")
 
     def test_square_image_is_cropped_for_the_community_feed(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -31,6 +53,16 @@ class CommunityPostTests(unittest.TestCase):
             with Image.open(destination) as image:
                 self.assertEqual(image.size, (1080, 1080))
                 self.assertEqual(image.mode, "RGB")
+
+    def test_a_post_labelled_one_day_is_outside_the_rolling_window(self):
+        page = mock.Mock()
+        page.locator.return_value.count.return_value = 1
+        page.locator.return_value.first.locator.return_value.count.return_value = 1
+        page.locator.return_value.first.locator.return_value.first.inner_text.return_value = "há 1 dia"
+        with mock.patch.object(community, "latest_post_label", return_value="há 1 dia"):
+            self.assertFalse(community.posted_recently(page))
+        with mock.patch.object(community, "latest_post_label", return_value="há 23 horas"):
+            self.assertTrue(community.posted_recently(page))
 
     def test_relative_post_time_crosses_midnight(self):
         now = datetime(2026, 11, 15, 0, 30)
