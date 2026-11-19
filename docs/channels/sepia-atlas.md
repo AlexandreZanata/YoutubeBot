@@ -12,7 +12,8 @@ or a generic photograph compilation.
 
 ## Video format
 
-- 14 to 18 minutes, 2,200 to 2,700 English words, one video every two days at 21:00.
+- No fixed duration until the owner approves the first episode's final format;
+  one video every two days at 21:00.
 - Documentary arc: opening hook with a concrete image, historical context, exploration, turning
   point, consequences and a reflective ending. No generic introductions, no section headings,
   no invented facts, quotations, dates or sources.

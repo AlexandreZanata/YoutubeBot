@@ -19,7 +19,9 @@ Do not produce a generic slideshow script, copied narration, repetitive template
 Requirements:
 
 - Everything must be 100% in American English.
-- Length: 2,200 to 2,700 words, about 14 to 18 minutes at a calm documentary pace.
+- Length: no fixed target. The episode ends when the subject is fully covered;
+  never pad with repetition or cut research to fit a duration. The owner sets
+  the final format after reviewing the first episode.
 - One subject, one period, one clear narrative arc.
 - No headings, lists, labels, notes, citations, links or metadata inside the narration.
 - No introduction about your process and no closing commentary outside the narration.

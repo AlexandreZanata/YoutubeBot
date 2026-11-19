@@ -32,7 +32,8 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   Zaflas articles target 4,000 to 4,800 words (26,000 to 34,000 characters) with one bounded
   rewrite above the ceiling.
 - Sepia Atlas is English-only, American English, premium historical documentaries built on
-  authentic archival photography: 14 to 18 minutes (2,200 to 2,700 words), one video every two
+  authentic archival photography with no fixed duration until the owner approves the
+  first episode's final format, one video every two
   days at 21:00, Cinematic Archival Minimalism (Archival Black, Aged Gold, Antique Ivory) and a
   photographer's eye for the Atlas Frame emblem. Never fabricate a historical photograph or
   present a generated image as documentary evidence. The first episode stays private for owner
@@ -150,7 +151,7 @@ DOM map, state machine and troubleshooting are in
 
 The Zaflas Inova Simples sales agent is the only list use (owner decision 2026-11-17): it opens
 one-to-one conversations only with businesses from the owner's reviewed Google Maps CSV (never
-scraped), at most 10 first contacts per day in business hours, never repeats an opening and
+scraped), at most 30 first contacts per day in business hours, never repeats an opening and
 sends at most one follow-up. It answers funnel leads by
 `tools/ytbot/commercial/whatsapp/sales/sales_rules.toml`, through OpenCode Go: free models
 first (zero price in the live catalog, rotating, paused on timeout or no credits), then only
