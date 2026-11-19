@@ -122,9 +122,88 @@ class DocumentaryTests(unittest.TestCase):
         render_params = inspect.signature(documentary.render).parameters
         self.assertTrue(render_params["voice_filter"].default)
         self.assertTrue(render_params["analog_texture"].default)
-        channel = channels.CHANNELS["sepia-atlas"]
-        self.assertEqual(channel.min_article_chars, 13000)
-        self.assertEqual(channel.max_article_chars, 36000)
+        for slug in ("sepia-atlas", "bathylora"):
+            channel = channels.CHANNELS[slug]
+            self.assertEqual(channel.min_article_chars, 13000)
+            self.assertEqual(channel.max_article_chars, 36000)
+
+    def test_abyssal_thumbnails_and_ocean_credits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            photo = run / "ocean.jpg"
+            Image.new("RGB", (1920, 1080), (10, 45, 70)).save(photo)
+            for tmpl in ("encounter", "discovery", "unknown"):
+                dest = documentary.thumbnail(
+                    run, photo, "WHAT LIVES\nBELOW?", style="abyssal", template=tmpl,
+                    subtitle="DEEP OCEAN", output_name=f"thumb-{tmpl}.png",
+                )
+                with Image.open(dest) as img:
+                    self.assertEqual(img.size, (1280, 720))
+            credits = documentary.write_credits(run, [{
+                "id": "001", "narration_segment": "Dumbo octopus",
+                "title": "File:Dumbo-hires.jpg", "institution": "NOAA",
+                "expedition": "Okeanos Explorer", "species": "Grimpoteuthis",
+                "place": "Atlantic", "depth": "2,000 m", "license": "Public domain",
+                "commercial_status": "public domain / commercial use permitted",
+                "attribution": "NOAA OER", "resolution": "1920x1080",
+                "source_page": "https://commons.wikimedia.org/wiki/File:Dumbo-hires.jpg",
+            }])
+            text = credits.read_text(encoding="utf-8")
+            self.assertIn("Grimpoteuthis", text)
+            self.assertIn("Public domain", text)
+
+    def test_documentary_cli_init_and_audit_gates(self):
+        from unittest import mock
+        from tools.ytbot import cli, documentary_commands
+
+        parser = cli.build_parser()
+        args = parser.parse_args(["documentary", "init", "--channel", "bathylora", "--title", "Bigfin Squid"])
+        self.assertEqual(args.doc_command, "init")
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory) / "bigfin-squid"
+            with mock.patch.object(documentary_commands, "_run_dir", return_value=run):
+                documentary_commands.cmd_init(args)
+                self.assertTrue((run / "scenes.json").is_file())
+                self.assertTrue((run / "metadata.json").is_file())
+                meta = (run / "metadata.json").read_text(encoding="utf-8")
+                self.assertIn("not affiliated with NOAA", meta)
+
+                # Audit rejects markdown headings and unaligned scripts
+                (run / "sources.json").write_text(
+                    '[{"id":"001","file":"a.jpg","narration_segment":"Bigfin squid Magnapinna"}]',
+                    encoding="utf-8",
+                )
+                (run / "article.txt").write_text("# Heading\nBigfin squid Magnapinna.", encoding="utf-8")
+                bad = parser.parse_args(["documentary", "audit", "--channel", "bathylora", "--run", "bigfin-squid", "--allow-length"])
+                with self.assertRaises(SystemExit):
+                    documentary_commands.cmd_audit(bad)
+
+                # Clean aligned prose passes audit and writes article.md
+                (run / "article.txt").write_text("The bigfin squid Magnapinna glides through deep dark water.", encoding="utf-8")
+                documentary_commands.cmd_audit(bad)
+                self.assertTrue((run / "article.md").is_file())
+
+    def test_generated_flag_flows_from_sources_to_timeline_rows(self):
+        sources = [
+            {'file': 'a.jpg', 'title': 'Real photo', 'narration_segment': 'a street',
+             'place': 'New York'},
+            {'file': 'b.jpg', 'title': 'Illustration', 'narration_segment': 'a vessel',
+             'place': 'Ocean', 'generated': True},
+        ]
+        rows = documentary.timeline_aligned('a street then a vessel', 20.0, sources)
+        self.assertFalse(rows[0]['generated'])
+        self.assertTrue(rows[1]['generated'])
+        summary = documentary.summarize_sources(sources)
+        self.assertEqual(summary["real"], 1)
+        self.assertEqual(summary["generated"], 1)
+        self.assertEqual(summary["generated_ids"], ["?"])
+
+    def test_illustration_label_is_channel_voiced_and_empty_when_absent(self):
+        self.assertIn('historical photograph', documentary.illustration_label_for('sepia-atlas'))
+        self.assertIn('real observation', documentary.illustration_label_for('bathylora'))
+        self.assertTrue(documentary.illustration_label_for('unknown-slug'))
+        self.assertEqual(documentary._illustration_filter(''), '')
+        self.assertIn('drawtext', documentary._illustration_filter('AI illustration - test'))
 
     def test_thumbnail_is_a_1280x720_episode_specific_title(self):
         with tempfile.TemporaryDirectory() as directory:

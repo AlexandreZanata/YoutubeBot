@@ -356,7 +356,8 @@ def timeline(article: str, duration: float, sources: list[dict]) -> list[dict]:
         end = duration * end_word / total
         rows.append({"photo": source["file"], "source": source.get("title", ""),
                      "start": round(start, 2), "end": round(end, 2),
-                     "caption": source.get("narration_segment", "")})
+                     "caption": source.get("narration_segment", ""),
+                     "generated": bool(source.get("generated", False))})
     return rows
 
 
@@ -507,8 +508,60 @@ def timeline_aligned(article: str, duration: float, sources: list[dict],
         end = duration * bounds[index + 1] / total
         rows.append({"photo": source["file"], "source": source.get("title", ""),
                      "start": round(start, 2), "end": round(end, 2),
-                     "caption": source.get("narration_segment", "")})
+                     "caption": source.get("narration_segment", ""),
+                     "generated": bool(source.get("generated", False))})
     return rows
+
+
+def summarize_sources(sources: list[dict]) -> dict:
+    """Split verified records from generated illustrations for human review."""
+    generated = [s.get("id", "?") for s in sources if s.get("generated")]
+    return {"real": len(sources) - len(generated),
+            "generated": len(generated),
+            "generated_ids": generated}
+
+
+def generate_scene_illustration(context, run_dir: Path, scene_id: str,
+                                topic: str, style_brief: str,
+                                timeout: int = 600) -> Path:
+    """Generate one honest illustration for a scene with no real photo.
+
+    Uses the ChatGPT browser image path on the legacy profile (never the
+    channel profile). The caller records the result in sources.json with
+    ``generated: True`` so the renderer burns the on-screen honesty label.
+    """
+    import base64
+    import time
+
+    from . import assets, chat
+
+    destination = run_dir / "photos" / f"{scene_id}.jpg"
+    prompt = ("Create ONE 16:9 atmospheric illustration for a documentary scene. "
+              "It must read as illustration, never as a photograph or record. "
+              "No text, letters, numbers, logos, watermarks, borders or UI. "
+              + style_brief
+              + "\n\nScene subject: " + topic
+              + "\n\nGenerate the final image now and reply only after it exists.")
+    page = context.new_page()
+    try:
+        page.goto("https://chatgpt.com/", timeout=90000)
+        page.wait_for_timeout(7000)
+        chat.dismiss_notice(page)
+        chat.send_text(page, prompt)
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            page.wait_for_timeout(5000)
+            data = assets.image_data_url(page)
+            if data and data.startswith("data:image/"):
+                destination.write_bytes(base64.b64decode(data.split(",", 1)[1]))
+                destination.chmod(0o600)
+                return destination
+            body = page.locator("body").inner_text()
+            if "Image generation failed" in body:
+                raise RuntimeError("ChatGPT image generation failed for the scene illustration")
+        raise RuntimeError("scene illustration was not generated")
+    finally:
+        page.close()
 
 
 def exact_duration(path: Path) -> float:
@@ -588,8 +641,32 @@ def _video_encoder_args() -> list[str]:
     return list(_ENCODER_ARGS)
 
 
+ILLUSTRATION_LABELS = {
+    "sepia-atlas": "AI illustration - not a historical photograph",
+    "bathylora": "AI illustration - not a real observation",
+}
+DEFAULT_ILLUSTRATION_LABEL = "AI illustration - not a real record"
+
+
+def illustration_label_for(channel_slug: str) -> str:
+    """On-screen label burned over generated illustrations, per channel voice."""
+    return ILLUSTRATION_LABELS.get(channel_slug or "", DEFAULT_ILLUSTRATION_LABEL)
+
+
+def _illustration_filter(label: str) -> str:
+    """Top-left honesty label for generated scenes; empty when not needed."""
+    if not label:
+        return ""
+    safe = label.replace("'", "").replace(":", " -")[:80]
+    font = config.ROOT / "assets" / "fonts" / "Inter.ttf"
+    return (
+        "drawtext=fontfile='" + str(font) + "':text='" + safe + "'"
+        ":fontsize=26:fontcolor=white:borderw=2:bordercolor=black@0.8"
+        ":x=36:y=36:box=1:boxcolor=black@0.55:boxborderw=12"
+    )
 def _clip(photo: Path, output: Path, seconds: float, index: int,
-          fade_in: float = 0.0, fade_out: float = 0.0) -> None:
+          fade_in: float = 0.0, fade_out: float = 0.0,
+          illustration_label: str = "") -> None:
     # Supersampled Ken Burns: render at 2560x1440 and downscale to 1920x1080.
     # The larger canvas absorbs zoompan integer rounding (eliminating tremor)
     # while running ~2x faster than 3840x2160. Reduce zoom on lower-resolution
@@ -616,6 +693,9 @@ def _clip(photo: Path, output: Path, seconds: float, index: int,
         filters.append(f"fade=t=in:st=0:d={fade_in:.2f}")
     if fade_out > 0:
         filters.append(f"fade=t=out:st={max(seconds - fade_out, 0):.2f}:d={fade_out:.2f}")
+    label_filter = _illustration_filter(illustration_label)
+    if label_filter:
+        filters.append(label_filter)
     command = ["ffmpeg", "-y", "-v", "error", "-loop", "1", "-i", str(photo),
                "-t", f"{seconds:.3f}", "-vf", ",".join(filters),
                "-r", str(FPS), *_video_encoder_args(), str(output)]
@@ -741,7 +821,7 @@ def mux_audio(silent: Path, narration: Path, output: Path, total_dur: float, *,
 def render(run_dir: Path, rows: list[dict], narration: Path | None = None,
            output_name: str = "video.mp4", crossfade: float = 1.2,
            analog_texture: bool = True, voice_filter: bool = True,
-           workers: int | None = None) -> Path:
+           workers: int | None = None, illustration_label: str = "") -> Path:
     import concurrent.futures
     import os
 
@@ -766,8 +846,9 @@ def render(run_dir: Path, rows: list[dict], narration: Path | None = None,
     def _build(index: int) -> None:
         fade_in = 1.2 if index == 0 else 0.0
         fade_out = 1.5 if index == n - 1 else 0.0
+        label = illustration_label if rows[index].get("generated") else ""
         _clip(Path(rows[index]["photo"]), clip_paths[index], durations[index], index,
-              fade_in=fade_in, fade_out=fade_out)
+              fade_in=fade_in, fade_out=fade_out, illustration_label=label)
 
     log(f"rendering {n} clips with {max_workers} workers ({_video_encoder_args()[1]})")
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
