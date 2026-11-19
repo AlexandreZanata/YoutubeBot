@@ -70,7 +70,8 @@ thumbnail.
 
 ## Status
 
-Profile, prompts, channel entry and visual identity are in the bot. The channel branding in
-Studio, the archival-photo research pipeline and the Ken Burns renderer are staged separately;
-the current renderer produces a still background under the narration, so the full photo-montage
-format needs the documentary render step before the first episode is final.
+Profile, prompts, channel entry, visual identity and branding are in the bot and in Studio.
+`tools/ytbot/documentary.py` collects public-domain photographs from Wikimedia Commons with
+their license records, builds a word-proportional scene timeline and renders the Ken Burns
+montage with the narration. The first episode package is prepared under the channel runs folder
+for owner review; nothing is published automatically.
