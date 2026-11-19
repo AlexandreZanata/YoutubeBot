@@ -52,7 +52,9 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   Bioluminescent Cyan `#55D9D0`, Ocean Mist `#B5D2D7`, Arctic White `#EDF7F5`, Submersed Teal
   `#164958`) and **The Depth Mark** emblem. Never reuse Sepia Atlas aesthetics, never fabricate
   species or discoveries, never present AI imagery as scientific evidence, and keep the first
-  episode private for owner review. See [its channel profile](docs/channels/bathylora.md).
+  episode private for owner review. See [its channel profile](docs/channels/bathylora.md) and
+  [its exact step-by-step production pipeline](docs/channels/bathylora-pipeline.md)
+  (`python3 -m tools.ytbot documentary init|collect|audit|narrate|render|qc`).
 - Midnight Tales is English-only long-form sleep stories for adults, 6,500 to 9,000 words
   (45 to 65 minutes), one video every two days at 21:00 and one Short every two days at 09:00.
   Thumbnails are painterly cinematic scenes with no text, and the thumbnail is the still video
@@ -70,6 +72,8 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   (32 to 43 minutes) with a unique world each. See
   [its channel profile](docs/channels/infinite-random-worlds.md).
 - Require an explicit channel. Verify its YouTube channel ID before mutating Studio.
+  When the owner names a channel by theme ("fundo do mar", "canal de documentário"), resolve it
+  through [channel nicknames](docs/CHANNEL-ALIAS.md) and never guess between two channels.
 - Schedule only: up to 4 videos/day for fallem prince at 00:00, 06:00, 12:00 and
   18:00 in America/Cuiaba, at least 60 minutes ahead, not made for kids, custom
   thumbnail and Subscribe + Best for viewer end screen.
