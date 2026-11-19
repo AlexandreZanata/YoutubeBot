@@ -305,44 +305,66 @@ def related_video() -> dict:
             "url": f"https://youtu.be/{video}"}
 
 
+POLICY_MARKERS = ("violate our content policies", "content policies",
+                  "políticas de conteúdo", "políticas de conteudo")
+
+
+def _safe_art_prompt(style: str, topic: str) -> str:
+    style = style.replace("biblical scene", "atmospheric landscape")
+    return ("Create one square 1:1 image for a YouTube community post. No text, no letters, "
+            "no numbers, no logos, no watermarks, no borders. A safe symbolic editorial scene "
+            "with no people: light through clouds, a calm horizon, open books or simple objects. "
+            "Style: " + style + ". Theme: " + topic[:120]
+            + ". Generate the final image now and reply only after it exists.")
+
+
 def _browser_art(topic: str, context) -> Path | None:
     from datetime import date
     from PIL import Image, ImageOps
 
     slug = config.CHANNEL.slug if config.CHANNEL else "channel"
     style = ART_STYLES.get(slug, "cinematic")
-    prompt = ("Create one square 1:1 image for a YouTube community post. No text, no letters, "
-              "no numbers, no logos, no watermarks, no borders. Style: " + style
-              + ". Illustrate this question: " + topic[:160]
-              + ". Generate the final image now and reply only after it exists.")
-    page = context.new_page()
-    try:
-        page.goto("https://chatgpt.com/", timeout=90000)
-        page.wait_for_timeout(7000)
-        chat.dismiss_notice(page)
-        chat.send_text(page, prompt)
-        deadline = time.time() + 900
-        while time.time() < deadline:
-            page.wait_for_timeout(5000)
-            data = assets.image_data_url(page)
-            if data and data.startswith("data:image/"):
-                destination = config.DATA / "community" / f"{slug}-{date.today():%Y%m%d}.png"
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                source = destination.with_suffix(".source.png")
-                source.write_bytes(base64.b64decode(data.split(",", 1)[1]))
-                with Image.open(source) as image:
-                    ImageOps.fit(image.convert("RGB"), (1080, 1080),
-                                 Image.Resampling.LANCZOS).save(
-                        destination, format="PNG", optimize=True)
-                source.unlink(missing_ok=True)
-                destination.chmod(0o600)
-                return destination
-            body = page.locator("body").inner_text()
-            if "Image generation failed" in body:
-                raise RuntimeError("ChatGPT image generation failed for the community post")
-        raise RuntimeError("community art was not generated")
-    finally:
-        page.close()
+    prompts = [
+        ("Create one square 1:1 image for a YouTube community post. No text, no letters, "
+         "no numbers, no logos, no watermarks, no borders. Style: " + style
+         + ". Illustrate this question: " + topic[:160]
+         + ". Generate the final image now and reply only after it exists."),
+        _safe_art_prompt(style, topic),
+    ]
+    for prompt in prompts:
+        page = context.new_page()
+        try:
+            page.goto("https://chatgpt.com/", timeout=90000)
+            page.wait_for_timeout(7000)
+            chat.dismiss_notice(page)
+            chat.send_text(page, prompt)
+            deadline = time.time() + 600
+            while time.time() < deadline:
+                page.wait_for_timeout(5000)
+                data = assets.image_data_url(page)
+                if data and data.startswith("data:image/"):
+                    destination = config.DATA / "community" / f"{slug}-{date.today():%Y%m%d}.png"
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    source = destination.with_suffix(".source.png")
+                    source.write_bytes(base64.b64decode(data.split(",", 1)[1]))
+                    with Image.open(source) as image:
+                        ImageOps.fit(image.convert("RGB"), (1080, 1080),
+                                     Image.Resampling.LANCZOS).save(
+                            destination, format="PNG", optimize=True)
+                    source.unlink(missing_ok=True)
+                    destination.chmod(0o600)
+                    return destination
+                body = page.locator("body").inner_text().lower()
+                if any(marker in body for marker in POLICY_MARKERS):
+                    log("image prompt rejected by content policy; trying a safe symbolic scene")
+                    break
+                if "image generation failed" in body:
+                    raise RuntimeError("ChatGPT image generation failed for the community post")
+            else:
+                raise RuntimeError("community art was not generated")
+        finally:
+            page.close()
+    raise RuntimeError("community art was rejected twice")
 
 
 def _generate_art(topic: str, context=None) -> Path | None:

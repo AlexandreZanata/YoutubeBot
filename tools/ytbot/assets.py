@@ -120,6 +120,10 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
                 log("thumbnail saved")
                 return destination
             body = page.locator("body").inner_text()
+            if "violate our content policies" in body.lower():
+                (run_dir / "thumbnail-response.txt").write_text(body, encoding="utf-8")
+                raise RuntimeError("ChatGPT rejected the thumbnail prompt by content policy; "
+                                   "completed assets were preserved")
             if "Image generation failed" in body:
                 (run_dir / "thumbnail-response.txt").write_text(body, encoding="utf-8")
                 raise RuntimeError("ChatGPT image generation failed; completed assets were preserved. Supply a channel-style thumbnail before resuming this run.")
