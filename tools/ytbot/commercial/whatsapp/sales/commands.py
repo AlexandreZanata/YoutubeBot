@@ -383,7 +383,10 @@ def run_cycles(agent, session, args, listen=None, out=None, stopped=None) -> Non
 
     def recover(error: BaseException) -> None:
         nonlocal failures
-        if not is_closed(error) or failures >= MAX_RECONNECTS:
+        # A closed page (suspend, Chrome restart) and a listener timeout on a wedged
+        # page (#pane-side never visible again) are both transient: reopen and go on.
+        recoverable = is_closed(error) or type(error).__name__ == "TimeoutError"
+        if not recoverable or failures >= MAX_RECONNECTS:
             raise error
         failures += 1
         session.reopen(agent, error)

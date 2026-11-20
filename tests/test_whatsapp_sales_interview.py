@@ -35,6 +35,7 @@ SUMMARY_PIX = SUMMARY + " O cliente também paga pelo Pix na hora de marcar."
 
 class InterviewTests(unittest.TestCase):
     rules = load()
+    rules.limits["auto_conversation"] = True  # automated mode under test
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()

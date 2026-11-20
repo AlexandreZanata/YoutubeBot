@@ -234,6 +234,10 @@ class SalesAgent:
         if fresh and (fresh.get("typing") or fresh.get("typing_since")):
             self.store.update_lead(lead_id, typing=False, typing_since=None)
 
+    def _auto_conversation(self) -> bool:
+        """Owner 2026-11-20: false = openings only; the owner takes every conversation."""
+        return bool(self.rules.limits.get("auto_conversation", True))
+
     def _in_scope(self, lead_id: str) -> bool:
         """When scoped (`--only-leads` / `--only-csv`), ignore leads outside the target batch."""
         return self.allowed_leads is None or lead_id in self.allowed_leads
@@ -409,13 +413,15 @@ class SalesAgent:
             typing_now.discard(lead["id"])
             changes = {"last_in_at": now, "chat": event.get("chat") or lead.get("chat"),
                        "typing": False, "typing_since": None}
-            if not reply_is_active(lead) and lead["state"] not in ("do-not-contact",
-                                                                       "invalid-number"):
+            if (not reply_is_active(lead) or not self._auto_conversation()) \
+                    and lead["state"] not in ("do-not-contact", "invalid-number"):
                 changes["state"] = "needs-owner"
                 self.store.update_lead(lead["id"], **changes)
                 if self._remind(lead):
-                    self._handoff(lead, "Mensagem de um contato com respostas automáticas "
-                                  "pausadas", event["text"], "needed")
+                    reason = ("Respondeu à nossa mensagem: no modo só-abertura a conversa "
+                              "é sua" if not self._auto_conversation() else
+                              "Mensagem de um contato com respostas automáticas pausadas")
+                    self._handoff(lead, reason, event["text"], "needed")
                 touched.append(lead["id"])
                 continue
             if lead["state"] in REOPENS:
@@ -472,6 +478,8 @@ class SalesAgent:
         return (self.now() - last).total_seconds() < window
 
     def reply_pending(self) -> list[dict]:
+        if not self._auto_conversation():
+            return []  # openings-only mode: the owner takes every conversation
         if not self.rules.in_window(self.now(), "reply"):
             waiting = len(self.pending())
             if waiting:
@@ -1214,6 +1222,8 @@ class SalesAgent:
         return {**result, "state": "opened"}
 
     def followups(self) -> list[dict]:
+        if not self._auto_conversation():
+            return []  # openings-only mode: no follow-ups, only the first message
         now = self.now()
         limits = self.rules.limits
         results = []

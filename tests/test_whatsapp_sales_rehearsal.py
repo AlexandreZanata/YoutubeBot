@@ -7,6 +7,7 @@ from tools.ytbot.commercial.whatsapp.sales.rules import load
 
 class RehearsalTests(unittest.TestCase):
     rules = load()
+    rules.limits["auto_conversation"] = True  # automated mode under test
 
     def test_versioned_scenarios_load(self):
         scenarios = rehearsal.load_scenarios()

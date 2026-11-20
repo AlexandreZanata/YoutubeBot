@@ -206,7 +206,11 @@ DOM map, state machine and troubleshooting are in
 The Zaflas Inova Simples sales agent is the only list use (owner decision 2026-11-17): it opens
 one-to-one conversations only with businesses from the owner's reviewed Google Maps CSV (never
 scraped), at most 50 first contacts per day in business hours, never repeats an opening and
-sends at most one follow-up. It answers funnel leads by
+sends at most one follow-up. Since 2026-11-20 the agent runs openings-only
+(`limits.auto_conversation = false`): a 24h WhatsApp restriction for incongruous automated
+conversations ended the automated replies. The bot sends the full opening combo (greeting,
+presentation, four example links) 5 minutes apart; every reply goes straight to the owner
+(`needs-owner` + notification) and no follow-up is sent. It answers funnel leads by
 `tools/ytbot/commercial/whatsapp/sales/sales_rules.toml`, through OpenCode Go: free models
 first (zero price in the live catalog, rotating, paused on timeout or no credits), then only
 `deepseek-v4.1-flash` and `muse-spark-1.3-contributor` as paid fallback; a price, deadline, link

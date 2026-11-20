@@ -16,7 +16,9 @@ language = "pt-BR"
 timezone = "America/Cuiaba"
 
 [limits]
-daily_openings = 50                 # owner decision 2026-11-19 (was 30 earlier today, 10 on 2026-11-17)
+daily_openings = 50
+auto_conversation = false            # owner 2026-11-20: openings only; the owner takes every
+                                     # conversation. false = no bot replies, no follow-ups                 # owner decision 2026-11-19 (was 30 earlier today, 10 on 2026-11-17)
 max_replies_per_lead_per_day = 12   # stops loops with other bots; the owner takes over
 max_bot_replies_before_owner = 8    # a long chat that has not reached a quote goes to the owner
 owner_reminder_minutes = 30         # new messages in a chat that is with the owner: one reminder
@@ -50,8 +52,11 @@ jitter = 0.15
 link_preview_seconds = 3.0          # minimum wait after typing a link, for the preview card
 between_chats_min_seconds = 10.0
 between_chats_max_seconds = 30.0
-between_openings_min_seconds = 120.0
-between_openings_max_seconds = 180.0
+# Owner decision 2026-11-20: after a 24h WhatsApp restriction caused by incongruous
+# automated conversations, the bot sends the opening only, 5 minutes apart, and never
+# answers: every reply goes straight to the owner (needs-owner + notification).
+between_openings_min_seconds = 300.0
+between_openings_max_seconds = 330.0
 max_typing_wait_seconds = 60.0      # safety cap while waiting for a contact in "digitando..." state
 reply_debounce_seconds = 30.0       # owner 2026-11-19: wait this long after the last incoming
                                     # bubble before answering, so a person splitting a thought
