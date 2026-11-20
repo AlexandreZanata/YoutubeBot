@@ -259,16 +259,18 @@ def upload_and_schedule_short(context, run_dir: Path, meta: dict, slot) -> dict:
     return result
 
 
-def schedule_existing(context, run_dir: Path, result: dict, slot) -> dict:
+def schedule_existing(context, run_dir, result: dict, slot) -> dict:
     title = ""
     try:
-        title = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8")).get("title", "")
+        if run_dir is not None:
+            title = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8")).get("title", "")
     except (OSError, ValueError):
         pass
     if upload_dialog.scheduled_at(context, result["videoId"], slot):
         result["scheduled"] = True
         result["slot"] = logic.slot_label(slot)
-        write_result(run_dir, result)
+        if run_dir is not None:
+            write_result(run_dir, result)
         log(f"scheduled {result['videoId']} at {result['slot']}")
         return result
     for attempt in range(2):
@@ -282,7 +284,8 @@ def schedule_existing(context, run_dir: Path, result: dict, slot) -> dict:
         if upload_dialog.scheduled_at(context, result["videoId"], slot):
             result["scheduled"] = True
             result["slot"] = logic.slot_label(slot)
-            write_result(run_dir, result)
+            if run_dir is not None:
+                write_result(run_dir, result)
             log(f"scheduled {result['videoId']} at {result['slot']}")
             return result
         log(f"schedule not confirmed, retry {attempt + 1}")
@@ -310,7 +313,15 @@ def upload_and_schedule_with_context(context, run_dir: Path, meta: dict, slot, *
             write_result(run_dir, result)
             result = schedule_existing(context, run_dir, result, slot)
             page = open_edit(context, video_id)
-            video_details.apply_details(page, run_dir, meta, custom_thumbnail=custom_thumbnail)
+            try:
+                video_details.apply_details(page, run_dir, meta, custom_thumbnail=custom_thumbnail)
+                result["detailsApplied"] = True
+            except Exception as error:
+                # The video is already scheduled; a failed detail re-save must not
+                # mark the whole upload as failed. Record it for the repair pass.
+                log(f"details deferred for repair: {error}")
+                result["detailsApplied"] = False
+            write_result(run_dir, result)
             return result
         if end_screen:
             wait_for_checks(page)
