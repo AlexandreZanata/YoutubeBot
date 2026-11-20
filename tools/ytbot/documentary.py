@@ -120,7 +120,9 @@ def collect(run_dir: Path, queries: list[dict],
                       if not any(word in row["title"].lower()
                                  for word in ("postcard", "map", "drawing", "drawn", "sketch",
                                               "illustration", "print", "plan", "engraving",
-                                              "lithograph", "woodcut", "painting", "etching"))]
+                                              "lithograph", "woodcut", "painting", "etching",
+                                              "currier", "ives", "aquatint", "mezzotint",
+                                              "caricature", "cartoon", "poster", "advertisement"))]
         chosen = next((row for row in photograph if row["title"] not in used), None)
         if chosen is None:
             log(f"no photo for {scene.get('subject', queries_list)}")
