@@ -28,7 +28,8 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   Portuguese, 4,000 to 4,800 words (25 to 35 minutes), photorealistic agribusiness
   thumbnails, the fixed site/social description prefix and
   [its channel profile](docs/channels/zaflas.md). Zaflas publishes one video per day at
-  12:00 America/Cuiaba. Its dedicated profile is upload-only; generation stays in legacy.
+  11:00 America/Cuiaba (12:00 in Sao Paulo/Brasilia, the Brazilian lunch peak). Its dedicated
+  profile is upload-only; generation stays in legacy.
   Zaflas articles target 4,000 to 4,800 words (26,000 to 34,000 characters) with one bounded
   rewrite above the ceiling.
 - Sepia Atlas is English-only, American English, premium historical documentaries built on
@@ -59,11 +60,11 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   (45 to 65 minutes), one video every two days at 21:00 and one Short every two days at 09:00.
   Thumbnails are painterly cinematic scenes with no text, and the thumbnail is the still video
   background. See [its channel profile](docs/channels/midnight-tales.md).
-- the word of reflection is English-only biblical stories at 05:00 and 17:00 daily, 14 to 16
+- the word of reflection is English-only biblical stories at 08:00 and 21:00 daily, 14 to 16
   minutes, full-bleed cinematic thumbnails with a two or three word white title. It shares the
   Google account with Vocal Pages. See
   [its channel profile](docs/channels/the-word-of-reflection.md).
-- zanata is English-only book summaries at 16:00 daily, 50 to 55 minutes, with the yellow
+- zanata is English-only book summaries at 10:00 daily, 50 to 55 minutes, with the yellow
   BOOK SUMMARY thumbnail formula in [its channel profile](docs/channels/zanata.md). It shares
   the Google account with Fallem Prince: switch the brand channel in Studio, never sign out.
 - Infinite Random Worlds is English-only and has no background video: the episode thumbnail
@@ -74,12 +75,18 @@ English in code, comments, documentation and commits; user-facing UI may use Por
 - Require an explicit channel. Verify its YouTube channel ID before mutating Studio.
   When the owner names a channel by theme ("fundo do mar", "canal de documentário"), resolve it
   through [channel nicknames](docs/CHANNEL-ALIAS.md) and never guess between two channels.
-- Schedule only: up to 2 videos/day for fallem prince at 00:00 and 12:00 in
-  America/Cuiaba, at least 60 minutes ahead, not made for kids, custom
+- Schedule only: up to 2 videos/day for fallem prince at 10:00 and 21:00 in
+  America/Cuiaba (09:00/20:00 US Eastern), at least 60 minutes ahead, not made for kids, custom
   thumbnail and Subscribe + Best for viewer end screen.
 - The owner reduced fallem prince to 2/day on 2026-11-20. Days with four scheduled videos
-  are rebalanced: the 06:00 and 18:00 extras move to future days at 00:00/12:00 until
+  are rebalanced: the extras move to future days at 10:00/21:00 until
   every day holds at most two. Use `--start-date YYYY-MM-DD` for a specific first day.
+- Posting hours are America/Cuiaba slots chosen per channel audience: US Eastern for every
+  English channel, Brasilia for Zaflas. The rationale and the Cuiabá-to-audience equivalence
+  live in each [channel profile](docs/channels/) under "Schedule profile". Two slots per day
+  are always at least six hours apart, and the frequency never changes when hours are tuned.
+  `python3 -m tools.ytbot reschedule --channel <slug>` moves already-scheduled future videos
+  to the current slots without touching generation.
 - Preserve channel-specific title/description/tags rules and media quality.
 - Never blindly retry an uncertain upload or start the same service operation twice.
 
