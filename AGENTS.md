@@ -74,12 +74,12 @@ English in code, comments, documentation and commits; user-facing UI may use Por
 - Require an explicit channel. Verify its YouTube channel ID before mutating Studio.
   When the owner names a channel by theme ("fundo do mar", "canal de documentário"), resolve it
   through [channel nicknames](docs/CHANNEL-ALIAS.md) and never guess between two channels.
-- Schedule only: up to 4 videos/day for fallem prince at 00:00, 06:00, 12:00 and
-  18:00 in America/Cuiaba, at least 60 minutes ahead, not made for kids, custom
+- Schedule only: up to 2 videos/day for fallem prince at 00:00 and 12:00 in
+  America/Cuiaba, at least 60 minutes ahead, not made for kids, custom
   thumbnail and Subscribe + Best for viewer end screen.
-- The 4/day expansion starts on 2026-11-15. Days that already have 00:00/12:00 keep
-  them; the new videos fill the exact middle slots 06:00/18:00 (2/day), completing
-  4/day. Use `--start-date YYYY-MM-DD` when a batch must start on a specific day.
+- The owner reduced fallem prince to 2/day on 2026-11-20. Days with four scheduled videos
+  are rebalanced: the 06:00 and 18:00 extras move to future days at 00:00/12:00 until
+  every day holds at most two. Use `--start-date YYYY-MM-DD` for a specific first day.
 - Preserve channel-specific title/description/tags rules and media quality.
 - Never blindly retry an uncertain upload or start the same service operation twice.
 
@@ -104,6 +104,21 @@ The service CLI is typed and bounded. Never expose a general shell, arbitrary su
 arguments or account secrets to ZaturoBot. Real generation/upload/Google consent tests
 are opt-in; CI uses fixtures. Read [accounts](docs/ACCOUNTS.md), [service](docs/SERVICE.md)
 and [migration](docs/MIGRATION.md) for those operations.
+
+## Autonomous operation (owner decision 2026-11-20)
+
+When the owner leaves a batch running unattended, monitor it and act on errors instead of
+waiting for instructions:
+
+- A single failed video or Short (expired session, Studio timeout, schedule not confirmed) is
+  logged to `.local/ytbot/incidents.log` and the queue continues with the next item. Never
+  regenerate or re-upload a video that already has a `videoId`; retry only its details/schedule.
+- An expired account is handled by the session contract: record, open the visible window once,
+  and continue with every other channel that does not depend on it.
+- Never stop the whole run for one channel. Stop only when no remaining item can proceed at all,
+  and then report why.
+- At the end, report every incident, what was recovered and what still needs the owner. Files
+  already uploaded stay as drafts; nothing is published twice.
 
 ## Verify and hand off
 
