@@ -35,7 +35,8 @@ class DocumentaryChannelTests(unittest.TestCase):
             self.assertNotIn(slug, audited)
 
     def test_batch_refuses_documentary_channels(self):
-        from unittest.mock import SimpleNamespace, patch
+        from types import SimpleNamespace
+        from unittest.mock import patch
 
         from tools.ytbot import batch, config
 
