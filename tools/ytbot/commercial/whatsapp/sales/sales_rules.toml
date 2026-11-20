@@ -335,10 +335,17 @@ reason = "Recusou: pedido de indicação enviado"
 when = "Recusa: 'nesse momento não estou precisando', 'não, obrigado', 'agora não', 'não tenho interesse', 'não preciso', ou 'não' em resposta à oferta de orçamento. 'Agora não posso, me chama amanhã' NÃO é recusa (é callback_later)."
 patterns = [
   'nao,? obrigad', 'nao (estou|to|estamos|tamo|tamos) precisando', 'nao (preciso|precisamos)( de site| disso| nao)?[,.! ]*(obrigad[oa])?[.!]*$',
-  'nao (tenho|temos) interesse', 'sem interesse', 'nao (quero|queremos)( nao)?[,.! ]*(obrigad[oa])?[.!]*$',
+  'nao (tenho|temos) interesse', 'sem interesse', 'nao (quero|queremos|preciso|precisamos)( de)?( (um |uma )?(site|sistema|aplicativo|app|isso|nada))?[,.! ]*( nao)?[,.! ]*(obrigad[oa])?[.! ]*$',
   '^agora nao[,.! ]*(obrigad[oa]|valeu)?[.!]*$', 'agora nao,? (obrigad|valeu|preciso|quero)',
   'n(esse|este|o) momento nao (estou |to |estamos )?(precis|quero|tenho interesse|temos interesse)',
   'nao me interessa', '\bdispens[aei]\w*\b(?!\s+(um\s+|uma\s+|a\s+|o\s+)?(funcionari|colaborador|advogad|gerent|empregad|pessoa|motorista|secretari))|\bdispenc[oa]\w*\b', 'obrigad[oa]( (pelo|pela) (contato|atencao|retorno|mensagem|link|exemplo))?,? mas nao', 'no momento nao[,.! ]*(obrigad[oa])?[.! ]*$', 'deixa(r|ndo|rei)? pra la\b', 'sem (dinheiro|grana|verba) agora[,.! ]*(obrigad[oa])?', 'nao,? valeu', 'nao e (do nosso|o nosso) interesse',
+  '^(negativo|nop)\b', '(prefiro|melhor|pra mim) nao\b', 'acredito que nao\b',
+  'nao k(ero|eremos)\b', '\besquece\b', 'deixa quieto', 'nao adianta\b',
+  'nao (vou )?fechamos? nada( nao)?\b', 'nao vou (fechar|fechar nada)\b(?! (hoje|agora))',
+  'nao da pra (fazer|ser) (isso )?agora( nao)?\b',
+  'nao (preciso|precisamos|to|estou) (agora|neste momento)\b',
+  'fora do (meu|nosso) orcamento\b.{0,25}(obrigad|valeu)?',
+  '\bnao\b.{0,15}(brother|mano|chefe|patrao)\b[,.! ]*(valeu|obrigad[oa])?',
 ]
 messages = []
 
