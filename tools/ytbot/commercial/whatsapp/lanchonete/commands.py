@@ -188,6 +188,27 @@ def command_allow(args, store_factory) -> None:
     _print(_public(updated))
 
 
+def command_opening(args, store_factory, page_factory) -> None:
+    """Owner: send the greeting and menu to a registered customer without replaying history."""
+    rules, store, _ = _context(args, store_factory)
+    customer = store.lead(args.customer)
+    if customer is None:
+        raise SystemExit(f"[lanchonete] unknown customer {args.customer}")
+    if store.is_blocked(customer):
+        raise SystemExit("[lanchonete] this customer is blocked")
+    if not store.acquire():
+        raise SystemExit("[lanchonete] another lanchonete run is active; stop it first")
+    try:
+        session = Session(args, page_factory, rules, store)
+        try:
+            agent = LanchoneteAgent(rules, store, session.channel, None, live=True)
+            _print(agent.opening(customer))
+        finally:
+            session.close()
+    finally:
+        store.release()
+
+
 def command_customers(args, store_factory) -> None:
     _, store, _ = _context(args, store_factory)
     customers = [customer for customer in store.leads().values()
@@ -226,6 +247,38 @@ def command_resolve(args, store_factory) -> None:
         raise SystemExit(f"[lanchonete] unknown customer {args.customer}")
     except ValueError as error:
         raise SystemExit(f"[lanchonete] {error}")
+
+
+def command_correct(args, store_factory) -> None:
+    """Owner: drop a corrupted cart and start the order clean, without resending it.
+
+    The neutral `correction_notice` from the rules is printed for the owner to paste in
+    WhatsApp; the bot never replays the old summary by itself. History is kept as audit.
+    """
+    from .order import Order
+    rules, store, _ = _context(args, store_factory)
+    customer = store.lead(args.customer)
+    if customer is None:
+        raise SystemExit(f"[lanchonete] unknown customer {args.customer}")
+    reset = Order().to_lead_fields()
+    store.update_lead(args.customer, state="ordering", awaiting=None, awaiting_field="",
+                       closing=False, unknown_count=0, confirmations=0, pending_replace=None,
+                       handoff_reason=None, order_number="", ficha="", **reset)
+    _print({**_public(store.lead(args.customer)),
+            "notice_to_paste": rules.texts["correction_notice"]})
+
+
+def command_recover(args, store_factory) -> None:
+    """Clear a transient unconfirmed state without retrying the uncertain message."""
+    rules, store, now = _context(args, store_factory)
+    if not args.all and not args.customer:
+        raise SystemExit("[lanchonete] recover needs --customer or --all")
+    recovered = store.recover_unconfirmed(now)
+    if args.customer:
+        recovered = [lead for lead in recovered if lead["id"] == args.customer]
+        if not recovered and store.lead(args.customer) is None:
+            raise SystemExit(f"[lanchonete] unknown customer {args.customer}")
+    _print([_public(lead) for lead in recovered])
 
 
 def command_block(args, store_factory) -> None:
@@ -277,7 +330,7 @@ def _reload(agent, path: Path, seen: float) -> float:
 
 
 def command_run(args, store_factory, page_factory) -> None:
-    rules, store, _ = _context(args, store_factory)
+    rules, store, now = _context(args, store_factory)
     model = _model(rules, store, not args.no_llm)
     if not args.live:
         print("[lanchonete] dry run: decisions are printed, nothing is sent "
@@ -285,6 +338,9 @@ def command_run(args, store_factory, page_factory) -> None:
     if not store.acquire():
         raise SystemExit("[lanchonete] another lanchonete run is active; one conversation at a "
                          "time")
+    if args.recover:
+        recovered = store.recover_unconfirmed(now)
+        print(f"[lanchonete] recovered {len(recovered)} unconfirmed conversation(s)", flush=True)
     try:
         session = Session(args, page_factory, rules, store)
     except RuntimeError as error:
@@ -326,8 +382,8 @@ def command_run(args, store_factory, page_factory) -> None:
             failures = 0
             for item in summary["replies"]:
                 if item.get("state") in ("unconfirmed", "error"):
-                    raise SystemExit("[lanchonete] a send was not confirmed; stopping. Check "
-                                     "the chat, then `commercial lanchonete resolve`.")
+                    print(f"[lanchonete] send fenced for {item.get('name')}; that customer is "
+                          f"waiting for the owner, the other chats continue", flush=True)
             print(json.dumps(summary, ensure_ascii=False), flush=True)
             cycles += 1
             if args.once or (args.max_cycles and cycles >= args.max_cycles):
@@ -372,6 +428,9 @@ def add_parser(actions, store_factory, page_factory) -> None:
     allow.add_argument("--phone", required=True)
     allow.add_argument("--name", required=True)
     allow.add_argument("--chat", default=None, help="WhatsApp chat title, when different")
+    opening = action("opening", "owner: send the greeting and menu to a registered customer",
+                     lambda args: command_opening(args, store_factory, page_factory))
+    opening.add_argument("--customer", required=True)
     customers = action("customers", "list customers and their state",
                        lambda args: command_customers(args, store_factory))
     customers.add_argument("--state", default=None)
@@ -389,6 +448,13 @@ def add_parser(actions, store_factory, page_factory) -> None:
     resolve.add_argument("--state", required=True,
                          choices=("ordering", "confirming", "confirmed", "closed", "cancelled",
                                   "human"))
+    correct = action("correct", "owner: drop a corrupted cart and print the neutral notice",
+                     lambda args: command_correct(args, store_factory))
+    correct.add_argument("--customer", required=True)
+    recover = action("recover", "clear a transient unconfirmed state without retrying it",
+                     lambda args: command_recover(args, store_factory))
+    recover.add_argument("--customer", default=None)
+    recover.add_argument("--all", action="store_true")
     block = action("block", "owner: never reply to this number again",
                    lambda args: command_block(args, store_factory))
     block.add_argument("--customer", required=True)
@@ -403,3 +469,5 @@ def add_parser(actions, store_factory, page_factory) -> None:
                      help="local parser and fixed replies only")
     run.add_argument("--only", action="append", default=[],
                      help="answer only this phone (repeat for more than one)")
+    run.add_argument("--recover", action="store_true",
+                     help="clear transient unconfirmed states at startup")

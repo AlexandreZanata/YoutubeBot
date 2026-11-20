@@ -19,8 +19,8 @@ timezone = "America/Cuiaba"
 address = "Avenida das Acácias, 1280 — Jardim das Américas, Cuiabá/MT"
 
 [limits]
-max_replies_per_customer_per_day = 20  # stops loops with other bots; the owner takes over
-max_bot_replies_before_owner = 15      # a long chat without a confirmed order goes to the owner
+max_replies_per_customer_per_day = 40  # stops loops with other bots; the owner takes over
+max_bot_replies_before_owner = 30      # a long chat without a confirmed order goes to the owner
 max_unknown = 2                        # two answers the bot did not understand: owner takes over
 max_confirmations = 2                  # correction rounds on the order summary
 max_messages_per_reply = 8             # the menu is sent in a few bubbles, links do not count
@@ -118,8 +118,11 @@ negative = ['^(nao|n|nop|negativo|errado|nao esta certo|nao e isso)\b']
 # "Fechar o pedido" is the end of the item list, not a refusal.
 done = [
   '^(so isso|e so isso|isso|por enquanto e isso|fechar|fecha|fechar o pedido|fecha o pedido|fechar pedido|pode fechar|pode fechar o pedido|pode confirmar|pode seguir|finalizar|encerrar|e isso|acabou|terminei|pronto|so esses|por enquanto so|nada mais|mais nada)\b',
+  '\b(?:pode )?fechar (?:o |meu )?pedido\b',
+  '\b(?:e )?so isso\b',
 ]
 cancel = [
+  '^(cancela|cancelar|desisto|esquece isso|esquece o pedido)[!. ]*$',
   'cancela(r)? (o |meu )?pedido', 'desisti do pedido', 'nao quero mais (o )?pedido',
   'pode cancelar', 'deixa pra (outra|depois)',
 ]
@@ -187,6 +190,8 @@ cancelled = "Pedido cancelado. Se quiser começar de novo, é só me chamar. �
 cancelled_after_kitchen = "Seu pedido já foi enviado para a cozinha. Vou chamar o atendente para ajustar com você."
 not_understood = "Desculpa, não entendi. Pode me dizer qual item do cardápio você quer e a quantidade? 😊"
 ask_what_to_adjust = "O que você quer ajustar? Pode dizer, por exemplo: \"tira a coca\" ou \"troca para retirada\"."
+swap_question = "Troco {fro} por {to}? Responde SIM para confirmar ou me diz o que prefere."
+removed_item = "Tirei {item} do pedido."
 below_min = "O pedido mínimo para entrega é R$ 15,00. Faltam {missing}. Você pode pedir mais alguma coisa ou escolher retirada, que não tem pedido mínimo."
 below_min_question = "Quer adicionar mais alguma coisa ou prefere retirar no balcão?"
 max_qty = "Consigo anotar até {max} unidades de cada item por pedido. Para uma quantidade maior, chamo o atendente."
@@ -196,7 +201,32 @@ extra_not_found = "Esse adicional não está no cardápio. Os adicionais dispon�
 payment_unknown = "Não entendi a forma de pagamento. Pode escolher Pix, dinheiro ou cartão?"
 change_too_low = "O total do pedido é {total}. Preciso de um valor maior para o troco, ou você pode pagar o valor exato."
 handoff_ack = "Vou confirmar com o atendente e já te respondo por aqui."
+correction_notice = "Olá! Para não restar dúvida, desconsidere o resumo anterior. Me diga como está seu pedido agora, com os itens e as quantidades, que eu anoto tudo certinho. 😊"
 large_order = "Vou chamar o atendente para confirmar esse pedido maior com você."
+harassment_warn = "Vamos manter o foco no seu pedido 😊"
+harassment_handoff = "Vou passar seu atendimento para o responsável continuar com você por aqui."
+partial_added = "Anotei {added}."
+partial_missing_extra = "Não temos {missing} no cardápio — quer ver os adicionais?"
+partial_missing_item = "Não encontrei {missing} no cardápio. Quer ver as opções do cardápio?"
+keep_only_question = "Quer deixar o pedido só com {item}? Responda *SIM* para confirmar ou me diga o que prefere."
+clear_cart_question = "Quer tirar todos os itens do pedido? Responda *SIM* para confirmar ou me diga o que quer ajustar."
+keep_which_question = "Qual item você quer manter no pedido? Me diga o nome e a quantidade."
+value_jump_question = "Vi um salto grande no pedido ({summary}). Foi isso mesmo? Responda *SIM* para confirmar ou me diga a quantidade certa."
+audio_uncertain_question = "No seu áudio entendi {summary}. A quantidade está certa? Responda *SIM* para confirmar ou me diga por texto."
+alive_reply = "Estou por aqui sim! Sou a {agent_name}, atendente virtual da {company}."
+handoff_waiting = "Seu atendimento já foi encaminhado para o responsável, que vai te responder por aqui."
+not_in_cart = "{item} não está no seu pedido."
+max_extras = "Consigo anotar até {max} adicionais por item. Anotei os primeiros; para mais, o atendente ajusta com você."
+item_offer_question = "Quer que eu anote esse item no seu pedido?"
+confirmed_followup = "Seu pedido já está com a cozinha. Avisei o atendente para ver isso com você."
+first_welcome = "Me diga o que você quer pedir ou peça o cardápio (ou me diga se quer ver lanches, hot dogs, porções, combos, bebidas ou sobremesas)."
+menu_link = "Confira nosso cardápio no link: {url}"
+ask_address_payment = "Para entrega, me envie seu endereço completo (rua, número e bairro) e como prefere pagar (Pix, dinheiro ou cartão — se precisar de troco, já avisa)."
+clarify_type = "Para fechar o pedido, me diga se prefere entrega ou retirada no balcão."
+clarify_address = "Não consegui identificar o endereço. Me envie a rua, número e bairro, por favor."
+clarify_address_payment = "Não consegui identificar o endereço. Me envie a rua, número e bairro, junto com a forma de pagamento (Pix, dinheiro ou cartão)."
+clarify_name = "Não consegui anotar o nome. Me envie apenas o nome para o pedido, por favor."
+clarify_change = "Para quanto você precisa de troco? Se não precisar, diga \"sem troco\"."
 owner_reason_unknown = "O cliente pediu algo que o bot não entendeu"
 owner_reason_confirm = "O cliente não confirmou o resumo do pedido"
 owner_reason_large = "Pedido acima do limite automático: confirme valores e prazo"
@@ -205,6 +235,8 @@ owner_reason_status = "Cliente quer saber do pedido confirmado"
 owner_reason_complaint = "Reclamação de pedido"
 owner_reason_human = "Cliente pediu para falar com uma pessoa"
 owner_reason_media = "Cliente enviou mídia ou áudio que o bot não conseguiu ler"
+owner_reason_harassment = "Cliente fez insinuação sexual ou comentário inadequado"
+owner_reason_waiting = "Cliente cobrando atendimento aguardando você"
 
 [guard]
 # Terms the bot may never write (checked after removing accents). "sem taxa" is the delivery
@@ -226,6 +258,10 @@ never_invent_item = true
 never_invent_price = true
 confirm_before_kitchen = true
 pix_key_only_from_owner = true
+
+[menu]
+# Optional website/app menu URL. Leave empty to send the catalog text directly on WhatsApp.
+url = ""
 
 [menu.categories]
 burgers = "Burgers artesanais"
@@ -304,7 +340,7 @@ id = "hot-dog"
 name = "Hot Dog"
 category = "hotdogs"
 price_cents = 1200
-aliases = ["hot dog", "hotdog", "hot dog simples", "cachorro quente", "cachorro quente simples"]
+aliases = ["hot dog", "hotdog", "hot doc", "hot dog simples", "cachorro quente", "cachorro quente simples"]
 description = "Pão de hot dog, salsicha, purê, milho, batata palha e molho da casa."
 
 [[menu.items]]
@@ -312,7 +348,7 @@ id = "hot-dog-completo"
 name = "Hot Dog Completo"
 category = "hotdogs"
 price_cents = 1600
-aliases = ["hot dog completo", "hotdog completo", "cachorro quente completo", "dog completo"]
+aliases = ["hot dog completo", "hotdog completo", "hot doc completo", "cachorro quente completo", "dog completo"]
 description = "Pão de hot dog, salsicha, purê, milho, queijo, bacon, cebola e batata palha."
 
 [[menu.items]]
@@ -472,7 +508,8 @@ id = "acai-300"
 name = "Açaí 300 ml"
 category = "desserts"
 price_cents = 1600
-aliases = ["acai 300", "açaí 300", "acai pequeno", "acai 300 ml"]
+aliases = ["acai 300", "açaí 300", "acai pequeno", "acai 300 ml", "acai mais barato",
+           "açaí mais barato", "o acai mais barato"]
 description = "Açaí 300 ml com banana e granola."
 
 [[menu.items]]
@@ -651,10 +688,12 @@ priority = "hot"
 reason = "Cliente pediu para falar com uma pessoa"
 patterns = [
   'falar com (um |o |a )?(atendente|humano|pessoa|responsavel|dono|gerente|atendimento)',
-  'quero (um |o )?atendente', 'atendimento humano', 'chama (o )?(atendente|responsavel|gerente)',
+  'quero (um |o )?atendente', 'quero pedir (o |a |um |uma )?atendente',
+  'pedir (o |a |um |uma )?atendente', 'atendimento humano',
+  'chama (o )?(atendente|responsavel|gerente)',
   'quero falar com alguem', 'me passa para (um |o )?(atendente|responsavel)',
 ]
-messages = ["Claro! Já chamo o atendente e ele continua com você por aqui. 😊"]
+messages = ["Claro! Vou passar sua conversa para um atendente humano agora e ele já te responde por aqui. Obrigado por aguardar! 😊"]
 
 [[intents]]
 id = "complaint"
@@ -703,8 +742,10 @@ fixed = true
 when = "A pessoa pede o cardápio, o menu ou pergunta o que a lanchonete tem."
 priority = "needed"
 patterns = [
-  'cardapio', 'menu', 'o que (voces )?(tem|vende|oferece)', 'quais (sao )?(os )?(lanches|itens|opcoes)',
+  'cardapio', 'menu', 'o que (voces )?(tem|vende|oferece)', 'quais (sao )?(os )?(itens|opcoes)',
   'me manda (o )?(cardapio|menu)', 'quero ver (o )?(cardapio|menu)', 'opcoes',
+  'link do (cardapio|menu)', 'site do (cardapio|menu)', 'cardapio (no |em )?(site|link|app|aplicativo)',
+  'quero fazer (um |o )?pedido', 'fazer (um |o )?pedido', 'quero pedir',
 ]
 messages = []
 

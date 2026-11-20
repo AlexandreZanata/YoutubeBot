@@ -60,7 +60,9 @@ def violations(rules: RestaurantRules, messages: list[str],
             continue
         if len(message) > int(limits["max_message_chars"]):
             problems.append(f"message longer than {limits['max_message_chars']} characters")
-        if links_in(message):
+        allowed_link = (rules.menu_url or "").rstrip("/")
+        found_links = [link.rstrip(".,;!?)") for link in links_in(message)]
+        if any((not allowed_link or link.rstrip("/") != allowed_link) for link in found_links):
             problems.append("links are not part of the restaurant rules")
         if EMAIL.search(message):
             problems.append("e-mail or handle")

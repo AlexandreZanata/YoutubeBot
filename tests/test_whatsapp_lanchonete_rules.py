@@ -87,6 +87,54 @@ class LanchoneteRulesTests(unittest.TestCase):
         self.assertIn("cartão", text)
         self.assertIn("troco", text)
 
+    def test_private_test_mirror_matches_the_production_catalog(self):
+        """The 24h test file may differ only in hours and pacing, never in menu or texts.
+
+        The mirror lives in private `.local` state, so CI (which has no `.local`)
+        skips this; on the owner's PC it enforces that the test file never drifts
+        from the production rules.
+        """
+        from pathlib import Path
+
+        mirror_path = (Path(__file__).parent.parent
+                       / ".local/commercial/whatsapp/lanchonete/test_rules.toml")
+        if not mirror_path.is_file():
+            self.skipTest("no private test mirror on this machine")
+        mirror = lanchonete_rules.load(mirror_path)
+        self.assertEqual([(item.id, item.price_cents) for item in mirror.items],
+                         [(item.id, item.price_cents) for item in self.rules.items])
+        self.assertEqual([(extra.id, extra.price_cents) for extra in mirror.extras],
+                         [(extra.id, extra.price_cents) for extra in self.rules.extras])
+        self.assertEqual({intent.id for intent in mirror.intents},
+                         {intent.id for intent in self.rules.intents})
+        self.assertEqual(set(mirror.texts), set(self.rules.texts))
+        self.assertEqual(mirror.texts["closed"], self.rules.texts["closed"])
+        self.assertEqual(mirror.menu_url, self.rules.menu_url)
+
+    def test_menu_url_is_validated_and_allowed_only_when_configured(self):
+        from tools.ytbot.commercial.whatsapp.lanchonete import guard
+
+        raw = copy.deepcopy(self.raw)
+        raw["menu"]["url"] = "https://cardapio.brasaepao.com.br"
+        linked = lanchonete_rules.build(raw)
+        msg = linked.fill(linked.texts["menu_link"], url=linked.menu_url)
+        self.assertEqual(guard.violations(linked, [msg]), [])
+        self.assertTrue(guard.violations(linked, ["https://outro.site.com"]))
+
+        bad = copy.deepcopy(self.raw)
+        bad["menu"]["url"] = "javascript:alert(1)"
+        with self.assertRaises(lanchonete_rules.RulesError):
+            lanchonete_rules.build(bad)
+
+    def test_neutral_texts_have_no_robot_blame_and_no_money(self):
+        for key in ("correction_notice", "swap_question", "removed_item"):
+            self.assertIn(key, self.rules.texts)
+        notice = self.rules.texts["correction_notice"].casefold()
+        self.assertNotIn("robô", notice)
+        self.assertNotIn("errei", notice)
+        self.assertNotIn("desculpa", notice)
+        self.assertIn("SIM", self.rules.texts["swap_question"])
+
 
 if __name__ == "__main__":
     unittest.main()

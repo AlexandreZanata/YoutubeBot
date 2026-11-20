@@ -7,6 +7,7 @@ import json
 import random
 import re
 import time
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -199,14 +200,33 @@ def text_key(value: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[*_~`]", "", value or "")).strip()
 
 
+def confirm_key(value: str) -> str:
+    """Formatting-insensitive key for the bubble WhatsApp actually renders (bullets vanish)."""
+    plain = unicodedata.normalize("NFKD", value or "")
+    plain = "".join(char for char in plain if not unicodedata.combining(char))
+    return re.sub(r"[^A-Za-z0-9]+", " ", plain).strip()
+
+
 def human_type(page, text: str, pacing: Pacing) -> None:
-    """Type in small chunks with plausible pauses instead of pasting."""
-    for chunk in re.findall(r"\S+\s*|\s+", text):
-        page.keyboard.insert_text(chunk)
-        delay = random.uniform(pacing.typing_min_ms, pacing.typing_max_ms) / 1000
-        if chunk.rstrip().endswith((".", "?", "!", ",")):
-            delay += random.uniform(0.15, 0.45)
-        time.sleep(delay)
+    """Type in small chunks with plausible pauses instead of pasting.
+
+    `keyboard.type` is used per chunk instead of `insert_text`: long formatted messages
+    (the menu) made WhatsApp's editor reorder or drop chunks when every chunk arrived as a
+    synthetic insert. Line breaks stay `insert_text`, because Enter would send the message.
+    """
+    for index, line in enumerate(text.split("\n")):
+        if index:
+            page.keyboard.insert_text("\n")
+        for chunk in re.findall(r"\S+\s*|\s+", line):
+            type_text = getattr(page.keyboard, "type", None)
+            if callable(type_text):
+                type_text(chunk, delay=0)
+            else:  # light test doubles only expose insert_text
+                page.keyboard.insert_text(chunk)
+            delay = random.uniform(pacing.typing_min_ms, pacing.typing_max_ms) / 1000
+            if chunk.rstrip().endswith((".", "?", "!", ",")):
+                delay += random.uniform(0.15, 0.45)
+            time.sleep(delay)
 
 
 def dismiss_ai_notice(page) -> bool:
@@ -380,13 +400,15 @@ def confirmed(page, text: str, before: set[str]) -> bool:
     """The newest outgoing bubble is new (when ids exist) and starts like the message."""
     prefix = text.strip()[:24]
     key_prefix = text_key(text)[:24]
+    accents = confirm_key(text)[:30]
     bubbles = read_bubbles(page, 15)
     outgoing = [bubble for bubble in bubbles if bubble["dir"] == "out"]
     if not outgoing:
         return False
     last_text = outgoing[-1]["text"]
     matched = ((prefix and prefix in last_text)
-               or (key_prefix and key_prefix in text_key(last_text)))
+               or (key_prefix and key_prefix in text_key(last_text))
+               or (accents and accents in confirm_key(last_text)))
     if not matched:
         return False
     newest = outgoing[-1]["id"]
@@ -523,6 +545,16 @@ def send_message(page, to: str, text: str, image: Path | None, pacing: Pacing,
     return deliver(page, text, pacing, image=image)
 
 
+def can_retry_before_send(path: Path, key: str) -> bool:
+    """A failed focus/typing check never reached the composer, so the message is not uncertain."""
+    entries = [entry for entry in read_journal(path) if entry.get("key") == key
+               and entry.get("state") in ("error", "sent", "unconfirmed")]
+    return bool(entries) and all(
+        entry.get("state") == "error"
+        and "the text did not reach the composer; nothing was sent"
+        in str(entry.get("error") or "") for entry in entries)
+
+
 def journal_state(path: Path, key: str) -> str | None:
     """`sent`, `uncertain` (started/unconfirmed/error) or None when never attempted."""
     states = [entry.get("state") for entry in read_journal(path) if entry.get("key") == key]
@@ -565,7 +597,7 @@ def send_sequence(page, to: str, items: list[dict], pacing: Pacing, journal_path
         if prior == "sent":
             results.append({"key": item["key"], "state": "duplicate"})
             continue
-        if prior == "uncertain":
+        if prior == "uncertain" and not can_retry_before_send(journal_path, item["key"]):
             results.append({"key": item["key"], "state": "fenced"})
             break
         entry = {"key": item["key"], "to": to, **(extra or {})}
