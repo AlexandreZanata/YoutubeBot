@@ -41,6 +41,16 @@ class FaithShortsTests(unittest.TestCase):
         self.assertEqual(channel.slots, (21,))
         self.assertEqual(channel.channel_id, "UCLukC7RYzHlXHjtnlkbe4Vw")
 
+    def test_sepia_and_bathylora_keep_every_two_days_for_longs_and_shorts(self):
+        from tools.ytbot import channels
+
+        for slug, hours in (("sepia-atlas", (9,)), ("bathylora", (21,))):
+            channel = channels.get(slug)
+            self.assertEqual(channel.interval_days, 2)
+            self.assertEqual(channel.slots, (21,))
+            self.assertEqual(faith_shorts.CHANNELS[slug]["interval_days"], 2)
+            self.assertEqual(faith_shorts.CHANNELS[slug]["hours"], hours)
+
     def test_a_copied_background_is_detected_against_other_shorts(self):
         import tempfile
         from pathlib import Path

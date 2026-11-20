@@ -229,10 +229,52 @@ def human_type(page, text: str, pacing: Pacing) -> None:
             time.sleep(delay)
 
 
+def dismiss_ai_notice(page) -> bool:
+    """Close WhatsApp's "AI from Meta" interstitial on first open of a business chat.
+
+    The modal covers the conversation until its OK button is pressed; typing behind it
+    never confirms. Returns True when a modal was dismissed.
+    """
+    try:
+        main = page.locator("#main")
+        text = main.inner_text() if main.count() else ""
+    except Exception:
+        return False
+    if "Get quick help" not in (text or "") or "AI from Meta" not in (text or ""):
+        return False
+    try:
+        if hasattr(page, "get_by_role"):
+            ok = page.get_by_role("button", name="OK")
+            if ok.count():
+                ok.first.click(timeout=5000)
+                page.wait_for_timeout(800)
+                return True
+        fallback = page.locator('div[role="dialog"] button:has-text("OK")')
+        if fallback.count():
+            fallback.first.click(timeout=5000)
+            page.wait_for_timeout(800)
+            return True
+    except Exception:
+        return False
+    return False
+
+
+def looks_like_phone(value: str) -> bool:
+    """A contact field holding a phone number instead of a saved name."""
+    digits = re.sub(r"\D", "", value or "")
+    return len(digits) >= 10 and len(digits) <= 15
+
+
 def open_chat(page, to: str, pacing: Pacing, phone: str | None = None) -> None:
-    """Open the conversation by saved name (search) or by number (click-to-chat URL)."""
-    if phone:
-        _open_by_phone(page, phone, pacing)
+    """Open the conversation by saved name (search) or by number (click-to-chat URL).
+
+    A `to` holding a phone number always takes the deterministic
+    `send?phone=` URL: name search is fuzzy and once opened the
+    Motorista Frotss chat for a similar-digit number.
+    """
+    if phone or looks_like_phone(to):
+        _open_by_phone(page, phone or to, pacing)
+        dismiss_ai_notice(page)
         return
     page.goto(LOGIN_URL, timeout=90000)
     page.wait_for_selector(CHAT_LIST, timeout=90000)
@@ -244,6 +286,7 @@ def open_chat(page, to: str, pacing: Pacing, phone: str | None = None) -> None:
     page.wait_for_selector(COMPOSER, state="attached", timeout=30000)
     page.wait_for_timeout(1200)
     time.sleep(pacing.open_chat_pause())
+    dismiss_ai_notice(page)
 
 
 def _open_by_phone(page, phone: str, pacing: Pacing, timeout: float = 60.0) -> None:

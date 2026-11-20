@@ -445,7 +445,7 @@ def publish_all(slugs=None, dry_run: bool = False) -> dict:
             except Exception as error:
                 results[slug] = {"state": "failed", "error": str(error)}
                 log(f"{slug}: {error}")
-        art_browser.close()
+        # Leave the shared legacy art browser running for the next stage.
     return results
 
 

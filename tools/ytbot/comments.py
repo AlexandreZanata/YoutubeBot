@@ -361,7 +361,10 @@ def answer_all(slugs=None, limit: int = DEFAULT_LIMIT, dry_run: bool = False) ->
                     context = browser.contexts[0]
                     account.ensure_channel(context)
                     results[slug] = answer(context, limit, dry_run)
-                    browser.close()
+                    # The legacy profile is the shared generation browser; closing
+                    # it here kills the ChatGPT page a batch is about to use.
+                    if identifier != "legacy":
+                        browser.close()
         except Exception as error:
             failures.append((slug, str(error)))
             log(f"{slug}: {error}")

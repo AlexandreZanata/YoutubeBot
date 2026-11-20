@@ -22,7 +22,7 @@ class RehearsalTests(unittest.TestCase):
         self.assertEqual(ready["turns"][0]["state"], "buying")
         self.assertEqual(ready["handoffs"][0]["priority"], "hot")
         self.assertEqual(ready["turns"][1]["bot"], [])
-        self.assertEqual(refusal["turns"][0]["state"], "do-not-contact")
+        self.assertEqual(refusal["turns"][0]["state"], "needs-owner")
         self.assertIn("🔥 Atender agora", rehearsal.render(transcripts))
 
 

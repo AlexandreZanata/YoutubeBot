@@ -20,8 +20,8 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   the owner. Operator/browser interface language never changes content language.
 - `tools/ytbot` keeps channel prompts, deduplication, resumable stage records and sequential
   upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`,
-  `infinite-random-worlds`, `vocal-pages`, `zanata`, `reflection`, `midnight-tales` and
-  `sepia-atlas`.
+  `infinite-random-worlds`, `vocal-pages`, `zanata`, `reflection`, `midnight-tales`,
+  `sepia-atlas` and `bathylora`.
   Whispers uses 2,400 to 2,800 words (15 to 17 minutes), Sacred Brown Engraving thumbnails,
   brown stippling background and the metadata/tag patterns in
   [its channel profile](docs/channels/whispers-from-heaven.md). Zaflas uses Brazilian
@@ -32,11 +32,29 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   Zaflas articles target 4,000 to 4,800 words (26,000 to 34,000 characters) with one bounded
   rewrite above the ceiling.
 - Sepia Atlas is English-only, American English, premium historical documentaries built on
-  authentic archival photography: 14 to 18 minutes (2,200 to 2,700 words), one video every two
-  days at 21:00, Cinematic Archival Minimalism (Archival Black, Aged Gold, Antique Ivory) and a
-  photographer's eye for the Atlas Frame emblem. Never fabricate a historical photograph or
-  present a generated image as documentary evidence. The first episode stays private for owner
-  review and is never auto-published. See [its channel profile](docs/channels/sepia-atlas.md).
+  authentic archival photography: 15 to 25 minutes average (1,900 to 3,200 words, tolerance up
+  to 40 minutes / ~5,100 words), one video every two days at 21:00, mandatory `0.9x` narration
+  speed (`slow_narration(..., factor=0.9)`), mandatory broadcast documentary voice filter
+  (`DOCUMENTARY_VOICE_FILTER`) with subtle filtered analog room-tone, smooth 1.2s optical
+  cross-dissolves, mandatory narration-to-image synchronization, Cinematic Archival Minimalism
+  (Archival Black, Aged Gold, Antique Ivory) and a photographer's eye for the Atlas Frame emblem.
+  Never fabricate a historical photograph or present a generated image as documentary evidence.
+  The first episode stays private for owner review and is never auto-published. See
+  [its channel profile](docs/channels/sepia-atlas.md).
+- Bathylora (`@Bathylora`, `UCxuhkOi4CDDStvQFpRGsoXA`) is English-only, American English,
+  premium deep-ocean science documentaries built on authentic oceanographic photography (NOAA
+  Ocean Exploration priority, USGS and verified open scientific archives): 15 to 25 minutes
+  average (1,900 to 3,200 words, tolerance up to 40 minutes / ~5,100 words), one video every two days
+  at 21:00, mandatory `0.9x` narration speed (`slow_narration(..., factor=0.9)`), mandatory
+  broadcast documentary voice filter (`DOCUMENTARY_VOICE_FILTER`) with subtle filtered analog
+  room-tone, smooth 1.2s optical cross-dissolves, mandatory narration-to-image synchronization,
+  **Abyssal Cinema** visual identity (Abyssal Black `#030B12`, Deep Ocean `#071F2C`,
+  Bioluminescent Cyan `#55D9D0`, Ocean Mist `#B5D2D7`, Arctic White `#EDF7F5`, Submersed Teal
+  `#164958`) and **The Depth Mark** emblem. Never reuse Sepia Atlas aesthetics, never fabricate
+  species or discoveries, never present AI imagery as scientific evidence, and keep the first
+  episode private for owner review. See [its channel profile](docs/channels/bathylora.md) and
+  [its exact step-by-step production pipeline](docs/channels/bathylora-pipeline.md)
+  (`python3 -m tools.ytbot documentary init|collect|audit|narrate|render|qc`).
 - Midnight Tales is English-only long-form sleep stories for adults, 6,500 to 9,000 words
   (45 to 65 minutes), one video every two days at 21:00 and one Short every two days at 09:00.
   Thumbnails are painterly cinematic scenes with no text, and the thumbnail is the still video
@@ -54,12 +72,14 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   (32 to 43 minutes) with a unique world each. See
   [its channel profile](docs/channels/infinite-random-worlds.md).
 - Require an explicit channel. Verify its YouTube channel ID before mutating Studio.
-- Schedule only: up to 4 videos/day for fallem prince at 00:00, 06:00, 12:00 and
-  18:00 in America/Cuiaba, at least 60 minutes ahead, not made for kids, custom
+  When the owner names a channel by theme ("fundo do mar", "canal de documentário"), resolve it
+  through [channel nicknames](docs/CHANNEL-ALIAS.md) and never guess between two channels.
+- Schedule only: up to 2 videos/day for fallem prince at 00:00 and 12:00 in
+  America/Cuiaba, at least 60 minutes ahead, not made for kids, custom
   thumbnail and Subscribe + Best for viewer end screen.
-- The 4/day expansion starts on 2026-11-15. Days that already have 00:00/12:00 keep
-  them; the new videos fill the exact middle slots 06:00/18:00 (2/day), completing
-  4/day. Use `--start-date YYYY-MM-DD` when a batch must start on a specific day.
+- The owner reduced fallem prince to 2/day on 2026-11-20. Days with four scheduled videos
+  are rebalanced: the 06:00 and 18:00 extras move to future days at 00:00/12:00 until
+  every day holds at most two. Use `--start-date YYYY-MM-DD` for a specific first day.
 - Preserve channel-specific title/description/tags rules and media quality.
 - Never blindly retry an uncertain upload or start the same service operation twice.
 
@@ -70,6 +90,9 @@ are private `.local/` state. Never log tokens/cookies or put them in Git. Google
 uses the owner's visible browser and consent; do not bypass challenges or copy another
 profile while in use. Browser automation remains the upload path; optional OAuth only
 helps discover and verify account/channel identity. Never silently switch channels.
+Every entry point follows the [session contract](docs/SESSION-CONTRACT.md): a signed-out
+profile records `needs-login.json`, opens one visible window and stops; it never clicks the
+avatar blindly or retries.
 
 When a session actually expires, the bot records `.local/ytbot/needs-login.json`, notifies the
 desktop, opens the profile in a visible window on the sign-in page and stops the batch. The
@@ -81,6 +104,21 @@ The service CLI is typed and bounded. Never expose a general shell, arbitrary su
 arguments or account secrets to ZaturoBot. Real generation/upload/Google consent tests
 are opt-in; CI uses fixtures. Read [accounts](docs/ACCOUNTS.md), [service](docs/SERVICE.md)
 and [migration](docs/MIGRATION.md) for those operations.
+
+## Autonomous operation (owner decision 2026-11-20)
+
+When the owner leaves a batch running unattended, monitor it and act on errors instead of
+waiting for instructions:
+
+- A single failed video or Short (expired session, Studio timeout, schedule not confirmed) is
+  logged to `.local/ytbot/incidents.log` and the queue continues with the next item. Never
+  regenerate or re-upload a video that already has a `videoId`; retry only its details/schedule.
+- An expired account is handled by the session contract: record, open the visible window once,
+  and continue with every other channel that does not depend on it.
+- Never stop the whole run for one channel. Stop only when no remaining item can proceed at all,
+  and then report why.
+- At the end, report every incident, what was recovered and what still needs the owner. Files
+  already uploaded stay as drafts; nothing is published twice.
 
 ## Verify and hand off
 
@@ -129,8 +167,8 @@ custom thumbnail. Every Short must have its own image tied to its story; never r
 another Short, and a near-duplicate background is replaced once. Each channel keeps its own art
 style, topic queue and slot hours: Zaflas
 09:00/18:00, reflection 08:00/20:00, Whispers 09:00/21:00, zanata 09:00, Fallem Prince 21:00,
-Infinite Random Worlds 09:00, Vocal Pages 21:00, Midnight Tales one every two days at 09:00 and
-Sepia Atlas 21:00.
+Infinite Random Worlds 09:00, Vocal Pages 21:00, Midnight Tales one every two days at 09:00,
+Sepia Atlas 21:00 and Bathylora 21:00.
 The Zaflas `shorts` command remains for legacy batches; new Shorts go through `faith-shorts`.
 Generation uses the legacy ChatGPT profile and only the upload touches the channel profile. Do
 not route Shorts through the long-form batch. See [Shorts](docs/SHORTS.md).
@@ -156,7 +194,9 @@ sends at most one follow-up. It answers funnel leads by
 first (zero price in the live catalog, rotating, paused on timeout or no credits), then only
 `deepseek-v4.1-flash` and `muse-spark-1.3-contributor` as paid fallback; a price, deadline, link
 or promise outside that file falls back to
-its fixed text or goes to the owner. A refusal is a permanent do-not-contact entry, the robot
+its fixed text or goes to the owner. A refusal sends the owner's five-bubble indication ask and then the chat goes to the owner
+(owner decision 2026-11-19); a true opt-out ("para de me mandar", "spam", "me remove") is the
+permanent do-not-contact entry. The robot
 question gets an honest answer, the OpenCode key stays in `.local/`, and `--live` stays
 required. Imported numbers start with replies active: the agent answers a lead that writes even before
 an opening, `sales activate|pause` toggles that per lead, and `run --live --prospect --limit`

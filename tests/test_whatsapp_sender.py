@@ -299,5 +299,89 @@ class WhatsAppSenderTests(unittest.TestCase):
             self.assertEqual(shot.parent, debug_dir)
 
 
+    def test_phone_number_to_opens_by_url_not_by_fuzzy_search(self):
+        self.assertTrue(sender.looks_like_phone("+5565999723793"))
+        self.assertTrue(sender.looks_like_phone("(65) 99972-3793"))
+        self.assertFalse(sender.looks_like_phone("Motorista Frotas"))
+        self.assertFalse(sender.looks_like_phone(""))
+        opened = []
+        used = []
+
+        class Composer:
+            count = lambda self: 1
+            first = property(lambda self: self)
+
+        class UrlPage:
+            def goto(self, url, timeout=None):
+                opened.append(url)
+
+            def locator(self, selector):
+                used.append(selector)
+                assert "Search or start a new chat" not in selector, \
+                    "name search must not run for a number"
+                node = Composer()
+                node.inner_text = lambda: ""
+                return node
+
+            def wait_for_timeout(self, ms):
+                pass
+
+        with patch.object(sender.time, "sleep", lambda s: None):
+            sender.open_chat(UrlPage(), "+5565999723793", sender.Pacing(0, 0))
+        self.assertEqual(opened, ["https://web.whatsapp.com/send?phone=5565999723793"])
+        self.assertNotIn("Search or start a new chat", " ".join(used))
+
+    def test_ai_notice_modal_is_dismissed_on_chat_open(self):
+        class Node:
+            def __init__(self, page, selector):
+                self.page = page
+                self.selector = selector
+
+            @property
+            def first(self):
+                return self
+
+            def count(self):
+                if self.selector == "#main":
+                    return 1
+                if self.selector == 'div[role="dialog"] button:has-text("OK")':
+                    return 1 if self.page.modal and not self.page.dismissed else 0
+                return 0
+
+            def inner_text(self):
+                if self.selector == "#main" and self.page.modal and not self.page.dismissed:
+                    return ("Get quick help from business chats that use AI from Meta "
+                            "OK")
+                return "regular chat content"
+
+            def click(self, timeout=None):
+                self.page.dismissed = True
+
+        class ModalPage:
+            modal = True
+
+            def __init__(self):
+                self.dismissed = False
+                self.waits = 0
+
+            def locator(self, selector):
+                return Node(self, selector)
+
+            def wait_for_timeout(self, ms):
+                self.waits += 1
+
+        class PlainPage(ModalPage):
+            modal = False
+
+        page = ModalPage()
+        self.assertTrue(sender.dismiss_ai_notice(page))
+        self.assertTrue(page.dismissed)
+        self.assertFalse(sender.dismiss_ai_notice(page),
+                         "a dismissed modal is not clicked again")
+        plain = PlainPage()
+        self.assertFalse(sender.dismiss_ai_notice(plain))
+        self.assertFalse(plain.dismissed)
+
+
 if __name__ == "__main__":
     unittest.main()

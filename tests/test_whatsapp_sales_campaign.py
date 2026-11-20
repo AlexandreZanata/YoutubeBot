@@ -515,9 +515,9 @@ class CampaignEndToEndTests(unittest.TestCase):
         ref_id = c3["referred_to"]
         self.assertEqual(self.store.lead(ref_id)["state"], "opened")
         self.assertIn(ref_id, agent.allowed_leads)
-        # Clinic #4: refused -> do-not-contact + revoked from rules.json
-        self.assertEqual(self.store.lead(clinics[3]["id"])["state"], "do-not-contact")
-        self.assertTrue(self.store.is_dnc(clinics[3]["phone"]))
+        # Clinic #4: refused -> indication ask, then the owner takes over
+        self.assertEqual(self.store.lead(clinics[3]["id"])["state"], "needs-owner")
+        self.assertFalse(self.store.is_dnc(clinics[3]["phone"]))
         # Clinic #5: links_not_opening + domain (registro.br)
         c5_texts = [s["text"] for s in channel.sent if s["lead"] == clinics[4]["id"]]
         self.assertTrue(any("salvar meu contato" in t for t in c5_texts))
@@ -594,7 +594,7 @@ class CampaignEndToEndTests(unittest.TestCase):
         self.assertEqual(self.store.lead(five[0]["id"])["state"], "engaged")
         self.assertEqual(self.store.lead(five[1]["id"])["state"], "engaged")
         self.assertEqual(self.store.lead(five[2]["id"])["state"], "engaged")
-        self.assertEqual(self.store.lead(five[3]["id"])["state"], "do-not-contact")
+        self.assertEqual(self.store.lead(five[3]["id"])["state"], "needs-owner")
         self.assertEqual(self.store.lead(five[4]["id"])["state"], "needs-owner")
 
     def test_transient_browser_close_during_opening_and_reply_reconnects_without_duplicate(self):
@@ -738,6 +738,24 @@ class CampaignEndToEndTests(unittest.TestCase):
         self.assertEqual([s for s in channel.sent if s["lead"] == second["id"]], [],
                          "must not send to second chat after unconfirmed first")
 
+    def test_error_opening_skips_to_next_and_never_pauses_prospecting(self):
+        _, clinics = self._import_clinics()
+        channel = SimulatedWhatsApp(self.store.journal_path, self.clock,
+                                    fail_open_once={clinics[0]["id"]: RuntimeError(
+                                        "WhatsApp chat did not open for the number")})
+        agent = SalesAgent(self.rules, self.store, channel, None, live=True,
+                           clock=self.clock, sleep=self._sleep, rng=random.Random(2),
+                           notify=self.notes.append, log=self.logs.append, paced_openings=True)
+        session = ScriptedSession(self.clock, channel)
+        commands.run_cycles(agent, session, _run_args(limit=10, interval=2),
+                            listen=lambda *a, **k: [], out=lambda line: None,
+                            stopped=lambda: len(channel.opening_windows) >= 2)
+        self.assertEqual(self.store.lead(clinics[0]["id"])["state"], "new")
+        self.assertIn("did not open", self.store.lead(clinics[0]["id"])["open_error"])
+        opened = [window[0] for window in channel.opening_windows]
+        self.assertEqual(opened, [clinics[1]["id"], clinics[2]["id"]],
+                         "the failed chat is skipped, the next ones open on schedule")
+
     def test_blocking_prospect_uses_two_to_three_minute_opening_interval(self):
         _, clinics = self._import_clinics()
         channel = SimulatedWhatsApp(self.store.journal_path, self.clock)
@@ -865,9 +883,9 @@ class TypingStateTests(unittest.TestCase):
         channel.push_incoming(self.lead["id"], ["No momento não temos interesse"])
         summary2 = agent.cycle([self._ev("No momento não temos interesse", "e2")])
         self.assertEqual(summary2["replies"][0]["intent"], "refusal")
-        self.assertEqual(self.store.lead(self.lead["id"])["state"], "do-not-contact")
+        self.assertEqual(self.store.lead(self.lead["id"])["state"], "needs-owner")
         self.assertEqual([item["text"] for item in channel.sent],
-                         ["Entendo, obrigado pela atenção! Tenha um ótimo dia."])
+                         list(self.rules.raw["referral_ask"]["messages"]))
 
     def test_contact_stops_typing_without_sending_second_message_still_gets_answered(self):
         channel = SimulatedWhatsApp(self.store.journal_path, self.clock)

@@ -87,17 +87,17 @@ class SalesDecisionTests(unittest.TestCase):
         self.assertEqual(guard.split_links(["Veja: https://zaflas.com.br e https://abastevo.com.br"]),
                          ["Veja", "https://zaflas.com.br", "e", "https://abastevo.com.br"])
 
-    def test_model_refusal_blocks_with_the_fixed_text(self):
+    def test_model_refusal_asks_for_an_indication(self):
         decision, _ = self.run_model("Talvez outro dia, por enquanto deixa quieto, tá bom assim", {
             "intent": "later", "messages": ["Tudo bem!"], "do_not_contact": True})
-        self.assertEqual((decision.intent, decision.action), ("refusal", "block"))
+        self.assertEqual((decision.intent, decision.action), ("refusal", "ask_referral"))
         self.assertEqual(decision.messages, list(self.rules.intent("refusal").messages))
 
     def test_local_refusal_wins_over_the_model(self):
         text = ("Nesse momento não estou precisando, mas achei os sites bonitos, "
                 "quem sabe no ano que vem a gente conversa")
         decision, _ = self.run_model(text, {"intent": "interested", "messages": ["Que bom!"]})
-        self.assertEqual(decision.action, "block")
+        self.assertEqual(decision.action, "ask_referral")
 
     def test_model_handoff_sends_only_the_owner_ack(self):
         decision, _ = self.run_model("Vocês emitem nota?", {
@@ -161,7 +161,7 @@ class SalesDecisionTests(unittest.TestCase):
     def test_short_decisive_messages_never_call_the_model(self):
         decision, model = self.run_model("Não, obrigado", {"intent": "interested"})
         self.assertEqual(model.calls, [])
-        self.assertEqual(decision.action, "block")
+        self.assertEqual(decision.action, "ask_referral")
 
     def test_custom_platform_beats_model_unknown_site_or_handoff(self):
         for answer in (

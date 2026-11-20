@@ -152,10 +152,12 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   caps the total openings of that run while keeping the reply loop alive afterward. Pass
   `--only-csv <path>` or `--only-leads <id1,id2>` to restrict `run` strictly to a target batch
   (and any referral created by those leads), leaving all other leads and personal chats untouched.
-  It pauses further cold prospecting immediately if an `unconfirmed` cold opening occurs while
-  keeping the reply listener alive so already-opened companies continue receiving answers; an
-  `unconfirmed` or failed reply/follow-up (or any failure in `--once` / `queue send`) stops the run
-  immediately without touching further chats. An edited `sales_rules.toml` is reloaded
+  A failed opening never stops the line and is never retried: `unconfirmed` stays fenced and an
+  `error` keeps its `open_error`, each pulls one owner-approved replacement from
+  `sales/importar/reserva-*.csv` to the end of the queue (same city first), and prospecting
+  moves on with the 2–3 minute pacing. An `unconfirmed` or failed reply/follow-up (or any failure
+  in `--once` / manual `queue send`) still stops the run immediately without touching further
+  chats. An edited `sales_rules.toml` is reloaded
   before the next cycle; an invalid edit is reported and the previous rules stay in use. When the
   browser page or the CDP connection closes outside a send (including before typing inside
   `_open_chat`; the computer slept, Chrome restarted; seen on 2026-11-18 as `TargetClosedError`
@@ -215,7 +217,10 @@ python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --l
   opens the same hidden WhatsApp browser and goes through `prospect` → `open_lead` →
   `send_sequence`: the lead becomes `opening` with `opened_at` before the browser acts, the
   journal fences every bubble, and a lead is `sent` only when `open_lead` returns `opened`. It
-  stops at the first `unconfirmed` or `error` and retries nothing by itself. The opening window
+  stops at the first `unconfirmed` and retries nothing by itself; an `error` (chat never opened,
+  nothing typed) is skipped and the next number goes on, keeping the 2–3 minute pacing. A failed
+  opening pulls one owner-approved replacement from `sales/importar/reserva-*.csv` to the end of
+  the queue (same city first) and is never retried. The opening window
   (07:00 to 17:00, Monday to Friday), the 50/day limit, pacing, do-not-contact and invalid
   numbers apply exactly as in `run --prospect`; a blocked run prints the reason.
 - **One sender at a time.** `queue send --live` and `run` share the lock, so one refuses while
@@ -240,7 +245,8 @@ python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --l
 new ──opening──▶ opened ──72 h without answer──▶ followed-up ──96 h──▶ no-response
                    │                                  │
                    └────────── incoming ──────────────┴──▶ engaged ◀──▶ qualifying ──▶ quote-requested
-engaged ──refusal / opt-out──▶ do-not-contact     engaged ──unknown / call / media──▶ needs-owner
+engaged ──refusal──▶ needs-owner (indication ask sent)
+engaged ──opt-out (parar, spam)──▶ do-not-contact     engaged ──unknown / call / media──▶ needs-owner
 engaged ──already has a site / later──▶ closed    send not confirmed ──▶ unconfirmed
 owner typed in the chat ──▶ owner                 number without WhatsApp ──▶ invalid-number
 ```
@@ -266,7 +272,7 @@ the model using only the facts.
 | Case | Intent | Action | Answer |
 | --- | --- | --- | --- |
 | First contact | opening | — | "Bom dia" (Boa tarde/Boa noite by hour) → "Tudo bem?" → introduction naming the business ("…a empresa {company} ainda não tem site.") → "Nós temos alguns exemplos…" → four links, one per message |
-| "Nesse momento não estou precisando", "não, obrigado", "agora não", "não" after the quote offer | `refusal` | block | Fixed thanks, then never contact again |
+| "Nesse momento não estou precisando", "não, obrigado", "agora não", "não" after the quote offer | `refusal` | ask_referral | Sends the five-bubble indication request, then hands the chat to the owner (owner decision 2026-11-19) |
 | "Para de mandar", "spam", "vou denunciar" | `opt_out` | block | Fixed apology, never contact again |
 | Business auto-reply (absence, hours, menu) | `auto_reply` | ignore | Nothing, avoids bot loops |
 | "É robô?", "é automático?" | `bot_question` | reply | Fixed honest answer: an automated assistant helps; the owner follows every chat |
@@ -578,6 +584,13 @@ live in `[opening]` and `[pacing]` of the rules file.
 - The opening is recorded before the browser acts and its journal keys are per lead, so it is
   never repeated, even after a crash.
 - One follow-up after 72 h without an answer; `no-response` 96 h later, then silence.
+- Answers wait `pacing.reply_debounce_seconds` (30 s) after the newest incoming bubble, so a
+  person splitting a thought into two or three messages is read as one turn and never answered
+  mid-thought by a machine. The live loop enables it; direct unit calls do not.
+- `referral_ask.messages` holds the owner's indication request as five short bubbles, sent when
+  the lead refuses. Right after it the chat moves to `needs-owner` and the bot stops answering
+  there: the owner takes over. A true opt-out ("para de me mandar", "spam", "me remove") still
+  goes to the permanent do-not-contact list with its fixed apology.
 - At most 12 automated replies per lead per day; then the owner takes over.
 - Every message is journaled `started` before typing; an `unconfirmed`, `error` or dangling
   `started` key is never retried and the run stops.

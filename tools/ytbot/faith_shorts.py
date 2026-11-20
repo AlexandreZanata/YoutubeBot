@@ -175,7 +175,8 @@ CHANNELS = {
     },
     "sepia-atlas": {
         "upload": "sepia",
-        "hours": (21,),
+        "hours": (9,),
+        "interval_days": 2,
         "hashtags": "#shorts #history #archivalphotography #documentary #sepiaatlas",
         "tags": "history, documentary, archival photography, historical photos, short",
         "topics": (
@@ -189,6 +190,25 @@ CHANNELS = {
             "The Invention Nobody Remembers",
             "A Farm Family in 1895",
             "The Day the Electric Light Arrived",
+        ),
+    },
+    "bathylora": {
+        "upload": "bathylora",
+        "hours": (21,),
+        "interval_days": 2,
+        "hashtags": "#shorts #deepsea #oceanexploration #marinebiology #bathylora",
+        "tags": "deep sea, ocean exploration, marine biology, documentary, ocean science, short",
+        "topics": (
+            "The Bigfin Squid Filmed in the Deep Gulf of Mexico",
+            "How Dumbo Octopuses Move Three Miles Below the Surface",
+            "Life Beside a 700-Degree Hydrothermal Vent",
+            "Why Glass Sponges Live for Thousands of Years",
+            "What Actually Happens to Light Below 1,000 Meters",
+            "The Deep-Sea Anglerfish and Its Bacterial Lantern",
+            "How Giant Isopods Survive Years Between Meals",
+            "Underwater Lakes of Brine on the Ocean Floor",
+            "How ROV Deep Discoverer Explores the Abyss",
+            "The Bioluminescent Alarm Systems of Deep-Sea Jellyfish",
         ),
     },
 }
@@ -344,7 +364,16 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
     upload_cdp = store.account(spec["upload"])["cdp_port"]
     store.activate("legacy")
     runtime.start_hidden_chrome()
-    topics = list(spec["topics"])[start_index:start_index + count]
+    topics = []
+    for candidate in list(spec["topics"])[start_index:]:
+        run_dir = config.DATA_DIR / "shorts" / logic.slug(candidate)
+        if (run_dir / "upload.json").is_file():
+            continue
+        topics.append(candidate)
+        if len(topics) == count:
+            break
+    if len(topics) < count:
+        raise RuntimeError(f"only {len(topics)} unused Short topics left for {channel_slug}")
     slots = short_slots(len(topics), spec["hours"],
                         start or (date.today() + timedelta(days=1)), skip_slots,
                         occupied_slots(config.DATA_DIR / "shorts"),

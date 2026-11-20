@@ -112,6 +112,14 @@ class SalesRulesTests(unittest.TestCase):
     def test_daily_opening_limit_is_fifty(self):
         self.assertEqual(self.rules.limits["daily_openings"], 50)
 
+    def test_reply_debounce_and_referral_ask_are_versioned_data(self):
+        self.assertEqual(float(self.rules.pacing["reply_debounce_seconds"]), 30.0)
+        ask = self.rules.raw["referral_ask"]
+        self.assertTrue(ask["enabled"], "owner decision 2026-11-19: ask after a refusal")
+        self.assertEqual(len(ask["messages"]), 5)
+        self.assertTrue(all(len(text) < 400 for text in ask["messages"]),
+                        "each bubble stays short; never one wall of text")
+
     def test_opening_window_is_weekday_business_hours(self):
         self.assertTrue(self.rules.in_window(MONDAY, "opening"))
         self.assertFalse(self.rules.in_window(MONDAY.replace(hour=18), "opening"))

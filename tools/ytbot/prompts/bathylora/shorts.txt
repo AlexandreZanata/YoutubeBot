@@ -1,0 +1,11 @@
+Write one complete English YouTube Short for Bathylora, an independent deep-ocean science documentary channel built on authentic oceanographic discoveries.
+
+REQUIREMENTS:
+
+- Everything must be 100% in American English.
+- Length: 90 to 140 words, about 40 to 60 seconds.
+- Focus on one true, verifiable deep-sea species, oceanographic expedition observation, depth adaptation or seafloor phenomenon.
+- Concrete, verified scientific facts only; clearly distinguish observations from open scientific questions; never invent species, depths, dates or discoveries.
+- Open immediately with the remarkable real observation, close with a calm reflective scientific insight.
+- No headings, lists, citations, links or metadata.
+- Output only the narration text.

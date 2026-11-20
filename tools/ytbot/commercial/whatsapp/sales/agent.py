@@ -42,8 +42,9 @@ REFERRAL_KEEPS = ("owner", "quote-requested", "won", "buying", "unconfirmed", "o
                   "invalid-number", "do-not-contact")
 NEXT_STATE = {"qualify": "qualifying", "collect": "qualifying", "quote": "quote-requested",
               "close": "closed", "block": "do-not-contact", "handoff": "needs-owner",
-              "won": "won", "buy": "buying", "lose": "lost", "refer": "referred"}
-OWNER_ACTIONS = ("handoff", "quote", "won", "buy", "lose")
+              "won": "won", "buy": "buying", "lose": "lost", "refer": "referred",
+              "ask_referral": "needs-owner"}
+OWNER_ACTIONS = ("handoff", "quote", "won", "buy", "lose", "ask_referral")
 # An app or system already offered (the offer question was asked once): when the client keeps
 # describing it, the requirements interview starts instead of offering again.
 SYSTEM_OFFERS = ("system_request", "system_price", "app_at_site_price")
@@ -169,7 +170,8 @@ class SalesAgent:
     def __init__(self, rules: SalesRules, store: SalesStore, channel=None, llm=None,
                  live: bool = False, clock=None, sleep=time.sleep, rng=random,
                  notify=owner_notify.desktop_notify, log=None, transcriber=None,
-                 paced_openings: bool = False, allowed_leads: set[str] | None = None):
+                 paced_openings: bool = False, allowed_leads: set[str] | None = None,
+                 reply_debounce: float | None = None):
         self.rules = rules
         self.store = store
         self.channel = channel
@@ -194,6 +196,8 @@ class SalesAgent:
         self._central_mtime: float | None = None
         self._typing_cycle: set[str] = set()
         self._planned: set[tuple[str, str]] = set()
+        # Opt-in: the live loop passes the rule value; unit tests keep answering at once.
+        self.reply_debounce = float(reply_debounce or 0.0)
         if live and channel is None:
             raise ValueError("live mode needs a WhatsApp channel")
 
@@ -453,6 +457,20 @@ class SalesAgent:
                  and self._in_scope(lead["id"])]
         return sorted(leads, key=lambda lead: lead.get("last_in_at") or "")
 
+    def _in_reply_debounce(self, lead: dict) -> bool:
+        """True while the contact may still be typing another bubble.
+
+        A person often sends two or three messages in a row; replying to the first
+        one reads like a machine. The rules set the quiet window (default 30 s).
+        """
+        window = self.reply_debounce
+        if window <= 0:
+            return False
+        last = self._parse(lead.get("last_in_at"))
+        if last is None:
+            return False
+        return (self.now() - last).total_seconds() < window
+
     def reply_pending(self) -> list[dict]:
         if not self.rules.in_window(self.now(), "reply"):
             waiting = len(self.pending())
@@ -461,6 +479,11 @@ class SalesAgent:
             return []
         results = []
         for lead in self.pending():
+            if self._in_reply_debounce(lead):
+                self.log(f"{lead.get('name', lead['id'])}: aguardando "
+                         f"{self.rules.pacing.get('reply_debounce_seconds', 30):.0f}s "
+                         "para ver se vem outra mensagem")
+                continue
             outcome = self.reply(lead)
             results.append(outcome)
             if _failed_outcome(outcome):
@@ -820,8 +843,8 @@ class SalesAgent:
         elif decision.intent == "ready_to_buy" and interest != "system":
             decision.owner_reason = "Quer fechar, mas não ficou claro se é site ou sistema"
         elif decision.intent == "refusal" and lead.get("interest"):
-            decision.action, decision.priority = "lose", "needed"
-            decision.owner_reason = "Desistiu da compra: você decide se retoma"
+            decision.action, decision.priority = "ask_referral", "needed"
+            decision.owner_reason = "Recusou depois de se interessar: pedido de indicação enviado"
         elif decision.intent == "gatekeeper" or (
                 lead["state"] == "gatekeeper"
                 and decision.intent not in ("referral", "forwarded_to_decider")):
@@ -851,6 +874,13 @@ class SalesAgent:
             decision.messages = list(decision.messages) + [texts["ask_name"]]
         decision.intent = decision.intent if decision.intent != "gatekeeper" else "gatekeeper"
         return decision
+
+    def _referral_ask(self) -> list[str]:
+        """The owner's indication request, always in short bubbles and only after a refusal."""
+        ask = self.rules.raw.get("referral_ask") or {}
+        if not ask.get("enabled"):
+            return []
+        return list(ask.get("messages") or [])
 
     def _refer(self, lead: dict, decision: Decision, text: str) -> Decision:
         """Save the number a staff member passed on as a new lead and thank them."""
@@ -929,6 +959,8 @@ class SalesAgent:
         if decision.action == "refer":
             decision = self._refer(lead, decision, text)
             lead = self.store.lead(lead["id"])
+        if decision.action == "ask_referral":
+            decision.messages = self._referral_ask()
         if decision.messages:
             items = self._items(lead, f"reply#{lead['awaiting']}", decision.messages, text)
             results = self.channel.send(lead, items, {"kind": "sales-reply", "lead": lead["id"],
@@ -1054,7 +1086,7 @@ class SalesAgent:
             if self._next_opening_at is not None and self.now() < self._next_opening_at:
                 return []
         results = self.prospect(1)
-        if self.live and any(item["state"] == "opened" for item in results):
+        if self.live and any(item["state"] in ("opened", "error") for item in results):
             wait = self.pacing.between_openings(self.rng)
             self._next_opening_at = self.now() + timedelta(seconds=wait)
             self.log(f"next opening in {wait:.0f}s (at {self._next_opening_at.strftime('%H:%M:%S')})")
@@ -1073,11 +1105,15 @@ class SalesAgent:
                 "referral": int(self.rules.raw["referral"]["daily_limit"])
                 - self.openings_today("referral")}
         # Referred numbers first: someone at the business asked us to talk to them. Maps
-        # leads keep the owner's CSV order (`queue_position`).
+        # leads keep the owner's CSV order (`queue_position`). A lead whose chat failed
+        # to open (`open_error`, nothing was typed) is skipped by the automatic run and
+        # left for an explicit manual `queue send`; only an `unconfirmed` send (something
+        # was typed) stops the line.
         candidates = sorted((lead for lead in self.store.leads().values()
                              if lead["state"] == "new" and not lead.get("opened_at")
                              and self._in_scope(lead["id"])
-                             and (in_queue(lead) or not queue_only)),
+                             and (in_queue(lead) or not queue_only)
+                             and (queue_only or not lead.get("open_error"))),
                             key=lambda lead: (not lead.get("referral"), *order_key(lead)))
         results = []
         for lead in candidates:
@@ -1092,9 +1128,43 @@ class SalesAgent:
             results.append(outcome)
             if outcome["state"] in ("opened", "unconfirmed", "planned"):
                 left[kind] -= 1
-            if outcome["state"] in ("error", "unconfirmed"):
-                break
+            if outcome["state"] in ("unconfirmed", "error"):
+                # Never retried: unconfirmed stays fenced, error stays new with open_error.
+                # A replacement goes to the end of the queue. The automatic run moves on;
+                # an explicit manual `queue send` stops at the first unconfirmed instead.
+                if not queue_only:
+                    self._backfill(lead, outcome["state"])
+                if outcome["state"] == "unconfirmed":
+                    self.log(f"opening unconfirmed for {lead.get('name', lead['id'])}; "
+                             "fenced, never retried"
+                             + (", moving on" if not queue_only else ""))
+                    if queue_only:
+                        break
+                else:
+                    self.log(f"opening failed for {lead.get('name', lead['id'])} before "
+                             f"typing ({outcome.get('error', 'error')}); skipping to the next")
         return results
+
+    def _backfill(self, failed: dict, reason: str) -> None:
+        """Replace a failed opening with the next owner-approved reserve lead."""
+        try:
+            rows = self.store.take_reserve(city=failed.get("city", "") or "", limit=1)
+        except Exception as error:
+            self.log(f"backfill indisponível: {error}")
+            return
+        if not rows:
+            self.log(f"sem reserva para repor {failed.get('name', failed.get('id'))}; "
+                     "o dono precisa aprovar mais empresas")
+            return
+        report = self.store.import_rows(rows, self.now(), "google-maps-manual")
+        if report.get("imported"):
+            added = rows[0].get("name", "?")
+            self.log(f"backfill: {added} entrou no fim da fila no lugar de "
+                     f"{failed.get('name', failed.get('id'))} ({reason})")
+        else:
+            self.log(f"backfill: reserva {rows[0].get('name', '?')} já era lead/DNC: "
+                     f"{report.get('duplicates', 0)} duplicada(s), "
+                     f"{len(report.get('rejected', []))} rejeitada(s)")
 
     def open_lead(self, lead: dict) -> dict:
         result = {"lead": lead["id"], "name": lead["name"]}

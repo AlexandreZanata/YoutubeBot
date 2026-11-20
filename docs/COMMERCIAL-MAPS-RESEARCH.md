@@ -150,6 +150,11 @@ After the owner reviews and edits the file, the import adds the leads with sourc
 `google-maps-manual` (`commercial sales import --network whatsapp --csv <file>`; the
 `--source` option is part of the implementation below).
 
+`export --mobile-only` writes only mobile numbers (9 digits starting with 9), the
+WhatsApp-capable form; landlines stay in `report.md` as "telefone fixo (filtro WhatsApp)".
+The module has no way to prove that a number is registered on WhatsApp: a mobile only means
+the owner or reception can be reached there.
+
 ## "Ajuste do Google Maps" service
 
 What Zaflas fixes on the client's Business Profile: website link, WhatsApp/phone, opening and
@@ -280,6 +285,57 @@ changes the page again.
 | Google confirmation | the shell text "Resultados da pesquisa"; AI overview or knowledge panel with no organic `h3`; explicit no-results phrase | `search_page` / `no_search_results`; empty result set is valid |
 | Directories | dental guides, marketplaces, booking hubs and navigation pages in the first page | `ignore_domains`, `marketplace` and `social-only` classes |
 | Stop | `/sorry`, reCAPTCHA frame, sign-in challenge, consent or an unknown layout | `ChallengeError` / `LayoutError`; the run stops and notifies |
+
+## Paid Places API path (owner's key)
+
+The browser flow gets throttled when Google decides the pace is too fast. The contract's
+sanctioned alternative is the owner's paid key:
+
+```bash
+python3 -m tools.ytbot commercial maps research --city "Lucas do Rio Verde" --state MT \
+  --group agro --limit 60 --source places
+python3 -m tools.ytbot commercial maps verify --run lucas-do-rio-verde --source places
+python3 -m tools.ytbot commercial maps export --run lucas-do-rio-verde
+```
+
+`--source places` calls `places:searchText` (New) with the same `<categoria> em <Cidade> - <UF>`
+queries, up to `places.max_pages` pages of `places.page_size` each, and writes the same `read`
+rows: name, category, address, phone, website, rating, reviews, hours, photo count and status.
+The key is read from `places.key_file` (private `.local/`, never committed) or
+`places.key_env`; it never appears in a log, report or error message. An API failure stops the
+command with the HTTP status and is never retried blindly.
+
+The API does not expose the age of the newest review (the score treats it as unknown) nor the
+"Reivindicar esta empresa" state. `verify --source places` therefore runs only the bounded
+direct-site probes, with no Google search: a working own site on Maps becomes `has-site` or
+`weak-site`, and everything else falls to `no-site` unless the obvious domain answers. The
+report prints a warning with that count, because a site that exists only off Maps cannot be
+proven absent this way. Review the names before importing.
+
+`verify --recheck --limit N` repeats the real Google confirmation for listings already marked
+`no-site`, best provisional score first. Use it to turn a Places-only shortlist into confirmed
+`no-site` / `site-not-on-maps` / `has-site` before the owner approves the batch.
+
+## Free web confirmation (no Google request)
+
+`verify --source web` confirms the same listings through DuckDuckGo Lite (`lite.duckduckgo.com`)
+with Bing as the fallback: one page per business, 2 to 5 seconds between queries, then the same
+bounded domain probes. It is faster than the one-tab Google flow and does not trigger Google's
+challenge. Prices, keys: none.
+
+Two rules keep directories from looking like a company site:
+
+1. `confirmation.ignore_domains` lists the CNPJ/city/classified directories seen in results
+   (`b2bleads`, `cnpjcheck`, `portaldacidade`, `guiacidade`, `popagro`, `worldorgs`, ...). The
+   owner extends it as new directories appear.
+2. A search result only counts as the business's own site when the **host** carries the brand
+   (`_host_signal`): `rcmaquinasmt.com.br` passes, `raizlegal.com.br/empresa/rc-maquinas` does
+   not. Social profiles, marketplaces and free builders are ignored before this check.
+
+A browser confirmation always wins: `places` and `web` never overwrite a `method = "browser"`
+check. `verify --only-mobile` restricts any confirmation to mobile numbers.
+
+## Verification and limits
 
 ## Verification and limits
 

@@ -166,17 +166,32 @@ class SalesFlowTests(unittest.TestCase):
         self.assertIn("ficha de requisitos completa", self.notes[-1]["reason"])
         self.assertEqual(self.sent()[-1], self.rules.brief_system["done_messages_buy"][0])
 
-    def test_giving_up_after_interest_is_lost_not_blocked(self):
+    def test_giving_up_after_interest_asks_for_an_indication(self):
         self.say("Vocês fazem aplicativo de agendamento?")
         self.say("Não tenho interesse")
-        self.assertEqual(self.state(), "lost")
+        self.assertEqual(self.state(), "needs-owner")
         self.assertFalse(self.store.is_dnc(self.lead["phone"]))
-        self.assertIn("você decide", self.notes[-1]["reason"])
+        self.assertIn("indicação", self.notes[-1]["reason"])
+        self.assertEqual(self.sent()[-1], self.rules.raw["referral_ask"]["messages"][-1])
 
-    def test_cold_refusal_still_blocks(self):
+    def test_cold_refusal_asks_for_an_indication_and_stops(self):
         self.say("Não tenho interesse")
+        self.assertEqual(self.state(), "needs-owner")
+        self.assertFalse(self.store.is_dnc(self.lead["phone"]))
+        ask = list(self.rules.raw["referral_ask"]["messages"])
+        self.assertEqual(self.sent()[-len(ask):], ask)
+        # The owner takes over: a new message does not get another bot reply.
+        sent = len(self.sent())
+        self.say("Obrigado")
+        self.assertEqual(len(self.sent()), sent)
+
+    def test_explicit_opt_out_still_blocks_forever(self):
+        self.say("Para de me mandar mensagem, isso é spam")
         self.assertEqual(self.state(), "do-not-contact")
         self.assertTrue(self.store.is_dnc(self.lead["phone"]))
+        self.assertEqual(self.sent()[-1],
+                         "Desculpe o incômodo! Não vou mais entrar em contato. "
+                         "Obrigado pela atenção.")
 
     def test_central_shows_the_new_states(self):
         self.say("Vocês fazem aplicativo de agendamento?")

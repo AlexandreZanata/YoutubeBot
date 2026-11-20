@@ -77,6 +77,13 @@ pub const CHANNELS: &[ChannelInfo] = &[
         channel_id: "UCJNamJBuijKJ5G7CgLgd7EQ",
         has_shorts: true,
     },
+    ChannelInfo {
+        slug: "bathylora",
+        name: "Bathylora",
+        handle: "@Bathylora",
+        channel_id: "UCxuhkOi4CDDStvQFpRGsoXA",
+        has_shorts: true,
+    },
 ];
 
 pub fn find(slug: &str) -> Option<&'static ChannelInfo> {
