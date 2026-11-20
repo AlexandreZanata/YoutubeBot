@@ -37,21 +37,24 @@ def license_allowed(value: str) -> bool:
     return any(marker in lowered for marker in ALLOWED)
 
 
-def period_ok(title: str, date: str) -> bool:
-    """Reject modern photographs; a title year must be from the period."""
+def period_ok(title: str, date: str, period: tuple[int, int] = (1880, 1915)) -> bool:
+    """Reject modern photographs; a title year must be from the episode period."""
     import re
+
+    low, high = period
 
     def years(text: str) -> list[int]:
         return [int(year) for year in re.findall(r"(?:18|19|20)\d{2}", text or "")]
 
     title_years = years(title)
     if title_years:
-        return all(1880 <= year <= 1915 for year in title_years)
+        return all(low <= year <= high for year in title_years)
     date_years = years(date)
-    return bool(date_years) and 1880 <= min(date_years) <= 1915
+    return bool(date_years) and low <= min(date_years) <= high
 
 
-def photo_candidates(query: str, limit: int = 4) -> list[dict]:
+def photo_candidates(query: str, limit: int = 4,
+                     period: tuple[int, int] = (1880, 1915)) -> list[dict]:
     params = {
         "action": "query", "generator": "search",
         "gsrsearch": f"filetype:bitmap {query}", "gsrlimit": str(limit), "gsrnamespace": "6",
@@ -75,7 +78,7 @@ def photo_candidates(query: str, limit: int = 4) -> list[dict]:
         })
     return [row for row in rows
             if row["url"] and license_allowed(row["license"])
-            and period_ok(row["title"], row["date"])]
+            and period_ok(row["title"], row["date"], period)]
 
 
 def download(url: str, destination: Path, attempts: int = 3) -> None:
@@ -94,7 +97,8 @@ def download(url: str, destination: Path, attempts: int = 3) -> None:
             time.sleep(3 * (attempt + 1))
 
 
-def collect(run_dir: Path, queries: list[dict]) -> list[dict]:
+def collect(run_dir: Path, queries: list[dict],
+            period: tuple[int, int] = (1880, 1915)) -> list[dict]:
     """Download one public-domain photograph per scene description."""
     photos_dir = run_dir / "photos"
     photos_dir.mkdir(parents=True, exist_ok=True)
@@ -107,15 +111,17 @@ def collect(run_dir: Path, queries: list[dict]) -> list[dict]:
         candidates: list[dict] = []
         for query in queries_list:
             try:
-                candidates.extend(photo_candidates(query))
+                candidates.extend(photo_candidates(query, period=period))
             except Exception as error:
                 log(f"search failed for {query}: {error}")
             if candidates:
                 break
         photograph = [row for row in candidates
                       if not any(word in row["title"].lower()
-                                 for word in ("postcard", "map", "drawing", "illustration", "print", "plan"))]
-        chosen = next((row for row in photograph + candidates if row["title"] not in used), None)
+                                 for word in ("postcard", "map", "drawing", "drawn", "sketch",
+                                              "illustration", "print", "plan", "engraving",
+                                              "lithograph", "woodcut", "painting", "etching"))]
+        chosen = next((row for row in photograph if row["title"] not in used), None)
         if chosen is None:
             log(f"no photo for {scene.get('subject', queries_list)}")
             continue

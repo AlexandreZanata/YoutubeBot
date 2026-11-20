@@ -25,6 +25,8 @@ class Channel:
     interval_days: int = 1
 
 
+DOCUMENTARY_CHANNELS = ("sepia-atlas", "bathylora")
+
 CHANNELS = {
     "zaflas": Channel(
         slug="zaflas",

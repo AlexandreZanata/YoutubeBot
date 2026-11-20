@@ -112,6 +112,16 @@ arguments or account secrets to ZaturoBot. Real generation/upload/Google consent
 are opt-in; CI uses fixtures. Read [accounts](docs/ACCOUNTS.md), [service](docs/SERVICE.md)
 and [migration](docs/MIGRATION.md) for those operations.
 
+## Documentary channels (strict, owner decision 2026-11-20)
+
+Sepia Atlas and Bathylora are only produced by `python3 -m tools.ytbot documentary
+init|collect|audit|narrate|render|qc`. Researched archival photographs carry the video and the
+cover, which is a real photograph with the editorial title burned over it, exactly like the first
+two episodes of each channel. Never generate an AI thumbnail and use it as the video background,
+never run these channels through the normal batch/distribution path, and never cut narration to
+hide a missing photo. `batch` refuses them, `distribute` skips them, and the renderer refuses a
+generated cover. See [documentary format](docs/DOCUMENTARY-FORMAT.md).
+
 ## Autonomous operation (owner decision 2026-11-20)
 
 When the owner leaves a batch running unattended, monitor it and act on errors instead of

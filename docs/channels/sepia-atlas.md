@@ -112,3 +112,10 @@ renders the supersampled Ken Burns montage in parallel (using `h264_nvenc` when 
 with `libx264` fallback) through a two-level `xfade` cross-dissolve tree with the `0.9x`
 narration and subtle analog room-tone. The first episode package is prepared under the channel
 runs folder for owner review; nothing is published automatically.
+
+## Strict production path
+
+Only the documentary pipeline (`documentary init|collect|audit|narrate|render|qc`) produces
+this channel. Researched archival photographs carry the video; the cover is a real photograph
+with the episode title over it, like the first two episodes. Never an AI thumbnail used as the
+background, never the normal batch path. See [documentary format](../DOCUMENTARY-FORMAT.md).

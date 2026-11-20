@@ -298,7 +298,13 @@ def cmd_render(args) -> None:
         cand = run_dir / "photos" / f"{args.thumb_photo}.jpg"
         photo_path = cand if cand.is_file() else Path(args.thumb_photo)
     elif sources:
-        photo_path = Path(sources[0]["file"])
+        # Documentary channels always build the thumbnail from a real archival
+        # photograph with burned-in editorial text, never from generated art.
+        photo_path = next((Path(s["file"]) for s in sources
+                           if not s.get("generated") and Path(s["file"]).is_file()), None)
+        if photo_path is None:
+            raise SystemExit("no real archival photograph available for the thumbnail; "
+                             "collect verified sources before rendering")
     if photo_path and photo_path.is_file():
         thumb_title = (args.thumb_title or (run_dir / "topic.txt").read_text(encoding="utf-8").strip()[:24]).replace("\\n", "\n")
         documentary.thumbnail(

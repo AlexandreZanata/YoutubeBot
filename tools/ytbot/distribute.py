@@ -63,7 +63,8 @@ def allocate(count: int, scheduled: dict[str, int]) -> dict[str, int]:
 
 
 def audit() -> dict[str, int]:
-    return {slug: future_scheduled(slug) for slug in channels.CHANNELS}
+    return {slug: future_scheduled(slug) for slug in channels.CHANNELS
+            if slug not in channels.DOCUMENTARY_CHANNELS}
 
 
 def command_for(slug: str, count: int) -> list[str]:

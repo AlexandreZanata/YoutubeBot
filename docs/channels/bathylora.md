@@ -173,3 +173,10 @@ episode production instructions usable by any agent, see
 [the Bathylora production pipeline runbook](bathylora-pipeline.md). The pilot episode package
 is prepared under `.local/ytbot/channels/bathylora/runs/` for owner review; nothing is
 published automatically.
+
+## Strict production path
+
+Only the documentary pipeline (`documentary init|collect|audit|narrate|render|qc`) produces
+this channel. Verified oceanographic photographs carry the video; the cover is a real photograph
+with the episode title over it. Never an AI thumbnail used as the background, never the normal
+batch path. See [documentary format](../DOCUMENTARY-FORMAT.md).
