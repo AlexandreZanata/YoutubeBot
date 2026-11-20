@@ -413,6 +413,25 @@ class SalesAgent:
             typing_now.discard(lead["id"])
             changes = {"last_in_at": now, "chat": event.get("chat") or lead.get("chat"),
                        "typing": False, "typing_since": None}
+            # An opt-out always wins. The reply flow already handles it (apology + block)
+            # in replyable states; this catches the states it never reaches, such as
+            # needs-owner after the indication ask, so the number is still fenced.
+            if lead["state"] != "do-not-contact" \
+                    and lead["state"] not in REPLYABLE + SILENT_STATES \
+                    and self.rules.intent("opt_out").matches(normalize(event["text"])):
+                apology = list(self.rules.intent("opt_out").messages)
+                if apology and self.channel is not None:
+                    self.channel.send(lead, self._items(
+                        lead, f"opt-out#{event.get('id')}", apology, event["text"]),
+                        {"kind": "sales-reply", "lead": lead["id"], "intent": "opt_out"})
+                self.store.add_dnc(lead["phone"], "opt_out", self.now())
+                listener.revoke_contact(self.store.contact_rules_path, self._contact_entry(lead))
+                self.store.update_lead(lead["id"], state="do-not-contact", awaiting=None,
+                                       **changes)
+                self._handoff(lead, "Pediu para parar de ser contactado", event["text"],
+                              "needed", "opt_out")
+                touched.append(lead["id"])
+                continue
             if (not reply_is_active(lead) or not self._auto_conversation()) \
                     and lead["state"] not in ("do-not-contact", "invalid-number"):
                 changes["state"] = "needs-owner"
@@ -883,10 +902,15 @@ class SalesAgent:
         decision.intent = decision.intent if decision.intent != "gatekeeper" else "gatekeeper"
         return decision
 
-    def _referral_ask(self) -> list[str]:
-        """The owner's indication request, always in short bubbles and only after a refusal."""
+    def _referral_ask(self, lead: dict) -> list[str]:
+        """The owner's indication request, always in short bubbles and only after a refusal.
+
+        Only when we already introduced ourselves: someone who refuses before our opening
+        never heard of Zaflas, so asking them for indications would be nonsense. That case
+        keeps the fixed thanks and is never contacted again.
+        """
         ask = self.rules.raw.get("referral_ask") or {}
-        if not ask.get("enabled"):
+        if not ask.get("enabled") or not lead.get("opened_at"):
             return []
         return list(ask.get("messages") or [])
 
@@ -968,7 +992,15 @@ class SalesAgent:
             decision = self._refer(lead, decision, text)
             lead = self.store.lead(lead["id"])
         if decision.action == "ask_referral":
-            decision.messages = self._referral_ask()
+            ask = self._referral_ask(lead)
+            if ask:
+                decision.messages = ask
+            else:
+                # Refused before our opening: thank, block, never contact again.
+                decision.action, decision.priority = "block", "needed"
+                decision.messages = list(self.rules.intent("refusal").messages) or [
+                    "Entendo, obrigado pela atenção! Tenha um ótimo dia."]
+                decision.owner_reason = "Recusou antes da nossa apresentação: bloqueado"
         if decision.messages:
             items = self._items(lead, f"reply#{lead['awaiting']}", decision.messages, text)
             results = self.channel.send(lead, items, {"kind": "sales-reply", "lead": lead["id"],

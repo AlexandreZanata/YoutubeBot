@@ -218,6 +218,34 @@ class PortugueseSalesValidationTests(unittest.TestCase):
                           if self.sent_texts()[i:i + len(ask)] == ask)
         self.assertEqual(occurrences, 1)
 
+    # 10. An opt-out written after the indication ask still blocks forever --------------
+    def test_opt_out_after_the_ask_still_records_the_do_not_contact(self):
+        self.say("Não tenho interesse")
+        self.assertEqual(self.state(), "needs-owner")
+        self.say("Para de me mandar mensagem")
+        self.assertEqual(self.state(), "do-not-contact")
+        self.assertTrue(self.store.is_dnc(self.lead["phone"]))
+        self.assertIn("Não vou mais entrar em contato", self.sent_texts()[-1])
+
+    # 11. A refusal from someone we never opened gets the thanks, never the ask ----------
+    def test_first_message_refusal_never_sends_the_indication_ask(self):
+        fresh = PortugueseSalesValidationTests()
+        fresh.setUp()
+        try:
+            fresh.agent._planned.clear()
+            # Lead that never received our opening: state new, no opened_at.
+            fresh.store.update_lead(fresh.lead["id"], state="new", opened_at=None)
+            fresh.say("Não quero site, não")  # writes first, refusing
+            self.assertEqual(fresh.state(), "do-not-contact",
+                             "someone who refused before our opening is never contacted again")
+            self.assertFalse(fresh.store.is_dnc(fresh.lead["phone"]) is False)
+            ask = fresh.ask_bubbles()
+            self.assertNotEqual(fresh.sent_texts()[-len(ask):], ask,
+                                "the indication ask must not go to someone never introduced")
+            self.assertTrue(any("obrigado pela atenção" in t for t in fresh.sent_texts()))
+        finally:
+            fresh.tearDown()
+
     # 10. The refusal wording still matches with accents, case and politeness -----------
     def test_classification_is_accent_and_case_insensitive(self):
         for text in ("NAO, OBRIGADO", "não obrigado", "Nao preciso não, valeu!"):
