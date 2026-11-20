@@ -18,7 +18,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     env:
       QT_QPA_PLATFORM: offscreen
       TZ: America/Cuiaba
@@ -36,21 +36,26 @@ jobs:
           cache-dependency-path: requirements-desktop.txt
       - name: Linux media libraries
         # The runner image already has most of these. Install only what is missing; an
-        # unconditional `apt-get update` was the slow/hanging step.
+        # unconditional `apt-get update` was the slow/hanging step. The EC2 mirror can
+        # stall on the large ffmpeg blobs (two main timeouts on 2026-11-18), so install
+        # with resume-friendly retries instead of failing on the first stall.
         run: |
           missing=""
           for package in ffmpeg libegl1 libopengl0 libxkbcommon0 libpulse0; do
             dpkg -s "$package" >/dev/null 2>&1 || missing="$missing $package"
           done
-          if [ -n "$missing" ]; then
-            echo "Installing missing packages:$missing"
-            sudo timeout 180 apt-get install -y --no-install-recommends \
-              -o Acquire::Retries=2 -o Acquire::http::Timeout=20 $missing \
-              || { sudo timeout 120 apt-get update -qq && \
-                   sudo timeout 180 apt-get install -y --no-install-recommends $missing; }
-          else
+          if [ -z "$missing" ]; then
             echo "All media libraries are already present."
+            exit 0
           fi
+          echo "Installing missing packages:$missing"
+          install_missing() {
+            sudo timeout 280 apt-get install -y --no-install-recommends \
+              -o Acquire::Retries=3 -o Acquire::http::Timeout=60 $missing
+          }
+          install_missing \
+            || { sudo timeout 120 apt-get update -qq && install_missing; } \
+            || { echo "mirror still slow, one last resume attempt"; sleep 15; install_missing; }
       - name: Install test dependencies
         run: |
           npm ci

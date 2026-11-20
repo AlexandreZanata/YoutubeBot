@@ -46,7 +46,16 @@ def _alias_pattern(aliases: list[str] | tuple[str, ...]) -> re.Pattern:
                     if normalize(alias)}, key=len, reverse=True)
     if not parts:
         raise RulesError("an alias list is empty")
-    return re.compile(r"(?<![a-z0-9])(?:" + "|".join(re.escape(part) for part in parts)
+
+    def plural(part: str) -> str:
+        # "cocas", "hot dogs completos", "batatas fritas": every word of an alias may be plural.
+        words = []
+        for word in part.split(" "):
+            escaped = re.escape(word)
+            words.append(escaped + "(?:e?s)?" if len(word) >= 3 and word.isalpha() else escaped)
+        return r"\ ".join(words)
+
+    return re.compile(r"(?<![a-z0-9])(?:" + "|".join(plural(part) for part in parts)
                       + r")(?![a-z0-9])")
 
 
@@ -144,6 +153,16 @@ class RestaurantRules:
     @property
     def menu_category_names(self) -> dict:
         return self.raw["menu"]["categories"]
+
+    @property
+    def menu_url(self) -> str:
+        return str(self.raw.get("menu", {}).get("url") or "").strip()
+
+    def menu_reply_messages(self) -> list[str]:
+        """Link to the website/app when configured, otherwise the full text menu."""
+        if self.menu_url:
+            return [self.fill(self.texts["menu_link"], url=self.menu_url)]
+        return self.menu_messages()
 
     def item(self, item_id: str) -> Item:
         for item in self.items:
@@ -324,13 +343,24 @@ def build(raw: dict) -> RestaurantRules:
                             "confirmed_delivery", "confirmed_pickup", "confirmed_thanks",
                             "cancelled", "cancelled_after_kitchen", "not_understood",
                             "ask_what_to_adjust", "below_min", "below_min_question",
-                            "max_qty", "max_order",
+                            "max_qty", "max_order", "swap_question", "removed_item",
                             "item_not_found", "extra_not_found", "payment_unknown",
-                            "change_too_low", "handoff_ack", "large_order",
+                            "change_too_low", "handoff_ack", "correction_notice",
+                            "large_order", "harassment_warn", "harassment_handoff",
+                            "partial_added", "partial_missing_extra",
+                            "partial_missing_item", "keep_only_question",
+                            "clear_cart_question", "keep_which_question",
+                            "value_jump_question", "audio_uncertain_question",
+                            "alive_reply", "handoff_waiting", "first_welcome",
+                            "menu_link", "ask_address_payment", "clarify_type",
+                            "clarify_address", "clarify_address_payment",
+                            "clarify_name", "clarify_change", "not_in_cart", "confirmed_followup", "max_extras",
+                            "item_offer_question",
                             "owner_reason_unknown", "owner_reason_confirm",
                             "owner_reason_large", "owner_reason_cancel",
                             "owner_reason_status", "owner_reason_complaint",
-                            "owner_reason_human", "owner_reason_media"))
+                            "owner_reason_human", "owner_reason_media",
+                            "owner_reason_harassment", "owner_reason_waiting"))
     _require(raw, "guard", ("forbidden", "human_claims"))
     _require(raw, "context_rules", ("model_only_reads", "never_invent_item",
                                     "never_invent_price", "confirm_before_kitchen",
@@ -338,6 +368,9 @@ def build(raw: dict) -> RestaurantRules:
     menu = raw.get("menu")
     if not isinstance(menu, dict) or not menu.get("categories") or not menu.get("items"):
         raise RulesError("missing [menu.categories] or [[menu.items]]")
+    menu_url = str(menu.get("url") or "").strip()
+    if menu_url and not menu_url.startswith(("http://", "https://")):
+        raise RulesError("menu.url must start with http:// or https://")
     categories = menu["categories"]
     items = []
     seen_ids = set()

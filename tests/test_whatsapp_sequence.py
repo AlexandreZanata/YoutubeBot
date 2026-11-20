@@ -41,6 +41,17 @@ class SequenceTests(unittest.TestCase):
         self.assertEqual([item["state"] for item in results], ["duplicate", "fenced"])
         self.assertEqual(sent, [])
 
+    def test_a_failure_before_the_composer_can_be_retried_safely(self):
+        def fail(page, text, pacing, delay=None, link_wait=0.0, **kwargs):
+            raise RuntimeError("the text did not reach the composer; nothing was sent")
+        results = sender.send_sequence(None, "Empresa", ITEMS, sender.Pacing(), self.journal,
+                                       deliver_fn=fail)
+        self.assertEqual(results[0]["state"], "error")
+        self.assertTrue(sender.can_retry_before_send(self.journal, "k0"))
+        results, sent = self.send(["sent", "sent", "sent"])
+        self.assertEqual([item["state"] for item in results], ["sent", "sent", "sent"])
+        self.assertEqual(len(sent), 3)
+
     def test_exception_is_journaled_as_error(self):
         def deliver(page, text, pacing, delay=None, link_wait=0.0, **kwargs):
             raise RuntimeError("composer missing")

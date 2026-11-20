@@ -18,6 +18,8 @@ class WhatsAppSenderTests(unittest.TestCase):
         self.assertEqual(sender.text_key("*Burgers artesanais*"), "Burgers artesanais")
         self.assertEqual(sender.text_key("  *X-Bacon*\n— R$ 24,00 "),
                          "X-Bacon — R$ 24,00")
+        self.assertEqual(sender.confirm_key("*Bebidas*\n• Coca-Cola — R$ 6,00"),
+                         "Bebidas Coca Cola R 6 00")
 
     def test_message_key_is_stable_and_distinct(self):
         first = sender.message_key("Ana", "Oferta do dia", None)
