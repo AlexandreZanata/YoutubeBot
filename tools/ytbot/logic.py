@@ -46,6 +46,8 @@ def strip_dashes(text: str, title: bool = False) -> str:
 
 
 def parse_metadata(text: str) -> dict:
+    # ChatGPT's browser text escapes list markers and hashtags ("1\." and "\#").
+    text = text.replace("\\.", ".").replace("\\#", "#")
     titles = re.findall(r"^\s*\d+\.\s*(.+)$", text, re.M)
     if not titles:
         # Browser innerText omits CSS-generated numbers from an ordered list.

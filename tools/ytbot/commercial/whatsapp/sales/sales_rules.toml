@@ -16,7 +16,7 @@ language = "pt-BR"
 timezone = "America/Cuiaba"
 
 [limits]
-daily_openings = 10                 # owner decision 2026-11-17
+daily_openings = 50                 # owner decision 2026-11-19 (was 30 earlier today, 10 on 2026-11-17)
 max_replies_per_lead_per_day = 12   # stops loops with other bots; the owner takes over
 max_bot_replies_before_owner = 8    # a long chat that has not reached a quote goes to the owner
 owner_reminder_minutes = 30         # new messages in a chat that is with the owner: one reminder
@@ -29,12 +29,12 @@ no_response_after_followup_hours = 96
 [hours]
 # Weekday numbers: 0 = Monday ... 6 = Sunday. Times are local (America/Cuiaba).
 opening_days = [0, 1, 2, 3, 4]
-opening_start = "08:30"
-opening_end = "17:30"
+opening_start = "07:00"
+opening_end = "17:00"
 # People who wrote are answered in this window; later messages wait for the next window.
 reply_days = [0, 1, 2, 3, 4, 5, 6]
 reply_start = "07:00"
-reply_end = "21:00"
+reply_end = "17:00"
 
 [pacing]
 # Interval between two messages of a reply = typing time of the message (+ reading time of the
@@ -50,6 +50,9 @@ jitter = 0.15
 link_preview_seconds = 3.0          # minimum wait after typing a link, for the preview card
 between_chats_min_seconds = 10.0
 between_chats_max_seconds = 30.0
+between_openings_min_seconds = 120.0
+between_openings_max_seconds = 180.0
+max_typing_wait_seconds = 60.0      # safety cap while waiting for a contact in "digitando..." state
 
 [llm]
 # Owner decision 2026-11-17 (evening): OpenCode Go free models first, in rotation, then the
@@ -251,7 +254,7 @@ gave_up = "Sem problema! Fico à disposição: se a pessoa responsável quiser c
 thanks = "Muito obrigado, {staff}! Vou falar com {who} agora."
 thanks_unnamed = "Muito obrigado! Vou falar com {who} agora."
 who_unnamed = "a pessoa responsável"
-daily_limit = 10                    # referral openings, apart from the 10 cold ones
+daily_limit = 10                    # referral openings, apart from the cold ones
 opening = [
   "{greeting}",
   "Tudo bem?",
@@ -324,8 +327,11 @@ fixed = true
 when = "Resposta automática de WhatsApp Business: saudação de ausência, horário de atendimento, 'em breve retornaremos', menu numérico."
 patterns = [
   'esta e uma (mensagem|resposta) automatica', 'obrigad[oa] (por|pelo) (entrar em )?contato',
-  'retornaremos', 'em breve (responderemos|retornaremos|entraremos)', 'nosso horario de atendimento',
-  'digite (o numero|1|uma opcao)', 'no momento (nao estamos|estamos fora)', 'agradecemos (o|seu) contato',
+  'retornaremos', 'em breve (responderemos|retornaremos|entraremos|nossa equipe)',
+  'assim que possivel (responderemos|retornaremos|entraremos)', 'nossa equipe (ira |vai )?(responder|retornar|atender)',
+  'nosso horario de atendimento', 'atendimento (automatico|eletronico)',
+  'digite (o numero|1|uma opcao)', 'selecione uma (das )?opco',
+  'no momento (nao estamos|estamos fora)', 'agradecemos (o |o seu |seu )?contato',
 ]
 messages = []
 
@@ -501,16 +507,36 @@ patterns = ['(?<!\d)(\+?55[\s.-]*)?\(?\d{2}\)?[\s.-]*9?[\s.-]*\d{4}[\s.-]*\d{4}(
 messages = ["Muito obrigado! Vou falar com a pessoa responsável agora."]
 
 [[intents]]
+id = "forwarded_to_decider"
+action = "close"
+fixed = true
+when = "Diz que vai encaminhar, repassar ou enviar a mensagem/proposta para o responsável, dono, gerência, diretoria ou setor responsável ('Irei encaminhar para o responsável!!', 'vou encaminhar para o marketing', 'já encaminhei pro dono'). Agradece e avisa que fica no aguardo do retorno, sem pedir o contato de novo e sem acionar o dono."
+patterns = [
+  '(vou|irei|vamos|iremos|estou|to|estarei|ja|vo|posso) (encaminhar|encaminhando|repassar|repassando)\b.{0,35}\b(responsavel|dono|dona|proprietari[oa]|gerent[ea]|gerencia|diretor(a|ia)?|chefe|patra[oa]|soci[oa]|gestor(a)?|gestao|coordenador(a)?|supervisor(a)?|administrativ[oa]|administracao|financeiro|marketing|comercial|setor|departamento|equipe|doutor(a)?|dr\.?|dra\.?|analise|avaliacao|internamente|ele|ela|eles|elas|quem (decide|cuida|resolve))',
+  '(vou|irei|vamos|iremos|estou|to|estarei|ja|vo|posso) (enviar|enviando)\b.{0,25}\b(pro|pra|para( [oa])?|ao|a) (setor |departamento |equipe )?(responsavel|dono|dona|proprietari[oa]|gerent[ea]|gerencia|diretor(a|ia)?|chefe|patra[oa]|soci[oa]|gestor(a)?|gestao|administrativ[oa]|administracao|financeiro|marketing|comercial|doutor(a)?|dr\.?|dra\.?)',
+  '(irei|iremos|estarei|estou|to|ja) (passar|passando|mostrar|mostrando)\b.{0,20}\b(pro|pra|para( [oa])?|ao|a) (setor |departamento |equipe )?(responsavel|dono|dona|proprietari[oa]|gerent[ea]|gerencia|diretor(a|ia)?|chefe|patra[oa]|soci[oa]|gestor(a)?|gestao|administrativ[oa]|administracao|financeiro|marketing|comercial|doutor(a)?|dr\.?|dra\.?)',
+  '\bvou (passar|mostrar)\b.{0,20}\b(pro|pra|para( [oa])?|ao|a) (setor |departamento |equipe )?(responsavel|gerencia|diretoria|marketing|financeiro|administrativ[oa]|administracao|setor|departamento)\b',
+  '\b(encaminhei|encaminho|encaminhando|encaminhado|encaminharemos|repassei|repasso|repassando|repassado|repassaremos)\b.{0,35}\b(responsavel|dono|dona|proprietari[oa]|gerent[ea]|gerencia|diretor(a|ia)?|chefe|patra[oa]|soci[oa]|gestor(a)?|gestao|coordenador(a)?|supervisor(a)?|administrativ[oa]|administracao|financeiro|marketing|comercial|setor|departamento|equipe|doutor(a)?|dr\.?|dra\.?|analise|avaliacao|internamente|ele|ela|eles|elas|quem (decide|cuida|resolve))',
+  '\b(passei|enviei)\b.{0,20}\b(pro|pra|para( [oa])?|ao|a) (setor |departamento |equipe )?(responsavel|dono|dona|proprietari[oa]|gerent[ea]|gerencia|diretor(a|ia)?|chefe|patra[oa]|soci[oa]|gestor(a)?|gestao|administrativ[oa]|administracao|financeiro|marketing|comercial|doutor(a)?|dr\.?|dra\.?)',
+  '\b(vou|irei|vamos|iremos|estou|to|estarei) (encaminhar|encaminhando|repassar|repassando)( (a |essa |sua |as )?(mensagem|proposta|informac\w*|contato|exemplos?|links?))?[!. ]*$',
+  '^(ja )?(encaminhei|encaminhado|encaminhando|repassei|repassado)( aqui| agora| sim)?[!. ]*$',
+]
+messages = [
+  "Entendido, muito obrigado! Fico no aguardo do retorno.",
+]
+
+[[intents]]
 id = "gatekeeper"
 action = "reply"
 fixed = true
 when = "Quem responde é funcionário ou atendente e não decide: 'sou funcionária', 'o dono não está', 'quem decide é o gerente', 'vou passar pro responsável', 'ele te chama'."
 patterns = [
-  'sou (funcionari|atendente|recepcionista|secretari|colaborador)', 'nao sou (o |a )?(dono|dona|responsavel|proprietari)',
-  '(o|a) (dono|dona|responsavel|proprietari[oa]|gerente|chefe|patra[oa]) (nao esta|nao ta|nao se encontra|esta ocupad|ta ocupad|que (decide|ve|cuida|resolve))',
-  'quem (decide|resolve|ve isso|cuida (disso|dessa parte))', 'vou (passar|repassar|mostrar|falar) (isso )?(pro|para o|pra|para a) (dono|dona|responsavel|chefe|gerente|patra[oa])',
+  'sou (funcionari|atendente|recepcionista|secretari|colaborador)', 'aqui e (da |a )?(recepcao|secretaria)',
+  'nao sou (o |a )?(dono|dona|responsavel|proprietari)',
+  '(o|a) (dono|dona|responsavel|proprietari[oa]|gerente|chefe|patra[oa]|doutor|doutora|dr\.?|dra\.?) (nao esta|nao ta|nao se encontra|esta ocupad|ta ocupad|esta em atendimento|ta em atendimento|que (decide|ve|cuida|resolve))',
+  'quem (decide|resolve|ve isso|cuida (disso|dessa parte))', 'vou (passar|repassar|mostrar|falar) (isso )?(pro|para o|pra|para a) (dono|dona|responsavel|chefe|gerente|patra[oa]|doutor|doutora|dr\.?|dra\.?)',
   'deixa eu ver com (o|a)', 'preciso ver com (o|a)', 'tenho que ver com (o|a)', 'nao sou eu que (decido|cuido)',
-  'vou (ver|falar|conversar) com (o|a) (dono|dona|responsavel|chefe|gerente|patra[oa])', '(ele|ela) (te )?(chama|retorna|liga|responde)',
+  'vou (ver|falar|conversar) com (o|a) (dono|dona|responsavel|chefe|gerente|patra[oa]|doutor|doutora|dr\.?|dra\.?)', '(ele|ela) (te )?(chama|retorna|liga|responde)',
 ]
 messages = [
   "Muito obrigado pelo retorno!",
@@ -774,7 +800,7 @@ action = "ignore"
 fixed = true
 when = "Só agradece, acusa recebimento ou se despede, sem pergunta: 'obrigado', 'obg', 'valeu', 'ok', 'entendi', '👍'."
 patterns = [
-  '^(obrigad[oa]|obg|obgd|agradeco|valeu|vlw|ok|oks|beleza|blz|show|certo|tmj|entendi|entendido|anotado|ta bom|ta certo|bom trabalho|sucesso|igualmente|deus abencoe|kk+|haha+|rs+)[!. ]*$',
+  '^((muito |mt )?obrigad[oa]|obg|obgd|agradeco|valeu|vlw|ok|oks|beleza|blz|show|certo|tmj|entendi|entendido|anotado|ta bom|ta certo|bom trabalho|sucesso|igualmente|deus abencoe|kk+|haha+|rs+)[!. ]*$',
   '^\W+$',
 ]
 messages = []

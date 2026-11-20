@@ -128,11 +128,12 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(len(self.pauses), 1)
         self.assertGreaterEqual(self.pauses[0], 10)
 
-    def test_daily_limit_of_ten_first_contacts(self):
-        self.leads(12)
+    def test_daily_limit_of_first_contacts(self):
+        limit = int(self.rules.limits["daily_openings"])
+        self.leads(limit + 2)
         agent, channel = self.agent()
         results = agent.prospect()
-        self.assertEqual(sum(1 for item in results if item["state"] == "opened"), 10)
+        self.assertEqual(sum(1 for item in results if item["state"] == "opened"), limit)
         self.assertEqual(agent.prospect(), [])
         self.clock.now = MONDAY + timedelta(days=1)
         self.assertEqual(len(agent.prospect()), 2)

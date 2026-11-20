@@ -15,6 +15,10 @@ UPLOAD_ACCOUNTS = {
     "zaflas": "zaflas",
     "infinite-random-worlds": "infinite",
     "vocal-pages": "vocal",
+    "zanata": "zanata",
+    "reflection": "reflection",
+    "midnight-tales": "midnight",
+    "sepia-atlas": "sepia",
 }
 
 
@@ -78,6 +82,11 @@ def run_distribution(count: int, dry_run: bool = False) -> list:
     failures: list = []
     if dry_run:
         return failures
+    from .comments import answer_all
+    try:
+        answer_all()
+    except Exception as error:
+        log(f"comments check warning: {error}")
     for slug in channels.CHANNELS:
         amount = plan[slug]
         if not amount:

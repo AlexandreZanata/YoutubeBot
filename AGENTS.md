@@ -20,7 +20,8 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   the owner. Operator/browser interface language never changes content language.
 - `tools/ytbot` keeps channel prompts, deduplication, resumable stage records and sequential
   upload/scheduling. Existing profiles are `fallem-prince`, `whispers-from-heaven`, `zaflas`,
-  `infinite-random-worlds`, `vocal-pages`, `zanata` and `reflection`.
+  `infinite-random-worlds`, `vocal-pages`, `zanata`, `reflection`, `midnight-tales` and
+  `sepia-atlas`.
   Whispers uses 2,400 to 2,800 words (15 to 17 minutes), Sacred Brown Engraving thumbnails,
   brown stippling background and the metadata/tag patterns in
   [its channel profile](docs/channels/whispers-from-heaven.md). Zaflas uses Brazilian
@@ -30,6 +31,16 @@ English in code, comments, documentation and commits; user-facing UI may use Por
   12:00 America/Cuiaba. Its dedicated profile is upload-only; generation stays in legacy.
   Zaflas articles target 4,000 to 4,800 words (26,000 to 34,000 characters) with one bounded
   rewrite above the ceiling.
+- Sepia Atlas is English-only, American English, premium historical documentaries built on
+  authentic archival photography: 14 to 18 minutes (2,200 to 2,700 words), one video every two
+  days at 21:00, Cinematic Archival Minimalism (Archival Black, Aged Gold, Antique Ivory) and a
+  photographer's eye for the Atlas Frame emblem. Never fabricate a historical photograph or
+  present a generated image as documentary evidence. The first episode stays private for owner
+  review and is never auto-published. See [its channel profile](docs/channels/sepia-atlas.md).
+- Midnight Tales is English-only long-form sleep stories for adults, 6,500 to 9,000 words
+  (45 to 65 minutes), one video every two days at 21:00 and one Short every two days at 09:00.
+  Thumbnails are painterly cinematic scenes with no text, and the thumbnail is the still video
+  background. See [its channel profile](docs/channels/midnight-tales.md).
 - the word of reflection is English-only biblical stories at 05:00 and 17:00 daily, 14 to 16
   minutes, full-bleed cinematic thumbnails with a two or three word white title. It shares the
   Google account with Vocal Pages. See
@@ -94,8 +105,9 @@ When Codex is installed, use `codex_media.py` for thumbnails, metadata and autom
 article generation and Read aloud only. The coordinator must be `gpt-6.1-terra` with low
 reasoning effort, or owner-selected `gpt-6-luna` with low effort. The native image tool
 renders the thumbnail. An empty or invalid Codex image path is retried once automatically; if it persists,
-stop. Never silently use a more expensive coordinator, API-key fallback,
-or ChatGPT image fallback after a Codex failure. Preserve media-attempt fences and existing
+stop. Never silently use a more expensive coordinator or API-key fallback.
+The only ChatGPT image fallback is the owner-authorized one after Codex reports its usage
+limit: log the reset time, record it privately and resume Codex when credits return. Preserve media-attempt fences and existing
 artifacts. See [Codex media setup](docs/CODEX-MEDIA.md).
 
 Only fallem prince alternates dense and classic thumbnail prompts. Whispers and Zaflas use
@@ -111,13 +123,17 @@ void/two-color poster interpretation is superseded. Alternate the dense prompt w
 
 ## Shorts
 
-Vertical Shorts use the dedicated `shorts` protocol: 1080x1920, 35 to 55 seconds, 90 to 130
-Portuguese words, portrait Zaflas background, a custom vertical 1080x1920 thumbnail in the
-existing Zaflas Shorts style, no end screen, and two per day at 09:00/18:00 when requested.
-They use the legacy generation profile and the Zaflas upload-only profile. Use the proven path
-with a custom thumbnail and no end screen, and stage the upload file in
-`.local/ytbot/upload-tmp`; the dialog cannot read a file inside the `/data` symlink. Do not
-route them through the long-form batch. See [Shorts](docs/SHORTS.md).
+Every channel now publishes Vertical Shorts through the `faith-shorts` protocol: 1080x1920,
+35 to 55 seconds, one generated image per Short as its background, burned-in subtitles and no
+custom thumbnail. Every Short must have its own image tied to its story; never reuse a scene from
+another Short, and a near-duplicate background is replaced once. Each channel keeps its own art
+style, topic queue and slot hours: Zaflas
+09:00/18:00, reflection 08:00/20:00, Whispers 09:00/21:00, zanata 09:00, Fallem Prince 21:00,
+Infinite Random Worlds 09:00, Vocal Pages 21:00, Midnight Tales one every two days at 09:00 and
+Sepia Atlas 21:00.
+The Zaflas `shorts` command remains for legacy batches; new Shorts go through `faith-shorts`.
+Generation uses the legacy ChatGPT profile and only the upload touches the channel profile. Do
+not route Shorts through the long-form batch. See [Shorts](docs/SHORTS.md).
 
 ## Commercial affiliates
 
@@ -134,7 +150,7 @@ DOM map, state machine and troubleshooting are in
 
 The Zaflas Inova Simples sales agent is the only list use (owner decision 2026-11-17): it opens
 one-to-one conversations only with businesses from the owner's reviewed Google Maps CSV (never
-scraped), at most 10 first contacts per day in business hours, never repeats an opening and
+scraped), at most 50 first contacts per day in business hours, never repeats an opening and
 sends at most one follow-up. It answers funnel leads by
 `tools/ytbot/commercial/whatsapp/sales/sales_rules.toml`, through OpenCode Go: free models
 first (zero price in the live catalog, rotating, paused on timeout or no credits), then only
@@ -144,7 +160,7 @@ its fixed text or goes to the owner. A refusal is a permanent do-not-contact ent
 question gets an honest answer, the OpenCode key stays in `.local/`, and `--live` stays
 required. Imported numbers start with replies active: the agent answers a lead that writes even before
 an opening, `sales activate|pause` toggles that per lead, and `run --live --prospect --limit`
-opens one number at a time up to 10/day. `sales queue list|send` is a view of `leads.json`
+opens one number at a time up to 50/day. `sales queue list|send` is a view of `leads.json`
 (Maps leads in CSV order, no second store) whose `send --live --limit 1` opens exactly one
 number through the same path and run lock; the opening names the business as on Google Maps. The rules' values are of the static institutional
 site only; apps and systems are always quoted by the owner and the bot must never tie the site

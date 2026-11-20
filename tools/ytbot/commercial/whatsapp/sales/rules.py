@@ -18,7 +18,7 @@ ACTIONS = ("reply", "qualify", "quote", "collect", "close", "block", "handoff", 
 REQUIRED_INTENTS = ("opt_out", "refusal", "auto_reply", "bot_question", "unknown",
                     "quote_accept", "quote_details", "custom_platform", "system_request",
                     "site_institutional", "domain", "human_request", "stuck", "ready_to_buy",
-                    "close_site", "payment_sent", "referral", "gatekeeper")
+                    "close_site", "payment_sent", "referral", "forwarded_to_decider", "gatekeeper")
 HANDOFF_ACTIONS = ("handoff", "quote", "collect", "won", "buy", "refer")
 PRIORITIES = ("hot", "needed", "alert")
 MONEY = re.compile(r"r\$\s*(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?")
@@ -249,7 +249,8 @@ def build(raw: dict) -> SalesRules:
     _require(raw, "pacing", ("typing_chars_per_second", "min_seconds", "max_seconds",
                              "reading_chars_per_second", "reading_min_seconds",
                              "reading_max_seconds", "jitter", "link_preview_seconds",
-                             "between_chats_min_seconds", "between_chats_max_seconds"))
+                             "between_chats_min_seconds", "between_chats_max_seconds",
+                             "between_openings_min_seconds", "between_openings_max_seconds"))
     _require(raw, "llm", ("base_url", "models_url", "api_key_env", "fallback", "exclude",
                           "temperature", "max_output_tokens", "timeout_seconds",
                           "free_timeout_seconds", "probe_timeout_seconds", "cooldown_seconds",
@@ -299,6 +300,10 @@ def build(raw: dict) -> SalesRules:
     pacing = raw["pacing"]
     if not 0 < float(pacing["min_seconds"]) <= float(pacing["max_seconds"]):
         raise RulesError("pacing.min_seconds must be positive and not above max_seconds")
+    if not 0 <= float(pacing["between_openings_min_seconds"]) <= float(
+            pacing["between_openings_max_seconds"]):
+        raise RulesError("pacing.between_openings_min_seconds must be non-negative and not above "
+                         "between_openings_max_seconds")
     for kind in ("opening", "reply"):
         _clock(raw["hours"][f"{kind}_start"], f"hours.{kind}_start")
         _clock(raw["hours"][f"{kind}_end"], f"hours.{kind}_end")

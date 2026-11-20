@@ -102,11 +102,14 @@ start
 4. Optional image: set the image input, wait for the preview, click Send in the preview.
 5. Type the message in small chunks, 35 to 95 ms per character, extra 150 to 450 ms after
    `.`, `,`, `?` and `!`. Never paste the whole text.
-6. Click Send (or press Enter when the button is absent).
-7. Poll for up to 8 s until the newest outgoing bubble is new (its `data-id` was not there
-   before typing) and contains the first characters of the message. A message with a link
-   waits at least 3 s after typing for the preview card.
-8. Journal `sent` or `unconfirmed`. `sent` is final; `unconfirmed` is never retried blindly.
+6. After the pacing wait (and link preview delay), re-verify that the composer still holds
+   the text — if chat hydration (such as a new Meta Business Account banner) cleared the draft,
+   focus and re-type once before sending, otherwise fail cleanly with nothing sent. Click Send
+   inside `#main` (or press Enter on the focused composer when the button is absent).
+7. Poll for up to 12 s until the newest outgoing bubble is new (its `data-id` was not there
+   before typing) and matches the message (raw or normalized `text_key` prefix).
+8. Journal `sent` or `unconfirmed` (capturing a private debug screenshot on `unconfirmed` or
+   error). `sent` is final; `unconfirmed` is never retried blindly.
 
 ## Incoming event listener
 

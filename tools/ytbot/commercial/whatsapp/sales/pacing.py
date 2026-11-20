@@ -24,6 +24,9 @@ class SalesPacing:
     link_preview: float = 4.0
     between_min: float = 20.0
     between_max: float = 60.0
+    between_openings_min: float = 120.0
+    between_openings_max: float = 180.0
+    max_typing_wait: float = 60.0
 
     @classmethod
     def from_rules(cls, rules: SalesRules) -> "SalesPacing":
@@ -33,7 +36,12 @@ class SalesPacing:
                    float(raw["reading_min_seconds"]), float(raw["reading_max_seconds"]),
                    float(raw["jitter"]), float(raw["link_preview_seconds"]),
                    float(raw["between_chats_min_seconds"]),
-                   float(raw["between_chats_max_seconds"]))
+                   float(raw["between_chats_max_seconds"]),
+                   float(raw.get("between_openings_min_seconds",
+                                 raw["between_chats_min_seconds"])),
+                   float(raw.get("between_openings_max_seconds",
+                                 raw["between_chats_max_seconds"])),
+                   float(raw.get("max_typing_wait_seconds", 60.0)))
 
     def _jittered(self, value: float, rng) -> float:
         return value * rng.uniform(1 - self.jitter, 1 + self.jitter)
@@ -50,6 +58,10 @@ class SalesPacing:
 
     def between_chats(self, rng=random) -> float:
         return rng.uniform(self.between_min, max(self.between_min, self.between_max))
+
+    def between_openings(self, rng=random) -> float:
+        low = max(0.0, self.between_openings_min)
+        return rng.uniform(low, max(low, self.between_openings_max))
 
     def plan(self, messages: list[str], incoming: str | None = None, rng=random) -> list[float]:
         """Wait before each message; the first also reads the received text."""

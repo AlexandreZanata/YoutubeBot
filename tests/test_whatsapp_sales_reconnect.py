@@ -98,6 +98,31 @@ class ReconnectTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.run_loop(Agent([failed]), Session(Page()))
 
+    def test_unconfirmed_opening_pauses_prospecting_but_keeps_reply_loop_alive(self):
+        class TrackingAgent(Agent):
+            def __init__(self, summaries):
+                super().__init__(summaries)
+                self.prospect_flags = []
+
+            def cycle(self, events, prospect=False, limit=None):
+                self.prospect_flags.append(prospect)
+                return super().cycle(events, prospect=prospect, limit=limit)
+
+        summaries = [
+            {**EMPTY, "openings": [{"lead": "L1", "state": "unconfirmed"}]},
+            {**EMPTY, "replies": [{"lead": "L2", "state": "engaged"}]},
+            EMPTY,
+        ]
+        agent = TrackingAgent(summaries)
+        self.run_loop(agent, Session(Page()), prospect=True, max_cycles=3)
+        self.assertEqual(agent.cycles, 3)
+        self.assertEqual(agent.prospect_flags, [True, False, False])
+
+    def test_unconfirmed_opening_with_once_still_stops(self):
+        failed = {**EMPTY, "openings": [{"lead": "L1", "state": "unconfirmed"}]}
+        with self.assertRaises(SystemExit):
+            self.run_loop(Agent([failed]), Session(Page()), prospect=True, once=True)
+
     def test_closed_errors_are_recognized(self):
         self.assertTrue(commands.is_closed(TargetClosedError("x")))
         self.assertTrue(commands.is_closed(RuntimeError("Connection closed while reading")))

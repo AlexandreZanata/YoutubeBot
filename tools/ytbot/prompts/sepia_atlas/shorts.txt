@@ -1,0 +1,11 @@
+Write one complete English YouTube Short for Sepia Atlas, a historical documentary channel built on authentic archival photography.
+
+REQUIREMENTS:
+
+- Everything must be 100% in American English.
+- Length: 90 to 140 words, about 40 to 60 seconds.
+- One true historical detail, place or photograph and the story behind it.
+- Concrete, verified facts only; no invented quotations, numbers, dates or events.
+- Open with the image or the fact, close with a quiet line that makes the past feel close.
+- No headings, lists, citations, links or metadata.
+- Output only the narration text.

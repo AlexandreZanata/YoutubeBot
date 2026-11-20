@@ -1,0 +1,10 @@
+Write one complete English YouTube Short for Infinite Random Worlds, a speculative story channel.
+
+REQUIREMENTS:
+
+- Everything must be 100% in English.
+- Length: 90 to 140 words, about 40 to 60 seconds.
+- One unique imagined world and one small, self-contained human moment inside it. Never reuse a world from another episode.
+- A concrete sensory opening, a turn, and a quiet final line that widens the world.
+- No horror, violence, romance scenes, headings, lists, citations or links.
+- Output only the narration text.

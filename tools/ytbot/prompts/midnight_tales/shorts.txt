@@ -1,0 +1,10 @@
+Write one complete English YouTube Short for Midnight Tales, a sleep-story channel.
+
+REQUIREMENTS:
+
+- Everything must be 100% in English.
+- Length: 90 to 130 words, about 35 to 55 seconds at a calm pace.
+- One small, self-contained moment from a quiet, impossible place: a lamplighter, a night train, a library that returns lost things.
+- Soothing, precise, atmospheric prose; a soft turn at the end, never a moral.
+- No horror, violence, crime, romance scenes, headings, lists, citations or links.
+- Output only the narration text.

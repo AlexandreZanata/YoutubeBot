@@ -12,7 +12,7 @@ and the journal in [WhatsApp Web](COMMERCIAL-WHATSAPP.md); there is no second se
 | First contact | One-to-one prospecting, only to numbers from a list the owner approved. No broadcast. |
 | Lead source | A CSV the owner builds by reviewing Google Maps. No scraping, no Places API. |
 | Replies | OpenCode Go free models first in rotation, then `deepseek-v4.1-flash` → `muse-spark-1.3-contributor` (updated the same evening). |
-| Daily limit | 10 first contacts per day. |
+| Daily limit | 50 first contacts per day. |
 
 ## Files
 
@@ -145,14 +145,32 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   and hand-off. Run it after editing the rules; about US$ 0.02 per full run.
 - `run` scans the chat list (listener), stores incoming messages of funnel leads, answers
   them, sends due follow-ups and, with `--prospect`, opens new leads up to the daily limit.
-  Without `--live` it prints the decisions and changes no lead state. It stops on the first
-  send that is not confirmed. An edited `sales_rules.toml` is reloaded before the next cycle;
-  an invalid edit is reported and the previous rules stay in use. When the browser page or the
-  CDP connection closes outside a send (the computer slept, Chrome restarted; seen on
-  2026-11-18 as `TargetClosedError` after a night), the run reconnects to the hidden browser
-  and continues, up to 3 times in a row; a failed send still stops the run. A `SIGTERM`
-  asks the run to stop: it finishes the current step (never in the middle of a send), closes
-  its WhatsApp tab and releases the run lock, so restarts no longer leave extra tabs in the
+  Without `--live` it prints the decisions and changes no lead state. In continuous mode
+  (without `--once`), `--prospect` opens at most one company per `between_openings` cooldown
+  (120 to 180 seconds, persisted across restarts via `opened_at`) without blocking the loop,
+  so the bot keeps scanning and replying to already-opened companies between openings; `--limit`
+  caps the total openings of that run while keeping the reply loop alive afterward. Pass
+  `--only-csv <path>` or `--only-leads <id1,id2>` to restrict `run` strictly to a target batch
+  (and any referral created by those leads), leaving all other leads and personal chats untouched.
+  It pauses further cold prospecting immediately if an `unconfirmed` cold opening occurs while
+  keeping the reply listener alive so already-opened companies continue receiving answers; an
+  `unconfirmed` or failed reply/follow-up (or any failure in `--once` / `queue send`) stops the run
+  immediately without touching further chats. An edited `sales_rules.toml` is reloaded
+  before the next cycle; an invalid edit is reported and the previous rules stay in use. When the
+  browser page or the CDP connection closes outside a send (including before typing inside
+  `_open_chat`; the computer slept, Chrome restarted; seen on 2026-11-18 as `TargetClosedError`
+  after a night), the run reconnects to the hidden browser and continues, up to 3 times in a row;
+  a failed send still stops the run. Chat-list echo suppression compares only the latest outgoing
+  bubble (so short customer replies like `"Bom dia"` or `"Tudo bem?"` are never dropped), and
+  WhatsApp Business auto-replies (`auto_reply`) are always decided locally regardless of length.
+  When a contact is actively typing (`"digitando..."` / `"typing..."` in the chat list or open
+  chat header — strictly typing only, never audio recording), the lead is categorized in the
+  `typing` wait state (`typing: true`, `state: "typing"`, `action: "wait"`): the bot sends
+  nothing (also re-checking right before sending after model inference) until the contact finishes
+  typing, then merges and answers all arrived bubbles together (capped at
+  `max_typing_wait_seconds = 60` so a stuck browser indicator can never stall a chat).
+  A `SIGTERM` asks the run to stop: it finishes the current step (never in the middle of a send),
+  closes its WhatsApp tab and releases the run lock, so restarts no longer leave extra tabs in the
   hidden browser. A second `SIGTERM` stops at once; `SIGKILL` still leaves the tab open.
 - `resolve` hands a conversation back to the agent after the owner handled it; `block` adds the
   number to the do-not-contact list.
@@ -161,7 +179,7 @@ python3 -m tools.ytbot commercial sales block    --network whatsapp --lead L1a2b
   opening to someone already in conversation. `activate --all` re-enables older leads,
   `pause --lead <id>` stops automatic replies and sends the message to "Precisa de você". `sales leads` and the
   Central show `reply: ativo` or `pausado`.
-- Openings stay one number at a time, in import order, up to 10/day and only in the opening
+- Openings stay one number at a time, in import order, up to 50/day and only in the opening
   window. Use `--limit 1` to start exactly one number per invocation or `--limit 10` for the
   daily batch; the existing pacing, journal and repeat fences apply to both.
 - The owner's selected list may be kept in
@@ -198,7 +216,7 @@ python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --l
   `send_sequence`: the lead becomes `opening` with `opened_at` before the browser acts, the
   journal fences every bubble, and a lead is `sent` only when `open_lead` returns `opened`. It
   stops at the first `unconfirmed` or `error` and retries nothing by itself. The opening window
-  (08:30 to 17:30, Monday to Friday), the 10/day limit, pacing, do-not-contact and invalid
+  (07:00 to 17:00, Monday to Friday), the 50/day limit, pacing, do-not-contact and invalid
   numbers apply exactly as in `run --prospect`; a blocked run prints the reason.
 - **One sender at a time.** `queue send --live` and `run` share the lock, so one refuses while
   the other runs. Stop the `run` loop (SIGTERM ends it between two steps), send, then start it
@@ -279,17 +297,22 @@ the model using only the facts.
 | Photo, video, document, location | `media` | handoff | Fixed ack; owner notified. A caption is read as the message text |
 | Sticker or GIF only | `sticker` | ignore | Nothing |
 | "Já temos site" | `already_has_site` | close | Thanks; available later |
+| "Irei encaminhar para o responsável!!", "vou encaminhar para a diretoria/marketing", "já encaminhei" | `forwarded_to_decider` | close | Fixed: "Entendido, muito obrigado! Fico no aguardo do retorno." (no hand-off; chat reopens automatically if the decider writes back) |
 | "Vou pensar", "mais pra frente" | `later` | close | Available whenever they want |
 | "Tudo bem e você?" | `greeting_reply` | reply | Short answer and an open question |
 | "Obrigado", "ok" | `thanks` | ignore | Nothing |
 | Anything not in the facts: city, invoice, contract, technology, e-mail, ambiguous text | `unknown` | handoff | Fixed: "Certo! Vou verificar direitinho e já te respondo."; owner notified |
-| Message outside 07:00–21:00 | — | — | Stored; answered at the start of the next reply window |
+| Message outside 07:00–17:00 | — | — | Stored; answered at the start of the next reply window |
 | The owner typed in the chat | — | — | Any message the bot did not send, after the bot's latest message in that chat (older personal or archived-cycle messages do not count), found when the chat opens to answer or to follow up; state `owner`, automation pauses |
 | A refused contact writes again | — | — | No automated answer; owner notified |
 
 ## Staff, referral, closing and end states (owner, 2026-11-17)
 
 ```text
+Someone says they will forward the proposal ("Irei encaminhar para o responsável!!", "vou encaminhar para o marketing")
+  └─▶ forwarded_to_decider · fixed thanks + wait ("Entendido, muito obrigado! Fico no aguardo do retorno.") → state closed
+      (no second contact request, no owner hand-off; chat reopens to engaged automatically if the decider writes back)
+
 A staff member answers ("sou funcionária", "o dono não está", "vou passar pro dono")
   └─▶ gatekeeper · state gatekeeper (the bot keeps the chat)
       "Muito obrigado pelo retorno!"
@@ -442,13 +465,18 @@ When the agent opens a chat to answer, it reads every bubble since its last mess
 
 ## Typing safety
 
-Before typing, the composer gets focus by a click (8 s) or, when something covers it (a new
-message banner while the chat scrolls), by focusing the element itself; a leftover draft is
-cleared. After typing, the composer must contain the text, or it is cleared and the send fails
-before Send is pressed. Any failure is journaled with the full error and a private screenshot
-in `.local/commercial/whatsapp/sales/debug/`, the lead becomes `unconfirmed` and the run stops.
-After checking the chat, `sales resolve --state engaged|qualifying` hands it back; messages that
-arrived meanwhile are answered on the next cycle.
+Before typing, `_open_by_phone` waits until the composer is visible (1.5 s hydration grace plus
+the open-chat pause). Before typing a message, the composer gets focus by a click (8 s) or, when
+something covers it (a new message banner while the chat scrolls), by focusing the element itself;
+a leftover draft is cleared. After typing, and again right after the pacing wait before clicking Send,
+the composer must still contain the text (if chat hydration cleared the draft once during the wait,
+it re-types once before Send; otherwise it fails cleanly with nothing sent). Bubble confirmation
+polls for 12 s matching either the raw prefix or normalized `text_key`. Any failure or `unconfirmed`
+outcome is journaled with a private screenshot in `.local/commercial/whatsapp/sales/debug/`, and the
+lead becomes `unconfirmed`: a failed reply/follow-up (or `--once` / `queue send`) stops the run,
+while a failed cold opening in continuous `run --live --prospect` pauses further openings and keeps
+reply monitoring active. After checking the chat, `sales resolve --state engaged|qualifying|opened`
+hands it back; messages that arrived meanwhile are answered on the next cycle.
 
 ## Owner test reset
 
@@ -546,7 +574,7 @@ live in `[opening]` and `[pacing]` of the rules file.
 - `--live` is required to send; the default prints the plan.
 - Refusal or opt-out → salted hash in `do-not-contact.json`, removal from the `rules.json`
   allow list, and no message ever again, including follow-ups and re-imports.
-- At most 10 first contacts per day (America/Cuiaba), weekdays 08:30–17:30.
+- At most 50 first contacts per day (America/Cuiaba), weekdays 07:00–17:00 (replies also 07:00–17:00).
 - The opening is recorded before the browser acts and its journal keys are per lead, so it is
   never repeated, even after a crash.
 - One follow-up after 72 h without an answer; `no-response` 96 h later, then silence.

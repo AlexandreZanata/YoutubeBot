@@ -1,8 +1,12 @@
 """Unit tests for Mercado Livre affiliate product metadata helpers."""
 
 import json
+import tempfile
 import unittest
+from datetime import datetime
+from pathlib import Path
 
+from tools.ytbot.commercial.mercadolivre import products
 from tools.ytbot.commercial.mercadolivre.products import (
     _extract_brand_name,
     _extract_seller_name,
@@ -39,6 +43,15 @@ class MercadoLivreProductHelpersTest(unittest.TestCase):
             _extract_seller_name(["Loja oficial", "Redragon", "", "+1 M vendas"]),
             "Loja oficial Redragon",
         )
+
+
+class CapturedAtTest(unittest.TestCase):
+    def test_save_writes_offset_aware_timestamp(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "products.json"
+            products.save(path, "ssd", [])
+            captured_at = json.loads(path.read_text())["captured_at"]
+        self.assertIsNotNone(datetime.fromisoformat(captured_at).utcoffset())
 
 
 if __name__ == "__main__":

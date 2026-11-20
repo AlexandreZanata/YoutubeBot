@@ -9,7 +9,7 @@ pub struct ChannelInfo {
     pub name: &'static str,
     pub handle: &'static str,
     pub channel_id: &'static str,
-    /// Whether the channel publishes vertical Shorts (only Zaflas today).
+    /// Every registered channel now publishes vertical Shorts.
     pub has_shorts: bool,
 }
 
@@ -19,14 +19,14 @@ pub const CHANNELS: &[ChannelInfo] = &[
         name: "fallem prince",
         handle: "@fallemprince",
         channel_id: "UCc288lF54UDCCGhTKIkr7BQ",
-        has_shorts: false,
+        has_shorts: true,
     },
     ChannelInfo {
         slug: "whispers-from-heaven",
         name: "Whispers From Heaven",
         handle: "@WhispersFromHeaven1",
         channel_id: "UCEE9qAtucy5OZcjvcyytu4w",
-        has_shorts: false,
+        has_shorts: true,
     },
     ChannelInfo {
         slug: "zaflas",
@@ -40,28 +40,42 @@ pub const CHANNELS: &[ChannelInfo] = &[
         name: "Infinite Random Worlds",
         handle: "@InfiniteRandomWorlds",
         channel_id: "UCY3Zp50I6Y6semQQccJxRPg",
-        has_shorts: false,
+        has_shorts: true,
     },
     ChannelInfo {
         slug: "vocal-pages",
         name: "Vocal Pages",
         handle: "@VocalPages01",
         channel_id: "UCm13oIPS1W43j9BYo0kewcQ",
-        has_shorts: false,
+        has_shorts: true,
     },
     ChannelInfo {
         slug: "zanata",
         name: "zanata",
         handle: "@zanatareal",
         channel_id: "UCx0AE-elCyDhfY0d1hQIwdw",
-        has_shorts: false,
+        has_shorts: true,
     },
     ChannelInfo {
         slug: "reflection",
         name: "the word of reflection",
         handle: "@thewordofreflection",
         channel_id: "UCISw6UDaFINPRuuMr0s7tpA",
-        has_shorts: false,
+        has_shorts: true,
+    },
+    ChannelInfo {
+        slug: "midnight-tales",
+        name: "Midnight Tales",
+        handle: "@Midnight1Tales",
+        channel_id: "UCLukC7RYzHlXHjtnlkbe4Vw",
+        has_shorts: true,
+    },
+    ChannelInfo {
+        slug: "sepia-atlas",
+        name: "Sepia Atlas",
+        handle: "@SepiaAtlas",
+        channel_id: "UCJNamJBuijKJ5G7CgLgd7EQ",
+        has_shorts: true,
     },
 ];
 

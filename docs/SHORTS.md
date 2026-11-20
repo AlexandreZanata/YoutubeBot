@@ -1,7 +1,7 @@
 # Shorts protocol
 
-Vertical Shorts use a separate, faster path from the long-form batch. They are generated only
-when the owner explicitly asks for Shorts.
+Vertical Shorts use a separate, faster path from the long-form batch. Every channel publishes
+them, always with one generated background image and burned-in subtitles.
 
 ## Format
 
@@ -10,10 +10,10 @@ when the owner explicitly asks for Shorts.
 | Canvas | 1080x1920, 9:16 |
 | Duration | about 35 to 55 seconds |
 | Script | 90 to 130 Brazilian Portuguese words |
-| Background | `assets/backgrounds/zaflas_agro_shorts.mp4` |
+| Background | one generated 1080x1920 image per Short, in the channel art style |
 | Audio | ChatGPT Read aloud, Cove voice |
 | Subtitles | centered, large condensed sans, burned in |
-| Thumbnail | custom 1080x1920 vertical in the Zaflas Shorts style |
+| Thumbnail | none; the generated image is the video background |
 | End screen | not applied |
 | Upload | Zaflas upload-only profile |
 | Generation | legacy profile with ChatGPT and audio capture |
@@ -22,21 +22,32 @@ when the owner explicitly asks for Shorts.
 
 The long-form Zaflas videos remain one per day at 12:00. Shorts are separate uploads.
 
+## One image per Short
+
+Every Short generates its own 1080x1920 image from that story's subject and place. Never reuse
+a background, character or composition from another Short. The image request leads with the
+topic and asks for a scene specific to it; after generation the bot compares a perceptual
+signature with the channel's other Shorts and, when a new image is too similar, keeps the old
+attempt and generates a different scene once.
+
 Zaflas is the only Portuguese channel. A short script that comes back in English is rejected
 and rewritten once; a second English result fails the asset before audio, render or upload.
 
 ## Channels with Shorts
 
-Only these channels publish Shorts; the others have no Shorts queue and must never receive one:
+Every channel now publishes Shorts. Each one keeps its own generated art style, topic queue
+and slot hours, and no Short receives a custom thumbnail:
 
 | Channel | Protocol | Cadence |
 | --- | --- | --- |
-| Zaflas | `shorts` | 2 per day at 09:00/18:00 |
+| Zaflas | `faith-shorts` | 2 per day at 09:00/18:00 |
 | the word of reflection | `faith-shorts` | 2 per day at 08:00/20:00 |
 | Whispers From Heaven | `faith-shorts` | 2 per day at 09:00/21:00 |
 | zanata | `faith-shorts` | 1 per day at 09:00 |
-
-Infinite Random Worlds, Vocal Pages and Fallem Prince do not use Shorts.
+| fallem prince | `faith-shorts` | 1 per day at 21:00 |
+| Infinite Random Worlds | `faith-shorts` | 1 per day at 09:00 |
+| Vocal Pages | `faith-shorts` | 1 per day at 21:00 |
+| Midnight Tales | `faith-shorts` | 1 every 2 days at 09:00 |
 
 ## Intelligent Shorts distribution
 

@@ -16,6 +16,11 @@ class AllocationTests(unittest.TestCase):
         plan = distribute.allocate(0, {"a": 3, "b": 8})
         self.assertEqual(plan, {"a": 0, "b": 0})
 
+    def test_every_upload_channel_has_its_bound_account(self):
+        self.assertEqual(distribute.UPLOAD_ACCOUNTS["midnight-tales"], "midnight")
+        self.assertEqual(distribute.UPLOAD_ACCOUNTS["zanata"], "zanata")
+        self.assertEqual(distribute.UPLOAD_ACCOUNTS["reflection"], "reflection")
+
     def test_negative_count_is_rejected(self):
         with self.assertRaises(ValueError):
             distribute.allocate(-1, {"a": 0})

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import signal
 from datetime import datetime
@@ -14,12 +15,13 @@ from . import central
 from . import llm as sales_llm
 from . import queue as sales_queue
 from . import rehearsal
-from .agent import (SalesAgent, WhatsAppChannel, owner_block, owner_reset, owner_resolve,
-                    split_pending)
+from .agent import (SalesAgent, WhatsAppChannel, _failed_outcome, is_closed_error, owner_block,
+                    owner_reset, owner_resolve, split_pending)
 from .decide import decide
 from .pacing import SalesPacing
 from .rules import RULES_PATH, RulesError, load
-from .store import AUTOMATED_STATES, SOURCES, SalesStore, mask, reply_is_active, stamp
+from .store import (AUTOMATED_STATES, SOURCES, SalesStore, canonical_phone, lead_id, mask,
+                    reply_is_active, stamp)
 
 OWNER_STATES = ("needs-owner", "quote-requested", "owner", "unconfirmed")
 
@@ -301,9 +303,33 @@ MAX_RECONNECTS = 3
 
 def is_closed(error: BaseException) -> bool:
     """The browser page or the CDP connection went away (suspend/resume, Chrome restart)."""
-    text = str(error)
-    return (type(error).__name__ == "TargetClosedError" or "has been closed" in text
-            or "Connection closed" in text or "Browser closed" in text)
+    return is_closed_error(error)
+
+
+def _allowed_leads(args) -> set[str] | None:
+    """Optional lead allowlist for `run` (`--only-leads` and/or `--only-csv`)."""
+    raw_ids = getattr(args, "only_leads", None)
+    csv_path = getattr(args, "only_csv", None)
+    if not raw_ids and not csv_path:
+        return None
+    allowed: set[str] = set()
+    if raw_ids:
+        for item in raw_ids.split(","):
+            item = item.strip()
+            if item:
+                allowed.add(item)
+    if csv_path:
+        path = Path(csv_path)
+        if not path.is_file():
+            raise SystemExit(f"[sales] --only-csv file not found: {path}")
+        with path.open(encoding="utf-8-sig", newline="") as handle:
+            for row in csv.DictReader(handle):
+                phone = canonical_phone((row.get("phone") or "").strip())
+                if phone:
+                    allowed.add(lead_id(phone))
+    if not allowed:
+        raise SystemExit("[sales] --only-leads/--only-csv resolved to zero leads")
+    return allowed
 
 
 class Session:
@@ -353,6 +379,8 @@ def run_cycles(agent, session, args, listen=None, out=None, stopped=None) -> Non
     rules_path = Path(args.rules) if args.rules else RULES_PATH
     rules_seen = rules_path.stat().st_mtime
     cycles = failures = 0
+    remaining = args.limit
+    prospecting_paused = False
 
     def recover(error: BaseException) -> None:
         nonlocal failures
@@ -368,23 +396,34 @@ def run_cycles(agent, session, args, listen=None, out=None, stopped=None) -> Non
         rules_seen = reload_if_changed(agent, rules_path, rules_seen)
         try:
             events = listen(session.page, agent.store.base, once=True, limit=args.max_chats)
-            summary = agent.cycle(events, prospect=args.prospect, limit=args.limit)
+            prospect_now = (bool(args.prospect) and not prospecting_paused
+                            and (remaining is None or remaining > 0))
+            summary = agent.cycle(events, prospect=prospect_now, limit=remaining)
         except Exception as error:
             recover(error)
             continue
         failures = 0
         out(json.dumps(summary, ensure_ascii=False))
         cycles += 1
-        outcomes = [item.get("state") for group in ("replies", "followups", "openings")
-                    for item in summary[group]]
-        if any(state in ("unconfirmed", "error") for state in outcomes):
+        if remaining is not None:
+            remaining -= sum(1 for item in summary["openings"]
+                             if item.get("state") in ("opened", "unconfirmed", "planned"))
+        if any(_failed_outcome(item) for group in ("replies", "followups")
+               for item in summary[group]):
             raise SystemExit("[sales] a send was not confirmed; stopping. Check the chat, "
                              "then `commercial sales resolve`.")
+        if any(_failed_outcome(item) for item in summary["openings"]):
+            if args.once:
+                raise SystemExit("[sales] an opening was not confirmed; stopping. Check the chat, "
+                                 "then `commercial sales resolve`.")
+            prospecting_paused = True
+            out("[sales] an opening was not confirmed; pausing new openings while keeping "
+                "reply monitoring active. Check the fenced lead, then `commercial sales resolve`.")
         if args.once or (args.max_cycles and cycles >= args.max_cycles):
             return
         try:
             # One second at a time, so a stop request ends the wait at once.
-            for _ in range(int(args.interval)):
+            for _ in range(max(1, int(args.interval))):
                 if stopped():
                     break
                 session.page.wait_for_timeout(1000)
@@ -394,6 +433,7 @@ def run_cycles(agent, session, args, listen=None, out=None, stopped=None) -> Non
 
 def command_run(args, store_factory, page_factory) -> None:
     rules, store, _ = _context(args, store_factory)
+    allowed = _allowed_leads(args)
     model = _model(rules, store, not args.no_llm)
     if not args.live:
         print("[sales] dry run: decisions are printed, nothing is sent (use --live to send)",
@@ -418,7 +458,8 @@ def command_run(args, store_factory, page_factory) -> None:
     previous = signal.signal(signal.SIGTERM, stop)
     try:
         agent = SalesAgent(rules, store, session.channel if args.live else None, model,
-                           live=args.live)
+                           live=args.live, paced_openings=not args.once,
+                           allowed_leads=allowed)
         if args.live:
             for item in agent.reconcile_openings():
                 print(json.dumps({"reconciled": item}, ensure_ascii=False), flush=True)
@@ -587,4 +628,8 @@ def add_parser(actions, store_factory, page_factory) -> None:
                      help="seconds between two scans of the chat list (default 2)")
     run.add_argument("--max-cycles", type=int, default=0)
     run.add_argument("--max-chats", type=int, default=30)
+    run.add_argument("--only-leads", default=None,
+                     help="comma-separated lead ids; ignore all other contacts during this run")
+    run.add_argument("--only-csv", default=None,
+                     help="path to a reviewed CSV; only attend leads in this CSV (plus their referrals)")
     run.add_argument("--no-llm", action="store_true")

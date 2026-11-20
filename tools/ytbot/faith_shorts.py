@@ -9,7 +9,7 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-from . import account, channels, chat, codex_media, config, logic, render, runtime, youtube
+from . import account, assets, channels, chat, config, logic, render, runtime, youtube
 from .accounts_store import AccountStore
 
 CHANNELS = {
@@ -29,6 +29,11 @@ CHANNELS = {
             "Paul's Thorn: When the Answer Is No",
             "The Friends Who Dug Through the Roof",
             "Stephen at the Stones: When Forgiveness Costs Everything",
+            "The Centurion's Faith: When Authority Meets Trust",
+            "Zacchaeus in the Tree: When You Need to See and Be Seen",
+            "The Woman Who Touched His Hem: When Faith Acts Before Words",
+            "Thomas After the Resurrection: When Doubt Becomes a Door",
+            "The Ethiopian Eunuch: When a Stranger Opens the Book",
         ),
     },
     "zaflas": {
@@ -42,6 +47,11 @@ CHANNELS = {
             "O que a umidade do grão faz com o preço?",
             "Por que o bezerro desmama mais leve?",
             "Quando a pulverização perde eficiência?",
+            "Por que o pH do solo muda depois da calagem?",
+            "Como o milho responde ao nitrogênio em cobertura?",
+            "O que a compactação do solo faz com a raiz?",
+            "Quando o gado precisa de suplementação mineral?",
+            "Por que a colheitadeira perde grãos na barra de corte?",
         ),
     },
     "zanata": {
@@ -60,6 +70,11 @@ CHANNELS = {
             "Flow: Csikszentmihalyi on the State of Absorption",
             "Man's Search for Meaning: Frankl in the Camp",
             "The Social Animal: How Groups Shape the Self",
+            "The Crowd: Le Bon on How Groups Think",
+            "Thinking, Fast and Slow: Kahneman on the Two Minds",
+            "The Life of the Mind: Arendt on Thinking",
+            "The Wisdom of Insecurity: Watts on Letting Go",
+            "Escape from Freedom: Fromm on Why We Surrender",
         ),
     },
     "whispers-from-heaven": {
@@ -78,6 +93,102 @@ CHANNELS = {
             "A Lamp for the Darkest Room",
             "The Hands That Hold Tomorrow",
             "Rest for the Ones Who Carry Everyone",
+            "When the Answer Comes Later Than You Hoped",
+            "He Walks With You Through the Valley",
+            "A Prayer for the Ones You Cannot Reach",
+            "The Peace That Holds in the Waiting",
+            "When Your Faith Is Small but Real",
+        ),
+    },
+    "fallem-prince": {
+        "upload": "legacy",
+        "hours": (21,),
+        "hashtags": "#shorts #fantasy #darkfantasy #story #audiobook",
+        "tags": "dark fantasy, story, audiobook, short, fiction, folklore",
+        "topics": (
+            "The Bell That Rings Only for the Dead",
+            "A Knight Who Forgot His Own Name",
+            "The Mirror in the Abandoned Chapel",
+            "The Cartographer of a Forest That Moves",
+            "The King Who Traded His Shadow",
+            "The Last Lantern on the Northern Road",
+            "A Debt Collected at Midnight",
+            "The Castle That Remembers Its Guests",
+            "The Smith Who Forged a Silence",
+            "The Wolf at the Edge of the Feast",
+        ),
+    },
+    "infinite-random-worlds": {
+        "upload": "infinite",
+        "hours": (9,),
+        "hashtags": "#shorts #scifi #story #worldbuilding #audiobook",
+        "tags": "speculative fiction, science fiction, story, audiobook, short, worldbuilding",
+        "topics": (
+            "On a World of Endless Stairs, One City Learns to Climb",
+            "The Ocean That Falls Upward",
+            "A Library Where Books Age Instead of People",
+            "The Last Rain on a Planet of Dust",
+            "A City That Only Exists at Low Tide",
+            "The Boy Who Delivers Messages Between Two Moons",
+            "The Garden That Grows Memories",
+            "The Train That Never Reaches the Station",
+            "A World Where Night Lasts a Generation",
+            "The Map That Redraws Itself Every Morning",
+        ),
+    },
+    "vocal-pages": {
+        "upload": "vocal",
+        "hours": (21,),
+        "hashtags": "#shorts #essay #reflection #story #audiobook",
+        "tags": "reflective essay, story, audiobook, short, psychology, humanity",
+        "topics": (
+            "The Chair Left Empty at Dinner",
+            "What We Keep in the Drawer",
+            "The Kindness We Do Not Remember",
+            "A Stranger Who Knew Your Name",
+            "The House That Feels Smaller",
+            "Why We Tell the Same Story",
+            "The Cost of Always Being Fine",
+            "A Letter You Never Sent",
+            "The Quiet After the Argument",
+            "What the Hands Remember",
+        ),
+    },
+    "midnight-tales": {
+        "upload": "midnight",
+        "hours": (9,),
+        "interval_days": 2,
+        "hashtags": "#shorts #sleepstory #fiction #bedtimestory #audiobook",
+        "tags": "sleep story, fiction, audiobook, short, bedtime story, cozy",
+        "topics": (
+            "The Lamplighter Who Waited for One Last Window",
+            "The Library That Returns Lost Things",
+            "A Night Train to a Town Without a Name",
+            "The Keeper of the Frozen Clock",
+            "The Harbor Where Ships Arrive at Dawn",
+            "The Inn at the Edge of the Snow",
+            "The Gardener of the Moonlit Greenhouse",
+            "The Postman of the Sleeping Village",
+            "The Star That Only Appears in Winter",
+            "The Door That Opens on Quiet Nights",
+        ),
+    },
+    "sepia-atlas": {
+        "upload": "sepia",
+        "hours": (21,),
+        "hashtags": "#shorts #history #archivalphotography #documentary #sepiaatlas",
+        "tags": "history, documentary, archival photography, historical photos, short",
+        "topics": (
+            "The Photograph That Saved a Vanished Town",
+            "What a 1900 Street Photograph Really Shows",
+            "The Machine That Changed Every Kitchen",
+            "A Lost Railway Station in One Frame",
+            "The Faces of Ellis Island",
+            "When Every City Had a Horse Market",
+            "The Last Photograph of the General Store",
+            "The Invention Nobody Remembers",
+            "A Farm Family in 1895",
+            "The Day the Electric Light Arrived",
         ),
     },
 }
@@ -102,7 +213,8 @@ def occupied_slots(root: Path) -> set[tuple[int, int, int, int]]:
 
 def short_slots(count: int, hours: tuple[int, ...], start: date,
                 skip: int = 0,
-                occupied: set[tuple[int, int, int, int]] | None = None) -> list[datetime]:
+                occupied: set[tuple[int, int, int, int]] | None = None,
+                interval_days: int = 1) -> list[datetime]:
     slots = []
     day = start
     index = 0
@@ -114,9 +226,52 @@ def short_slots(count: int, hours: tuple[int, ...], start: date,
                 slots.append(slot)
                 if len(slots) == count + skip:
                     return slots[skip:]
-        day += timedelta(days=1)
+        day += timedelta(days=interval_days)
         index += 1
     return slots
+
+
+def background_signature(path: Path) -> int:
+    from PIL import Image
+
+    with Image.open(path) as image:
+        small = image.convert("L").resize((16, 16), Image.Resampling.LANCZOS)
+        pixels = list(small.getdata())
+    mean = sum(pixels) / len(pixels)
+    return sum(1 << index for index, value in enumerate(pixels) if value > mean)
+
+
+def similar_background(root: Path, run_dir: Path, limit: int = 24) -> Path | None:
+    current = run_dir / "thumbnail.png"
+    if not current.is_file():
+        return None
+    signature = background_signature(current)
+    for other in root.glob("*/thumbnail.png"):
+        if other.parent == run_dir or not other.is_file():
+            continue
+        if bin(signature ^ background_signature(other)).count("1") < limit:
+            return other
+    return None
+
+
+def ensure_unique_background(gen, run_dir: Path, root: Path) -> None:
+    """Every Short owns one image; a near-duplicate is replaced once."""
+    for _attempt in range(2):
+        duplicate = similar_background(root, run_dir)
+        if duplicate is None:
+            return
+        log(f"background too similar to {duplicate.parent.name}; generating a new scene")
+        stamp = int(time.time())
+        (run_dir / "thumbnail.png").rename(run_dir / f"thumbnail-similar-{stamp}.png")
+        state = run_dir / ".codex-media" / "thumbnail"
+        if state.is_dir():
+            state.rename(state.with_name(f"thumbnail-attempt-{stamp}"))
+        assets.generate_thumbnail(
+            gen, run_dir, "short-background",
+            variation="Create a clearly different scene from the previous attempt: change the "
+                      "place, the objects, the light and the composition.")
+    if similar_background(root, run_dir) is not None:
+        log("background still resembles another Short; kept for review")
 
 
 def generate_script(page, topic: str, run_dir: Path) -> str:
@@ -192,7 +347,8 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
     topics = list(spec["topics"])[start_index:start_index + count]
     slots = short_slots(len(topics), spec["hours"],
                         start or (date.today() + timedelta(days=1)), skip_slots,
-                        occupied_slots(config.DATA_DIR / "shorts"))
+                        occupied_slots(config.DATA_DIR / "shorts"),
+                        spec.get("interval_days", 1))
     failures = []
     with sync_playwright() as playwright:
         gen_browser, gen = runtime.connect_hidden(playwright)
@@ -224,7 +380,8 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
                 except Exception:
                     pass
             try:
-                codex_media.generate_thumbnail(run_dir, "short-background")
+                assets.generate_thumbnail(gen, run_dir, "short-background")
+                ensure_unique_background(gen, run_dir, root)
                 render_short(run_dir)
                 meta = metadata(topic, text, spec)
                 (run_dir / "metadata.json").write_text(

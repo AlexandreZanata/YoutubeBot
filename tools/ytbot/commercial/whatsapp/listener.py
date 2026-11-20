@@ -46,19 +46,30 @@ READ_ROWS = """(limit) => {
     const named = titleNode ? titleNode.querySelector('span[title]') : null;
     const icons = Array.from(row.querySelectorAll('svg title, [data-icon]'))
       .map((node) => node.textContent || node.getAttribute('data-icon') || '');
+    const statusTitles = Array.from(row.querySelectorAll('span[title]'))
+      .filter((node) => !titleNode || !titleNode.contains(node))
+      .map((node) => (node.getAttribute('title') || '').replace(/\\u00a0/g, ' ').trim())
+      .filter(Boolean);
     return {
       title: named && named.getAttribute('title') ? named.getAttribute('title').trim() : clean(titleNode),
       stamp: clean(pick('chat-list-timestamp')),
       preview: clean(pick('last-msg-status')),
       outgoing: icons.some((name) => /(delivered|-read$|-sent$|pending|msg-time|dblcheck|-check$)/.test(name)),
       unread: Boolean(pick('icon-unread-count') || row.querySelector(unreadSel)),
+      statusTitles,
       fallbackText: clean(row),
     };
   });
 }"""
 UNREAD = ('[aria-label*="unread"]', '[aria-label*="não lida"]', '[aria-label*="não lidas"]')
 OUTGOING_PREFIXES = ("you:", "you :", "você:", "você :", "voce:")
+TYPING_TEXT = re.compile(r"^(digitando|typing)(?:\.{1,3}|…)?$", re.IGNORECASE)
 DEFAULT_RULES = {"mode": "allow", "contacts": []}
+
+
+def is_typing_text(value: str) -> bool:
+    """True only for the live 'digitando...' / 'typing...' status (never audio recording)."""
+    return bool(TYPING_TEXT.match((value or "").replace("\xa0", " ").strip()))
 
 
 def log(message: str) -> None:
@@ -221,16 +232,23 @@ def _parsed_rows(page, limit: int) -> list[dict]:
             if data.get("title") and data.get("stamp"):
                 lines = [line.strip() for line in str(data.get("preview", "")).splitlines()
                          if line.strip()]
+                preview = _preview(lines)
+                typing = (is_typing_text(preview)
+                          or any(is_typing_text(item) for item in (data.get("statusTitles") or [])))
                 parsed_rows.append({
                     "title": data["title"], "stamp": data["stamp"],
-                    "preview": _preview(lines), "outgoing": bool(data.get("outgoing")),
-                    "unread": bool(data.get("unread")),
+                    "preview": preview, "outgoing": bool(data.get("outgoing")),
+                    "unread": bool(data.get("unread")), "typing": typing,
                 })
             elif data.get("fallbackText"):
                 parsed = parse_row(data["fallbackText"])
                 if parsed:
                     parsed["outgoing"] = False
                     parsed["unread"] = bool(data.get("unread"))
+                    parsed["typing"] = (
+                        is_typing_text(parsed.get("preview", ""))
+                        or any(is_typing_text(item) for item in (data.get("statusTitles") or []))
+                    )
                     parsed_rows.append(parsed)
         return parsed_rows
     rows = page.locator(ROW)
@@ -254,7 +272,22 @@ def scan_once(page, seen: set[str], rules: dict, limit: int = 30) -> list[dict]:
             page.wait_for_timeout(1500)
     events: list[dict] = []
     for parsed in _parsed_rows(page, limit):
-        if not parsed.get("title") or not parsed.get("preview"):
+        if not parsed.get("title"):
+            continue
+        if parsed.get("typing") or is_typing_text(parsed.get("preview", "")):
+            events.append({
+                "id": f"typing:{parsed['title']}",
+                "kind": "typing",
+                "at": datetime.now().isoformat(timespec="seconds"),
+                "message_at": parsed.get("stamp", ""),
+                "chat": parsed["title"],
+                "text": "",
+                "typing": True,
+                "unread": bool(parsed.get("unread")),
+                "allowed": contact_allowed(parsed["title"], rules),
+            })
+            continue
+        if not parsed.get("preview"):
             continue
         if parsed.get("outgoing") or parsed["preview"].casefold().startswith(OUTGOING_PREFIXES):
             continue
@@ -283,11 +316,14 @@ def listen(page, base: Path, once: bool = False, interval: int = 30,
     collected: list[dict] = []
     while True:
         batch = scan_once(page, seen, rules, limit)
+        persisted = False
         for event in batch:
-            append_event(base / "events.jsonl", event)
-            log(f"{event['chat']}: {event['text'][:60]}")
+            if event.get("kind") != "typing":
+                append_event(base / "events.jsonl", event)
+                log(f"{event['chat']}: {event['text'][:60]}")
+                persisted = True
         collected.extend(batch)
-        if batch or not seen_exists:
+        if persisted or not seen_exists:
             write_json(seen_path, sorted(seen)[-5000:])
             seen_exists = True
         if once or len(collected) >= max_events:

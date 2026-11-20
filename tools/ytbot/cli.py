@@ -7,7 +7,7 @@ import contextlib
 import json
 from datetime import datetime
 
-from . import account, catalog, channels, community, config, flow_profiles, logic, runtime
+from . import account, catalog, channels, comments, community, config, flow_profiles, logic, runtime
 
 
 def command_setup(_args) -> None:
@@ -46,6 +46,11 @@ def command_check(args) -> None:
 
 
 def command_community(args) -> None:
+    if not args.channel:
+        results = community.publish_all(dry_run=args.dry_run)
+        if not results:
+            raise SystemExit("no channel posts were attempted")
+        return
     channels.apply(args.channel)
     runtime.start_hidden_chrome()
     from playwright.sync_api import sync_playwright
@@ -55,7 +60,15 @@ def command_community(args) -> None:
         topics = args.topic or []
         if not topics and config.TOPICS.is_file():
             topics = [config.TOPICS.read_text(encoding="utf-8").splitlines()[0].strip()]
-        community.ensure_post(context, topics or ["What do you think?"])
+        community.ensure_post(context, topics or ["What do you think?"], args.dry_run)
+
+
+def command_comments(args) -> None:
+    from .comments import answer_all
+    slugs = [args.channel] if args.channel else None
+    results = answer_all(slugs=slugs, limit=args.limit, dry_run=args.dry_run)
+    if not results:
+        raise SystemExit("no channel comments were checked")
 
 
 def command_distribute_shorts(args) -> None:
@@ -153,8 +166,9 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--channel", choices=sorted(channels.CHANNELS), default="")
     check.set_defaults(func=command_check)
     community_parser = sub.add_parser("community", help="check the Community tab and publish a first post when empty")
-    community_parser.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True)
+    community_parser.add_argument("--channel", choices=sorted(channels.CHANNELS), default="")
     community_parser.add_argument("--topic", action="append", default=[])
+    community_parser.add_argument("--dry-run", action="store_true")
     community_parser.set_defaults(func=command_community)
     shorts = sub.add_parser("shorts", help="generate, render and schedule vertical Shorts")
     shorts.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True)
@@ -175,9 +189,8 @@ def build_parser() -> argparse.ArgumentParser:
     distribute_shorts.set_defaults(func=command_distribute_shorts)
     faith = sub.add_parser("faith-shorts",
                            help="religious Shorts with one generated background per short")
-    faith.add_argument("--channel",
-                       choices=("reflection", "whispers-from-heaven", "zanata", "zaflas"),
-                       required=True)
+    faith.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True,
+                       help="channel profile with a Shorts queue")
     faith.add_argument("--count", type=int, default=5)
     faith.add_argument("--start-date", default=None, help="first schedule date (YYYY-MM-DD)")
     faith.add_argument("--skip-slots", type=int, default=0,
@@ -188,6 +201,12 @@ def build_parser() -> argparse.ArgumentParser:
     clean = sub.add_parser("cleanup", help="free trash, staging and already scheduled media")
     clean.add_argument("--dry-run", action="store_true")
     clean.set_defaults(func=command_cleanup)
+    comments_parser = sub.add_parser(
+        "comments", help="like, heart and answer unanswered comments on the channels")
+    comments_parser.add_argument("--channel", choices=sorted(channels.CHANNELS), default="")
+    comments_parser.add_argument("--limit", type=int, default=25)
+    comments_parser.add_argument("--dry-run", action="store_true")
+    comments_parser.set_defaults(func=command_comments)
     distribute = sub.add_parser("distribute",
                                 help="spread new videos over the channels with fewer scheduled")
     distribute.add_argument("--count", type=int, default=20)
