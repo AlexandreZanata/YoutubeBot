@@ -57,7 +57,8 @@ def photo_candidates(query: str, limit: int = 4,
                      period: tuple[int, int] = (1880, 1915)) -> list[dict]:
     params = {
         "action": "query", "generator": "search",
-        "gsrsearch": f"filetype:bitmap {query}", "gsrlimit": str(limit), "gsrnamespace": "6",
+        "gsrsearch": (f"filetype:bitmap {query} -painting -drawing -lithograph "
+                      f"-engraving -print -sketch -artwork"), "gsrlimit": str(limit), "gsrnamespace": "6",
         "prop": "imageinfo", "iiprop": "url|extmetadata", "iiurlwidth": "1920",
         "format": "json",
     }
@@ -175,7 +176,8 @@ def ocean_photo_candidates(query: str, limit: int = 12,
     """Search verified public-domain / CC-BY oceanographic photographs."""
     params = {
         "action": "query", "generator": "search",
-        "gsrsearch": f"filetype:bitmap {query}", "gsrlimit": str(limit), "gsrnamespace": "6",
+        "gsrsearch": (f"filetype:bitmap {query} -painting -drawing -lithograph "
+                      f"-engraving -print -sketch -artwork"), "gsrlimit": str(limit), "gsrnamespace": "6",
         "prop": "imageinfo", "iiprop": "url|size|extmetadata", "iiurlwidth": "1920",
         "format": "json",
     }
