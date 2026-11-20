@@ -108,6 +108,15 @@ def command_shorts(args) -> None:
         raise SystemExit(1)
 
 
+def command_reschedule(args) -> None:
+    from .reschedule import run
+    failures = run(args.channel, args.dry_run)
+    print("[ytbot] reschedule finished")
+    if failures:
+        print(f"[ytbot] {len(failures)} failure(s): {failures}")
+        raise SystemExit(1)
+
+
 def command_distribute(args) -> None:
     from .distribute import run_distribution
     failures = run_distribution(args.count, args.dry_run)
@@ -212,6 +221,12 @@ def build_parser() -> argparse.ArgumentParser:
     distribute.add_argument("--count", type=int, default=20)
     distribute.add_argument("--dry-run", action="store_true")
     distribute.set_defaults(func=command_distribute)
+    reschedule = sub.add_parser(
+        "reschedule",
+        help="move already-scheduled future videos to the channel's current slots")
+    reschedule.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True)
+    reschedule.add_argument("--dry-run", action="store_true")
+    reschedule.set_defaults(func=command_reschedule)
     run = sub.add_parser("run", help="generate, render, upload and schedule videos")
     run.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True,
                      help="channel profile; ask the user when it is not specified")

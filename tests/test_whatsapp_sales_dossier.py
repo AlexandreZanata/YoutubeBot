@@ -29,6 +29,7 @@ BRIEF_DONE = {
 
 class ClientDossierTests(unittest.TestCase):
     rules = load()
+    rules.limits["auto_conversation"] = True  # automated mode under test
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()

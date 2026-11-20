@@ -12,6 +12,7 @@ from tools.ytbot.commercial.whatsapp.sales.store import SalesStore
 
 class SalesAgentTests(unittest.TestCase):
     rules = load()
+    rules.limits["auto_conversation"] = True  # automated mode under test
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()

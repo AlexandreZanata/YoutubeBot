@@ -92,6 +92,13 @@ def _upload_context(playwright, context, upload_cdp):
 
 def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
               start_date=None, topics: list[str] | None = None) -> list:
+    from . import channels
+    if config.CHANNEL and config.CHANNEL.slug in channels.DOCUMENTARY_CHANNELS:
+        raise RuntimeError(
+            f"{config.CHANNEL.slug} is a documentary channel: build it with "
+            "python3 -m tools.ytbot documentary init|collect|audit|narrate|render|qc. "
+            "The batch path would generate an AI thumbnail and use it as the background, "
+            "which this channel forbids.")
     if not (config.PROFILE / "Default" / "Cookies").is_file():
         runtime.setup_profile()
     runtime.start_hidden_chrome()

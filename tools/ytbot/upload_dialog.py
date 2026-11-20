@@ -93,6 +93,47 @@ def _set_date(page, slot) -> None:
         page.wait_for_timeout(1000)
 
 
+def _verify_model(page, slot) -> None:
+    model = page.evaluate(
+        "()=>document.querySelector('#publish-from-private-non-sponsor-selector')?.getAttribute('model')")
+    if not model:
+        raise RuntimeError("schedule model was not created")
+    parsed = json.loads(model)
+    expected = {"year": slot.year, "month": slot.month - 1, "day": slot.day}
+    if parsed.get("date") != expected or parsed.get("selectedTimeOfDayValue") != slot.hour * 3600:
+        raise RuntimeError(f"schedule model mismatch: {model}")
+
+
+def _click_done(page) -> None:
+    log("clicking schedule")
+    deadline = time.time() + 180
+    words = ("Programar", "Schedule", "Salvar", "Save", "Concluir", "Done", "Publish",
+             "Atualizar", "Update")
+    while time.time() < deadline:
+        state = page.evaluate(
+            "()=>{const b=document.querySelector('#done-button'); return b?{text:(b.innerText||'').trim(),disabled:b.getAttribute('aria-disabled')}:null}")
+        if state and state.get("disabled") != "true" and any(word in state.get("text", "") for word in words):
+            break
+        page.wait_for_timeout(3000)
+    else:
+        raise RuntimeError("schedule button did not become ready")
+    page.evaluate("()=>{const b=document.querySelector('#done-button'); if(b)b.click()}")
+    page.wait_for_timeout(10000)
+
+
+def change_scheduled_time(page, slot) -> None:
+    """Set a new date and time inside the open dialog of an already-scheduled video."""
+    if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
+        page.evaluate("()=>{const b=document.querySelector('#second-container-expand-button'); if(b)b.click()}")
+        page.wait_for_timeout(1500)
+    if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
+        raise RuntimeError("the schedule dialog did not open")
+    log("setting schedule date")
+    _set_date(page, slot)
+    _verify_model(page, slot)
+    _click_done(page)
+
+
 def schedule_in_dialog(page, slot) -> None:
     log("answering audience")
     answer_audience(page)
@@ -103,12 +144,24 @@ def schedule_in_dialog(page, slot) -> None:
     if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
         raise RuntimeError("the schedule dialog did not open")
     log("waiting for checks")
-    deadline = time.time() + 900
+    import re
+
+    deadline = time.time() + 600
+    started = time.time()
     while time.time() < deadline:
         body = page.locator("body").inner_text()
         state = page.evaluate(
             "()=>{const b=document.querySelector('#done-button'); return b?{text:(b.innerText||'').trim(),disabled:b.getAttribute('aria-disabled')}:null}")
-        if state and state.get("disabled") != "true" and ("Verificações concluídas" in body or "Checks complete" in body):
+        done_enabled = bool(state) and state.get("disabled") != "true"
+        complete = ("Verificações concluídas" in body or "Checks complete" in body
+                    or "Nenhum problema" in body)
+        running = re.search(r"Verifica(?:ç|c)[aã]o\s+\d+%", body, re.I) is not None
+        if done_enabled and (complete or not running):
+            break
+        # Scheduling is allowed while a slow check is still finishing; don't
+        # block the whole queue for 15 minutes on a cosmetic progress label.
+        if done_enabled and time.time() - started > 240:
+            log("checks still running; scheduling with the current result")
             break
         if not page.locator("#step-badge-3").count() and not page.locator("#datepicker-trigger").count():
             raise RuntimeError("the dialog closed during checks")
@@ -123,27 +176,8 @@ def schedule_in_dialog(page, slot) -> None:
         page.evaluate("()=>{const b=document.querySelector('#second-container-expand-button'); if(b)b.click()}")
         page.wait_for_timeout(1500)
     _set_date(page, slot)
-    model = page.evaluate(
-        "()=>document.querySelector('#publish-from-private-non-sponsor-selector')?.getAttribute('model')")
-    if not model:
-        raise RuntimeError("schedule model was not created")
-    parsed = json.loads(model)
-    expected = {"year": slot.year, "month": slot.month - 1, "day": slot.day}
-    if parsed.get("date") != expected or parsed.get("selectedTimeOfDayValue") != slot.hour * 3600:
-        raise RuntimeError(f"schedule model mismatch: {model}")
-    log("clicking schedule")
-    deadline = time.time() + 180
-    words = ("Programar", "Schedule", "Salvar", "Save", "Concluir", "Done", "Publish")
-    while time.time() < deadline:
-        state = page.evaluate(
-            "()=>{const b=document.querySelector('#done-button'); return b?{text:(b.innerText||'').trim(),disabled:b.getAttribute('aria-disabled')}:null}")
-        if state and state.get("disabled") != "true" and any(word in state.get("text", "") for word in words):
-            break
-        page.wait_for_timeout(3000)
-    else:
-        raise RuntimeError("schedule button did not become ready")
-    page.evaluate("()=>{const b=document.querySelector('#done-button'); if(b)b.click()}")
-    page.wait_for_timeout(10000)
+    _verify_model(page, slot)
+    _click_done(page)
 
 
 def scheduled_at(context, video_id: str, slot) -> bool:

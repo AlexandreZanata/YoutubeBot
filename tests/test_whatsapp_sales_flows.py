@@ -15,6 +15,7 @@ class SalesFlowTests(unittest.TestCase):
     """Staff answering, referral to the decision maker, closing and end classifications."""
 
     rules = load()
+    rules.limits["auto_conversation"] = True  # automated mode under test
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()

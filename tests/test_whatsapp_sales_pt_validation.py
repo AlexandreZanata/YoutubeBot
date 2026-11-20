@@ -21,6 +21,7 @@ OFFER = [{"dir": "out", "text": "Você gostaria que eu fizesse um orçamento?", 
 
 class PortugueseSalesValidationTests(unittest.TestCase):
     rules = load()
+    rules.limits["auto_conversation"] = True  # automated mode under test
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()

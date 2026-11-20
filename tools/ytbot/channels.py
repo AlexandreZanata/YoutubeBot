@@ -18,9 +18,14 @@ class Channel:
     article_retry: str
     max_article_chars: int = 0
     narration_volume: float = 2.0
-    slots: tuple[int, ...] = (0, 12)
+    # America/Cuiaba hours tuned to each channel's audience profile
+    # (see docs/channels/<slug>.md, "Schedule profile"). Two slots per day are at
+    # least six hours apart.
+    slots: tuple[int, ...] = (10, 21)
     interval_days: int = 1
 
+
+DOCUMENTARY_CHANNELS = ("sepia-atlas", "bathylora")
 
 CHANNELS = {
     "zaflas": Channel(
@@ -38,7 +43,7 @@ CHANNELS = {
             "fixed Zaflas Agro opening identification and final sign-off."
         ),
         max_article_chars=100000,
-        slots=(12,),
+        slots=(11,),
     ),
     "fallem-prince": Channel(
         slug="fallem-prince",
@@ -50,7 +55,7 @@ CHANNELS = {
         language="en",
         min_article_chars=40000,
         article_retry="Target narration length: at least 6,500 words.",
-        slots=(0, 12),
+        slots=(10, 21),
     ),
     "infinite-random-worlds": Channel(
         slug="infinite-random-worlds",
@@ -66,7 +71,7 @@ CHANNELS = {
             "minutes at a measured pace. Each story must use a unique world and cast."
         ),
         max_article_chars=85000,
-        slots=(12,),
+        slots=(19,),
     ),
     "vocal-pages": Channel(
         slug="vocal-pages",
@@ -82,7 +87,7 @@ CHANNELS = {
             "whole sections instead of summarizing. Keep one theme and the quiet ending."
         ),
         max_article_chars=130000,
-        slots=(0,),
+        slots=(21,),
         interval_days=2,
     ),
     "reflection": Channel(
@@ -99,7 +104,7 @@ CHANNELS = {
             "minutes. Keep the same character and moment."
         ),
         max_article_chars=48000,
-        slots=(5, 17),
+        slots=(8, 21),
     ),
     "zanata": Channel(
         slug="zanata",
@@ -115,7 +120,7 @@ CHANNELS = {
             "minutes. Keep the same book and author."
         ),
         max_article_chars=100000,
-        slots=(16,),
+        slots=(10,),
     ),
     "sepia-atlas": Channel(
         slug="sepia-atlas",
@@ -185,6 +190,7 @@ CHANNELS = {
             "Target narration length: 2,400 to 2,800 words, about 15 to 17 "
             "minutes at a calm pace."
         ),
+        slots=(8, 22),
     ),
 }
 

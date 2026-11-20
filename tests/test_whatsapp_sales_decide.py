@@ -11,6 +11,7 @@ LEAD = {"id": "Ltest", "name": "Barbearia Teste", "category": "Barbearia", "city
 
 class SalesDecisionTests(unittest.TestCase):
     rules = load()
+    rules.limits["auto_conversation"] = True  # automated mode under test
 
     def run_model(self, text, answer, history=None):
         model = FakeModel(answer)

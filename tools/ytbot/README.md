@@ -105,14 +105,19 @@ For every topic, the bot runs these stages and records each one:
 8. **End screen** on the draft edit page: adds the Subscribe element and a Video
    element set to **Melhor para o espectador** (YouTube chooses the best video).
 9. **Schedule** on the visibility tab, never publish now:
-   - up to 4 videos per day for fallem prince: **00:00**, **06:00**, **12:00** and **18:00**
-   - the 4/day expansion starts on **2026-11-15**; days that already have 00:00/12:00
-     keep them, and the new videos fill the exact middle slots 06:00/18:00 (2/day),
-     completing 4/day
+   - the slot hours come from the channel profile (`tools/ytbot/channels.py`) and are tuned to
+     each audience; see the "Schedule profile" section of the
+     [channel profile docs](../../docs/channels/)
+   - fallem prince: up to 2 videos per day at **10:00** and **21:00** America/Cuiaba
+     (09:00/20:00 US Eastern)
+   - two slots per day are always at least six hours apart; the daily count per channel
+     never changes when hours are tuned
    - use `--start-date YYYY-MM-DD` when a batch must start on a specific day
-   - if a slot is taken, use the next free slot; if all four are taken, move to the next day
+   - if a slot is taken, use the next free slot; if the day is full, move to the next day
    - existing slots are read from YouTube Studio's `list_creator_videos` data
    - starts at least 60 minutes in the future
+   - `python3 -m tools.ytbot reschedule --channel <slug>` realigns already-scheduled
+     future videos to the current slots without touching generation
 10. **Records** are appended to:
     - `.local/ytbot/records/records.jsonl` (every event)
     - `.local/ytbot/runs/<slug>/record.json` (per-video timeline)

@@ -16,6 +16,21 @@ The channel speaks to Christians in waiting, grief, doubt, exhaustion, regret, f
 uncertainty. The tone is reverent, tender and biblically grounded. It never uses prosperity
 gospel, fear, manipulation or aggressive calls to action.
 
+## Schedule profile
+
+Audience: United States Christians, concentrated in the South and Midwest (US Eastern and
+Central time), skewing 45 and older. Devotional content has two daily peaks: the morning
+devotional before work and the evening prayer before sleep. Cuiaba is one hour ahead of US
+Eastern time in November.
+
+| Slot (America/Cuiaba) | US Eastern | Why |
+| --- | --- | --- |
+| 08:00 | 07:00 | Morning devotional window; a 2026 sample of 214,345 religious YouTube clips shows the niche peaking between 9 a.m. and 12 p.m. EST, so 7 a.m. leads that peak by 1 to 2 hours |
+| 22:00 | 21:00 | Evening prayer and bedtime window (8 to 10 p.m. local), the second daily devotional peak |
+
+The two slots are 14 hours apart and the daily count stays two. Before 2026-11-20 the channel
+published at 00:00 and 12:00 America/Cuiaba; the noon slot missed both devotional peaks.
+
 ## Catalog snapshot
 
 Analyzed from the public catalog on 15/11/2026:

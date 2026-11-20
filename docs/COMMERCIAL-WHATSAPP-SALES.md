@@ -13,6 +13,7 @@ and the journal in [WhatsApp Web](COMMERCIAL-WHATSAPP.md); there is no second se
 | Lead source | A CSV the owner builds by reviewing Google Maps. No scraping, no Places API. |
 | Replies | OpenCode Go free models first in rotation, then `deepseek-v4.1-flash` → `muse-spark-1.3-contributor` (updated the same evening). |
 | Daily limit | 50 first contacts per day. |
+| Conversation | Owner decision 2026-11-20: openings only. After a 24h WhatsApp restriction caused by incongruous automated conversations, the bot sends the full opening combo (greeting, presentation, the four example links) 5 minutes apart and never answers: every reply goes straight to the owner (`needs-owner` + notification), and there are no follow-ups. `limits.auto_conversation = false` in the rules turns this on; `true` restores the automated state machine. |
 
 ## Files
 
@@ -584,6 +585,11 @@ live in `[opening]` and `[pacing]` of the rules file.
 - The opening is recorded before the browser acts and its journal keys are per lead, so it is
   never repeated, even after a crash.
 - One follow-up after 72 h without an answer; `no-response` 96 h later, then silence.
+- **Openings-only mode (`limits.auto_conversation = false`, owner 2026-11-20):** the bot sends
+  the opening combo and nothing else. Any reply moves the lead to `needs-owner` and notifies
+  the owner ("Respondeu à nossa mensagem: no modo só-abertura a conversa é sua"); no bot reply
+  is ever sent and no follow-up goes out. The opening spacing is 5 minutes
+  (`between_openings 300-330 s`).
 - Answers wait `pacing.reply_debounce_seconds` (30 s) after the newest incoming bubble, so a
   person splitting a thought into two or three messages is read as one turn and never answered
   mid-thought by a machine. The live loop enables it; direct unit calls do not.

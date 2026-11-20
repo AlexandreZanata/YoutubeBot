@@ -44,6 +44,7 @@ class PerLeadChannel(FakeChannel):
 
 class QueueTests(unittest.TestCase):
     rules = load()
+    rules.limits["auto_conversation"] = True  # automated mode under test
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()

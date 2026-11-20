@@ -20,7 +20,8 @@ them, always with one generated background image and burned-in subtitles.
 | Schedule | 2 per day at 09:00 and 18:00 America/Cuiaba |
 | Media | `.local/ytbot/channels/zaflas/shorts/` (symlink to `/data/zaflas-shorts`) |
 
-The long-form Zaflas videos remain one per day at 12:00. Shorts are separate uploads.
+The long-form Zaflas videos remain one per day at 11:00 America/Cuiaba (12:00 in
+Sao Paulo/Brasilia). Shorts are separate uploads and keep their own hours.
 
 ## One image per Short
 

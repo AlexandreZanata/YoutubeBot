@@ -19,6 +19,19 @@ The account was signed in by the owner in a visible window on 15/11/2026. Studio
 profile bound to `UCY3Zp50I6Y6semQQccJxRPg`; verify the channel ID again before the first
 upload of any batch.
 
+## Schedule profile
+
+Audience: United States and wider English speculative-fiction viewers, roughly 18 to 40, who
+watch long imaginary-world stories as evening entertainment after work or classes. Cuiaba is
+one hour ahead of US Eastern time in November.
+
+| Slot (America/Cuiaba) | US Eastern | US Pacific | Why |
+| --- | --- | --- | --- |
+| 19:00 | 18:00 | 15:00 | Start of the evening entertainment prime window (6 to 8 p.m. local), when fiction and worldbuilding are actually watched |
+
+One video per day, unchanged. Before 2026-11-20 the channel published at 12:00 America/Cuiaba
+(11:00 US Eastern), a midday slot that misses the after-work fiction window.
+
 ## Content shape
 
 Public sample from the Videos tab on 15/11/2026: 73 videos, 4 subscribers, 18 to 58.8
@@ -65,7 +78,7 @@ python3 -m tools.ytbot run --channel infinite-random-worlds --account legacy \
   --upload-account infinite --count 1
 ```
 
-Cadence is one video per day in the 12:00 slot, and batches run only on an explicit owner
+Cadence is one video per day in the 19:00 slot, and batches run only on an explicit owner
 request.
 
 ## Chapters and sequels

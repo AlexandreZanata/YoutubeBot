@@ -293,6 +293,8 @@ def build(raw: dict) -> SalesRules:
         if not str(raw["llm"][key]).startswith("https://opencode.ai/"):
             raise RulesError(f"llm.{key} must be an https://opencode.ai/ address")
     limits = raw["limits"]
+    if "auto_conversation" in limits and not isinstance(limits["auto_conversation"], bool):
+        raise RulesError("limits.auto_conversation must be true or false")
     if not 0 < int(limits["daily_openings"]) <= 50:
         raise RulesError("limits.daily_openings must be between 1 and 50")
     if int(limits["max_followups"]) not in (0, 1):

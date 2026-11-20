@@ -261,6 +261,7 @@ def _run_args(**overrides):
 
 class CampaignEndToEndTests(unittest.TestCase):
     rules = load()
+    rules.limits["auto_conversation"] = True  # automated mode under test
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -486,7 +487,7 @@ class CampaignEndToEndTests(unittest.TestCase):
         for prev, nxt in zip(cold_openings, cold_openings[1:]):
             gap = (nxt[1] - prev[2]).total_seconds()
             self.assertGreaterEqual(gap, 120.0, f"gap {gap:.1f}s < 120s between {prev[0]} and {nxt[0]}")
-            self.assertLessEqual(gap, 185.0, f"gap {gap:.1f}s > 185s between {prev[0]} and {nxt[0]}")
+            self.assertLessEqual(gap, 340.0, f"gap {gap:.1f}s > 340s between {prev[0]} and {nxt[0]}")
 
         # 3. Non-blocking interleaving proven: Clinic #1 was answered BEFORE Clinic #2 opened!
         self.assertTrue(first_reply_before_second_opening["ok"],
@@ -648,9 +649,9 @@ class CampaignEndToEndTests(unittest.TestCase):
         agent1 = SalesAgent(self.rules, self.store, channel, None, live=True,
                             clock=self.clock, sleep=self._sleep, rng=random.Random(5),
                             notify=self.notes.append, log=self.logs.append, paced_openings=True)
-        # Open Clinic #1 and #2 before simulated restart.
+        # Open Clinic #1 and #2 before simulated restart (5-minute spacing).
         agent1.cycle([], prospect=True, limit=10)
-        self.clock.now += timedelta(seconds=185)
+        self.clock.now += timedelta(seconds=340)
         agent1.cycle([], prospect=True, limit=10)
         self.assertEqual(len(channel.opening_windows), 2)
         second_finished = channel.opening_windows[1][2]
@@ -660,7 +661,7 @@ class CampaignEndToEndTests(unittest.TestCase):
         agent2 = SalesAgent(self.rules, self.store, channel, None, live=True,
                             clock=self.clock, sleep=self._sleep, rng=random.Random(6),
                             notify=self.notes.append, log=self.logs.append, paced_openings=True)
-        # Must NOT open Clinic #3 yet (only 40s elapsed < 120s), MUST still answer Clinic #1!
+        # Must NOT open Clinic #3 yet (only 40s elapsed < 300s), MUST still answer Clinic #1!
         channel.push_incoming(clinics[0]["id"], ["Isso é robô?"])
         digits = clinics[0]["phone"]
         chat = f"+{digits[:2]} {digits[2:4]} {digits[4:9]}-{digits[9:]}"
@@ -670,8 +671,8 @@ class CampaignEndToEndTests(unittest.TestCase):
         summary = agent2.cycle(ev, prospect=True, limit=10)
         self.assertEqual(summary["openings"], [], "cooldown from persisted opened_at holds")
         self.assertEqual(len(summary["replies"]), 1, "replies still work during opening cooldown")
-        # Once 185s past Clinic #2's opening, Clinic #3 opens cleanly and #1/#2 are never repeated.
-        self.clock.now = second_finished + timedelta(seconds=185)
+        # Once past the 5-minute cooldown, Clinic #3 opens cleanly and #1/#2 are never repeated.
+        self.clock.now = second_finished + timedelta(seconds=340)
         summary2 = agent2.cycle([], prospect=True, limit=10)
         self.assertEqual([item["lead"] for item in summary2["openings"]], [clinics[2]["id"]])
         self.assertEqual(len([s for s in channel.sent
@@ -697,11 +698,11 @@ class CampaignEndToEndTests(unittest.TestCase):
                          "unread": True, "allowed": True}]
             return []
 
-        # Run 12 simulated minutes with limit=3 (enough time for 5 openings if uncapped).
+        # Run 20 simulated minutes with limit=3 (5-minute spacing needs ~15 min for 3).
         commands.run_cycles(
             agent, session, _run_args(limit=3, interval=5),
             listen=fake_listen, out=lambda line: None,
-            stopped=lambda: self.clock() >= MONDAY + timedelta(minutes=12),
+            stopped=lambda: self.clock() >= MONDAY + timedelta(minutes=20),
         )
         self.assertEqual(len(channel.opening_windows), 3)
         self.assertEqual(self.store.lead(clinics[3]["id"])["state"], "new")
@@ -756,7 +757,7 @@ class CampaignEndToEndTests(unittest.TestCase):
         self.assertEqual(opened, [clinics[1]["id"], clinics[2]["id"]],
                          "the failed chat is skipped, the next ones open on schedule")
 
-    def test_blocking_prospect_uses_two_to_three_minute_opening_interval(self):
+    def test_blocking_prospect_uses_five_minute_opening_interval(self):
         _, clinics = self._import_clinics()
         channel = SimulatedWhatsApp(self.store.journal_path, self.clock)
         pauses: list[float] = []
@@ -766,7 +767,7 @@ class CampaignEndToEndTests(unittest.TestCase):
         results = agent.prospect(3)
         self.assertEqual([item["state"] for item in results], ["opened", "opened", "opened"])
         self.assertEqual(len(pauses), 2)
-        self.assertTrue(all(120.0 <= p <= 180.0 for p in pauses), pauses)
+        self.assertTrue(all(300.0 <= p <= 330.0 for p in pauses), pauses)
 
     def test_long_clinic_auto_reply_and_doctor_gatekeeper_patterns(self):
         long_auto = ("Olá! Seja bem-vindo à Clínica Odontológica! Agradecemos o seu contato. "
@@ -780,17 +781,19 @@ class CampaignEndToEndTests(unittest.TestCase):
                     "Vou falar com o Dr. quando ele sair da consulta"):
             self.assertEqual(classifier.classify(self.rules, msg), "gatekeeper", msg)
 
-    def test_pacing_between_openings_stays_inside_two_to_three_minutes(self):
+    def test_pacing_between_openings_stays_inside_five_minutes(self):
         pacing = SalesPacing.from_rules(self.rules)
         rng = random.Random(11)
-        self.assertEqual((pacing.between_openings_min, pacing.between_openings_max), (120.0, 180.0))
+        self.assertEqual((pacing.between_openings_min, pacing.between_openings_max),
+                         (300.0, 330.0))
         for _ in range(50):
             value = pacing.between_openings(rng)
-            self.assertTrue(120.0 <= value <= 180.0, value)
+            self.assertTrue(300.0 <= value <= 330.0, value)
 
 
 class TypingStateTests(unittest.TestCase):
     rules = load()
+    rules.limits["auto_conversation"] = True  # automated mode under test
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()

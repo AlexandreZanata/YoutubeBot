@@ -8,6 +8,7 @@ OFFER = [{"dir": "out", "text": "Você gostaria que eu fizesse um orçamento?", 
 
 class SalesClassifierTests(unittest.TestCase):
     rules = load()
+    rules.limits["auto_conversation"] = True  # automated mode under test
 
     def check(self, text, expected, history=None, state="engaged"):
         self.assertEqual(classifier.classify(self.rules, text, history, state), expected, text)

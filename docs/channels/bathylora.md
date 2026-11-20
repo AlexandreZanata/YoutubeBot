@@ -12,6 +12,18 @@ like a curated independent science documentary — scientific, mysterious withou
 contemplative, respectful of marine life — never horror, conspiracy, monster lore or a generic
 AI slideshow.
 
+## Schedule profile
+
+Audience: United States science-curious viewers, roughly 25 to 45, who watch deep-ocean
+documentaries in the evening prime window. Cuiaba is one hour ahead of US Eastern time in
+November.
+
+| Slot (America/Cuiaba) | US Eastern | US Pacific | Why |
+| --- | --- | --- | --- |
+| 21:00 | 20:00 | 17:00 | Evening prime window (8 to 10 p.m. local), when documentary and science long-form are watched on both coasts |
+
+One video every two days, unchanged; 21:00 Cuiaba is already prime-time optimal and is kept.
+
 ## Video format
 
 - Target duration: **15 to 25 minutes** average (`1,900` to `3,200` American English words at
@@ -161,3 +173,10 @@ episode production instructions usable by any agent, see
 [the Bathylora production pipeline runbook](bathylora-pipeline.md). The pilot episode package
 is prepared under `.local/ytbot/channels/bathylora/runs/` for owner review; nothing is
 published automatically.
+
+## Strict production path
+
+Only the documentary pipeline (`documentary init|collect|audit|narrate|render|qc`) produces
+this channel. Verified oceanographic photographs carry the video; the cover is a real photograph
+with the episode title over it. Never an AI thumbnail used as the background, never the normal
+batch path. See [documentary format](../DOCUMENTARY-FORMAT.md).

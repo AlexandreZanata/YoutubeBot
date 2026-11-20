@@ -29,6 +29,22 @@ The channel description must keep the website link at the top:
 🌱 Conheça o Zaflas:  https://zaflas.com.br/
 ```
 
+## Schedule profile
+
+Audience: Brazilian farmers, agronomists and agro professionals, concentrated in
+Center-South Brazil (Sao Paulo/Brasilia time, UTC-3). Cuiaba is one hour behind Brasilia, so
+the slot is chosen in Cuiaba hours to land on the Brazilian lunch peak, when field work
+pauses and phones come out. Metricool's 2026 study of 799,718 videos shows long-form
+activity concentrated between 10:00 and 16:00 local, and the national engagement peak is the
+12:00 to 13:00 lunch window.
+
+| Slot (America/Cuiaba) | Brasilia/Sao Paulo | Why |
+| --- | --- | --- |
+| 11:00 | 12:00 | Publishes exactly at the start of the Brazilian lunch peak, the strongest midday engagement window for the agro audience |
+
+One video per day, unchanged. Before 2026-11-20 the channel published at 12:00 America/Cuiaba
+(13:00 Brasilia), one hour into the lunch window.
+
 ## Catalog snapshot
 
 Analyzed from the public Videos tab on 15/11/2026. Shorts are excluded from the duration
@@ -196,8 +212,9 @@ verified. This is an **upload-only** profile: ChatGPT and the capture extension 
 required. Generation uses the main `legacy` profile; catalog, Community, upload and
 scheduling use the Zaflas profile.
 
-Zaflas publishes **one video per day at 12:00 America/Cuiaba**. The channel profile uses
-`slots=(12,)`, so a batch fills one noon slot per day.
+Zaflas publishes **one video per day at 11:00 America/Cuiaba**, which is **12:00 in
+Sao Paulo/Brasilia**, the start of the Brazilian lunch peak. The channel profile uses
+`slots=(11,)`, so a batch fills one slot per day.
 
 ## Limits
 

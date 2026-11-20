@@ -26,5 +26,25 @@ class AllocationTests(unittest.TestCase):
             distribute.allocate(-1, {"a": 0})
 
 
+class DocumentaryChannelTests(unittest.TestCase):
+    def test_documentary_channels_never_enter_the_water_fill(self):
+        from tools.ytbot import channels
+
+        audited = distribute.audit()
+        for slug in channels.DOCUMENTARY_CHANNELS:
+            self.assertNotIn(slug, audited)
+
+    def test_batch_refuses_documentary_channels(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from tools.ytbot import batch, config
+
+        fake = SimpleNamespace(slug="sepia-atlas")
+        with patch.object(config, "CHANNEL", fake):
+            with self.assertRaisesRegex(RuntimeError, "documentary"):
+                batch.run_batch(1)
+
+
 if __name__ == "__main__":
     unittest.main()
