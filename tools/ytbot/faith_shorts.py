@@ -364,7 +364,16 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
     upload_cdp = store.account(spec["upload"])["cdp_port"]
     store.activate("legacy")
     runtime.start_hidden_chrome()
-    topics = list(spec["topics"])[start_index:start_index + count]
+    topics = []
+    for candidate in list(spec["topics"])[start_index:]:
+        run_dir = config.DATA_DIR / "shorts" / logic.slug(candidate)
+        if (run_dir / "upload.json").is_file():
+            continue
+        topics.append(candidate)
+        if len(topics) == count:
+            break
+    if len(topics) < count:
+        raise RuntimeError(f"only {len(topics)} unused Short topics left for {channel_slug}")
     slots = short_slots(len(topics), spec["hours"],
                         start or (date.today() + timedelta(days=1)), skip_slots,
                         occupied_slots(config.DATA_DIR / "shorts"),
