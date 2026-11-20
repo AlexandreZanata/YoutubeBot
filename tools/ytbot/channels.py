@@ -50,7 +50,7 @@ CHANNELS = {
         language="en",
         min_article_chars=40000,
         article_retry="Target narration length: at least 6,500 words.",
-        slots=(0, 6, 12, 18),
+        slots=(0, 12),
     ),
     "infinite-random-worlds": Channel(
         slug="infinite-random-worlds",

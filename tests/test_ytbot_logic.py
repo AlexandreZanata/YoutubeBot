@@ -112,8 +112,9 @@ class ChannelProfileTests(unittest.TestCase):
         self.assertEqual(channels.get("zaflas").max_article_chars, 100000)
         self.assertEqual(channels.get("zaflas").min_article_chars, 26000)
 
-    def test_fallem_keeps_four_daily_slots(self):
-        self.assertEqual(channels.get("fallem-prince").slots, (0, 6, 12, 18))
+    def test_fallem_uses_two_daily_slots(self):
+        # Owner decision 2026-11-20: 2/day at 00:00 and 12:00 (was 4/day until 2026-11-15).
+        self.assertEqual(channels.get("fallem-prince").slots, (0, 12))
 
     def test_only_zaflas_uses_brazilian_portuguese(self):
         self.assertEqual(channels.get("zaflas").language, "pt-BR")

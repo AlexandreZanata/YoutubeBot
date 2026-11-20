@@ -318,6 +318,10 @@ fixed = true
 when = "Pede para parar, remover o número, diz que é spam, ameaça denunciar ou bloquear."
 patterns = [
   'para de (me )?(mandar|enviar)', 'pare de', 'nao (me )?(mande|mandem|envie)', 'remov[ae] (meu|o meu|esse) (numero|contato)',
+  '(me )?remov[ae]( (da|de)( minha)? lista)?( por favor| pfv)?[.! ]*$',
+  '(meu|o meu|esse) (numero|contato).{0,15}(remov[ae]|apag[ae]|tira|retira|exclu[ai])',
+  '(tira|retira|apaga|exclui|exclua)\s*(o\s+meu|meu|o|esse)?\s*(numero|contato)(\s+da\s+lista)?(\s+dai)?',
+  '(pode|por favor|pfv)?\s*(tirar|remover|apagar|retirar)\s*(o\s+meu|meu|o|esse)?\s*(numero|contato)(\s+da\s+lista)?',
   '\bspam\b', 'denunci', '\bbloque(ar|ia|ei|io)\b', 'nao (me )?(chame|chama|procure|incomode) mais',
   'nao (me )?(chame|chama|procure|incomode)[.! ]*$', 'sai fora',
 ]
@@ -334,7 +338,7 @@ patterns = [
   'nao (tenho|temos) interesse', 'sem interesse', 'nao (quero|queremos)( nao)?[,.! ]*(obrigad[oa])?[.!]*$',
   '^agora nao[,.! ]*(obrigad[oa]|valeu)?[.!]*$', 'agora nao,? (obrigad|valeu|preciso|quero)',
   'n(esse|este|o) momento nao (estou |to |estamos )?(precis|quero|tenho interesse|temos interesse)',
-  'nao me interessa', 'dispenso', 'obrigad[oa],? mas nao', 'nao,? valeu', 'nao e (do nosso|o nosso) interesse',
+  'nao me interessa', '\bdispens[aei]\w*\b(?!\s+(um\s+|uma\s+|a\s+|o\s+)?(funcionari|colaborador|advogad|gerent|empregad|pessoa|motorista|secretari))|\bdispenc[oa]\w*\b', 'obrigad[oa]( (pelo|pela) (contato|atencao|retorno|mensagem|link|exemplo))?,? mas nao', 'no momento nao[,.! ]*(obrigad[oa])?[.! ]*$', 'deixa(r|ndo|rei)? pra la\b', 'sem (dinheiro|grana|verba) agora[,.! ]*(obrigad[oa])?', 'nao,? valeu', 'nao e (do nosso|o nosso) interesse',
 ]
 messages = []
 
@@ -552,7 +556,7 @@ patterns = [
   'sou (funcionari|atendente|recepcionista|secretari|colaborador)', 'aqui e (da |a )?(recepcao|secretaria)',
   'nao sou (o |a )?(dono|dona|responsavel|proprietari)',
   '(o|a) (dono|dona|responsavel|proprietari[oa]|gerente|chefe|patra[oa]|doutor|doutora|dr\.?|dra\.?) (nao esta|nao ta|nao se encontra|esta ocupad|ta ocupad|esta em atendimento|ta em atendimento|que (decide|ve|cuida|resolve))',
-  'quem (decide|resolve|ve isso|cuida (disso|dessa parte))', 'vou (passar|repassar|mostrar|falar) (isso )?(pro|para o|pra|para a) (dono|dona|responsavel|chefe|gerente|patra[oa]|doutor|doutora|dr\.?|dra\.?)',
+  'quem (decide|resolve|ve isso|cuida (disso|dessa parte))', 'vou (passar|repassar|mostrar|falar) (isso )?(pro|para o|pra|para a) (meu |minha )?(dono|dona|responsavel|chefe|gerente|patra[oa]|doutor|doutora|dr\.?|dra\.?)',
   'deixa eu ver com (o|a)', 'preciso ver com (o|a)', 'tenho que ver com (o|a)', 'nao sou eu que (decido|cuido)',
   'vou (ver|falar|conversar) com (o|a) (dono|dona|responsavel|chefe|gerente|patra[oa]|doutor|doutora|dr\.?|dra\.?)', '(ele|ela) (te )?(chama|retorna|liga|responde)',
 ]
