@@ -40,7 +40,7 @@ FLOW_PROFILE = "standard"
 FLOW_SELECTION = None
 BROWSER_MODE = "system"
 TIMEZONE = "America/Cuiaba"
-SLOT_HOURS = (0, 12)
+SLOT_HOURS = (10, 21)
 TAG_LIMIT = 425
 MIN_LEAD_MINUTES = 60
 

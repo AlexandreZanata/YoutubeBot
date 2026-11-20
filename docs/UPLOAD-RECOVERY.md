@@ -99,6 +99,9 @@ caches.
   "Mostrar mais" and checked after save.
 - Scheduling confirms the slot first, opens the Programar block, supports the calendar,
   and retries the end screen verification; checks are bounded.
-- Fallem prince uses up to four daily slots from 2026-11-15 (00:00, 06:00, 12:00,
-  18:00); dated batches use `--start-date YYYY-MM-DD`.
+- Fallem prince uses two daily slots, 10:00 and 21:00 America/Cuiaba, since the
+  2026-11-20 audience-tuned schedule; dated batches use `--start-date YYYY-MM-DD`.
+- `python3 -m tools.ytbot reschedule --channel <slug>` moves already-scheduled future
+  videos to the channel's current slots (same date, order kept, at most the channel
+  frequency per day, at least 60 minutes ahead); it never uploads or regenerates.
 - Every fix follows the branch/PR/CI rule and is documented here or in the README.

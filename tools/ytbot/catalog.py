@@ -67,12 +67,14 @@ def fetch_creator_videos(context) -> dict:
         page.mouse.wheel(0, 100000)
         page.wait_for_timeout(1500)
         if page.locator("#navigate-after").count():
-            before = len(pages)
-            page.locator("#navigate-after").click()
-            for _ in range(15):
-                if len(pages) > before:
-                    break
-                page.wait_for_timeout(1000)
+            next_page = page.locator("#navigate-after").first
+            if next_page.get_attribute("aria-disabled") != "true":
+                before = len(pages)
+                next_page.click()
+                for _ in range(15):
+                    if len(pages) > before:
+                        break
+                    page.wait_for_timeout(1000)
     finally:
         page.close()
     if not pages:

@@ -8,13 +8,28 @@
 | Handle | `@thewordofreflection` |
 | Channel ID | `UCISw6UDaFINPRuuMr0s7tpA` |
 | Language | English only |
-| Cadence | two videos per day at 05:00 and 17:00 America/Cuiaba |
+| Cadence | two videos per day at 08:00 and 21:00 America/Cuiaba |
 | Upload account | `reflection` (upload-only profile, same Google account as Vocal Pages) |
 | Generation account | `legacy` |
 | Background | Whispers brown stippling loop |
 
 The channel shares the Google account with Vocal Pages. Switch the brand channel in Studio;
 never sign out of the Google account and never copy another browser profile.
+
+## Schedule profile
+
+Audience: the same United States Christian viewers as Whispers From Heaven, concentrated in
+US Eastern and Central time. Biblical story videos serve the morning devotional and the
+evening reflection windows. Cuiaba is one hour ahead of US Eastern time in November.
+
+| Slot (America/Cuiaba) | US Eastern | Why |
+| --- | --- | --- |
+| 08:00 | 07:00 | Morning devotional, 1 to 2 hours before the religious-niche 9 a.m. to 12 p.m. EST peak seen in 2026 posting data |
+| 21:00 | 20:00 | Evening reflection window (7 to 9 p.m. local) before sleep |
+
+The two slots are 13 hours apart and the daily count stays two. Before 2026-11-20 the channel
+published at 05:00 and 17:00 America/Cuiaba (04:00/16:00 US Eastern), hours that miss both
+devotional peaks.
 
 ## Catalog snapshot
 

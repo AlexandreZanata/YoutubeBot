@@ -11,13 +11,26 @@
 | Tagline | Listen. Reflect. Discover. |
 | Upload account | `vocal` (upload-only profile, CDP 9304) |
 | Generation account | `legacy` |
-| Cadence | one video every two days at 00:00 America/Cuiaba |
+| Cadence | one video every two days at 21:00 America/Cuiaba |
 | Background | `assets/backgrounds/vocal_pages.mp4` (24 s loop) |
 | Article target | 9,000 to 10,500 words, hard cap 130,000 characters |
 
 The public catalog was measured on 15/11/2026. The `vocal` profile now opens Studio directly
 on `UCm13oIPS1W43j9BYo0kewcQ` and the binding is saved. Studio first signed in to another
 channel of the same Google account; always confirm the channel name and ID before uploading.
+
+## Schedule profile
+
+Audience: United States adults who use long reflective narrations (60 to 104 minutes) as
+evening wind-down and pre-sleep companionship listening. A video that starts at 8 p.m. local
+carries the whole evening wind-down. Cuiaba is one hour ahead of US Eastern time in November.
+
+| Slot (America/Cuiaba) | US Eastern | US Pacific | Why |
+| --- | --- | --- | --- |
+| 21:00 | 20:00 | 17:00 | Start of the evening calm-listening window; the median 66-minute listen then covers the 8 to 10 p.m. local relaxation peak |
+
+One video every two days, unchanged. Before 2026-11-20 the channel published at 00:00
+America/Cuiaba (11 p.m. US Eastern), catching only the tail of the wind-down window.
 
 ## Catalog snapshot
 

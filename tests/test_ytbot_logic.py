@@ -55,6 +55,7 @@ class ScheduleTests(unittest.TestCase):
         config.SLOT_HOURS = self.slots
 
     def test_existing_scheduled_times(self):
+        config.SLOT_HOURS = (0, 12)
         payload = {"x": {"scheduledPublishingDetails": {"scheduledPublishings": [
             {"scheduledTimeSeconds": "1796227200"}]}}}
         slots = logic.scheduled_slots(payload)
@@ -107,14 +108,16 @@ class TopicTests(unittest.TestCase):
 
 
 class ChannelProfileTests(unittest.TestCase):
-    def test_zaflas_has_one_noon_slot_per_day(self):
-        self.assertEqual(channels.get("zaflas").slots, (12,))
+    def test_zaflas_keeps_one_lunch_slot_per_day(self):
+        # 11:00 America/Cuiaba = 12:00 Brasilia, the Brazilian lunch peak.
+        self.assertEqual(channels.get("zaflas").slots, (11,))
         self.assertEqual(channels.get("zaflas").max_article_chars, 100000)
         self.assertEqual(channels.get("zaflas").min_article_chars, 26000)
 
     def test_fallem_uses_two_daily_slots(self):
-        # Owner decision 2026-11-20: 2/day at 00:00 and 12:00 (was 4/day until 2026-11-15).
-        self.assertEqual(channels.get("fallem-prince").slots, (0, 12))
+        # Owner decision 2026-11-20: 2/day, audience-tuned to 10:00/21:00 America/Cuiaba
+        # (09:00/20:00 US Eastern; was 00:00/06:00/12:00/18:00 until 2026-11-20).
+        self.assertEqual(channels.get("fallem-prince").slots, (10, 21))
 
     def test_only_zaflas_uses_brazilian_portuguese(self):
         self.assertEqual(channels.get("zaflas").language, "pt-BR")
@@ -126,7 +129,7 @@ class ChannelProfileTests(unittest.TestCase):
         channel = channels.get("vocal-pages")
         self.assertEqual(channel.background, "vocal_pages")
         self.assertEqual(channel.channel_id, "UCm13oIPS1W43j9BYo0kewcQ")
-        self.assertEqual(channel.slots, (0,))
+        self.assertEqual(channel.slots, (21,))
         self.assertEqual(channel.interval_days, 2)
         self.assertEqual(channel.language, "en")
 
@@ -134,13 +137,13 @@ class ChannelProfileTests(unittest.TestCase):
         channel = channels.get("reflection")
         self.assertEqual(channel.channel_id, "UCISw6UDaFINPRuuMr0s7tpA")
         self.assertEqual(channel.language, "en")
-        self.assertEqual(channel.slots, (5, 17))
+        self.assertEqual(channel.slots, (8, 21))
 
     def test_zanata_is_the_daily_book_summary_channel(self):
         channel = channels.get("zanata")
         self.assertEqual(channel.channel_id, "UCx0AE-elCyDhfY0d1hQIwdw")
         self.assertEqual(channel.language, "en")
-        self.assertEqual(channel.slots, (16,))
+        self.assertEqual(channel.slots, (10,))
         self.assertEqual(channel.max_article_chars, 100000)
 
     def test_infinite_uses_the_thumbnail_as_background(self):

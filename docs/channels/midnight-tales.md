@@ -3,6 +3,19 @@
 Long-form sleep stories for adults, in English, on `@Midnight1Tales`
 (`UCLukC7RYzHlXHjtnlkbe4Vw`). One long video every two days at 21:00.
 
+## Schedule profile
+
+Audience: United States adults who fall asleep to narrated stories. Bedtime listening peaks
+between 9 p.m. and midnight local time, and 2026 engagement guidance is to publish one to two
+hours before the audience peak. Cuiaba is one hour ahead of US Eastern time in November.
+
+| Slot (America/Cuiaba) | US Eastern | Why |
+| --- | --- | --- |
+| 21:00 | 20:00 | Publishes one to two hours before the 9 p.m. to midnight bedtime listening window, so the story is indexed and recommended exactly when listeners get in bed |
+
+One video every two days, unchanged; the 21:00 slot is already the bedtime-optimal hour and
+is kept. Shorts stay on their own 09:00 cadence.
+
 ## Format
 
 - 6,500 to 9,000 words, about 45 to 65 minutes at a calm narration pace.

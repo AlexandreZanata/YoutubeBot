@@ -8,7 +8,7 @@
 | Handle | `@zanatareal` |
 | Channel ID | `UCx0AE-elCyDhfY0d1hQIwdw` |
 | Language | English only |
-| Cadence | one video per day at 16:00 America/Cuiaba |
+| Cadence | one video per day at 10:00 America/Cuiaba |
 | Upload account | `zanata` (upload-only profile, same Google account as Fallem Prince) |
 | Generation account | `legacy` |
 | Background | Standard black particle loop |
@@ -16,6 +16,19 @@
 The channel shares the Google account with Fallem Prince. In Studio, switch the brand
 channel with the account icon and "Switch account"; never sign out of the Google account and
 never copy another browser profile.
+
+## Schedule profile
+
+Audience: United States readers and professionals who consume books as summaries, listening
+during the morning focus window, the lunch break or commutes. Cuiaba is one hour ahead of US
+Eastern time in November.
+
+| Slot (America/Cuiaba) | US Eastern | Why |
+| --- | --- | --- |
+| 10:00 | 09:00 | 9 a.m. is the strongest weekday long-form slot in Buffer's 2026 study of 1.8M videos and the standard educational window (8 to 10 a.m.); it also leads the lunch-listening peak by 2 to 3 hours |
+
+One video per day, unchanged. Before 2026-11-20 the channel published at 16:00 America/Cuiaba
+(15:00 US Eastern), a mid-afternoon gap between the morning and evening windows.
 
 ## Catalog snapshot
 

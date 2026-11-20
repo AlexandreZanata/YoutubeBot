@@ -10,6 +10,18 @@ vanished cities, old technologies and remarkable true stories, told through auth
 photographs. It must feel like a curated museum documentary, never a mass-produced AI slideshow
 or a generic photograph compilation.
 
+## Schedule profile
+
+Audience: United States documentary viewers, skewing 40 and older, who watch historical
+documentaries in the evening prime window the way broadcast documentaries are scheduled.
+Cuiaba is one hour ahead of US Eastern time in November.
+
+| Slot (America/Cuiaba) | US Eastern | US Pacific | Why |
+| --- | --- | --- | --- |
+| 21:00 | 20:00 | 17:00 | Broadcast-style prime time (8 to 10 p.m. local), when long documentary viewing happens on both coasts |
+
+One video every two days, unchanged; 21:00 Cuiaba is already prime-time optimal and is kept.
+
 ## Video format
 
 - Target duration: **15 to 25 minutes** average (`1,900` to `3,200` English words at `0.9x`),
