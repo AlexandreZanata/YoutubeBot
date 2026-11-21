@@ -14,6 +14,7 @@ them, always with one generated background image and burned-in subtitles.
 | Audio | ChatGPT Read aloud, Cove voice |
 | Subtitles | centered, large condensed sans, burned in |
 | Thumbnail | none; the generated image is the video background |
+| Related video | one different, already-published long video of the same channel |
 | End screen | not applied |
 | Upload | Zaflas upload-only profile |
 | Generation | legacy profile with ChatGPT and audio capture |
@@ -22,6 +23,13 @@ them, always with one generated background image and burned-in subtitles.
 
 The long-form Zaflas videos remain one per day at 11:00 America/Cuiaba (12:00 in
 Sao Paulo/Brasilia). Shorts are separate uploads and keep their own hours.
+
+## Related video link
+
+Every Short links to a different long video already published on the same channel. The link is
+set in Studio's **Related video** field after the Short is scheduled, never points to another
+Short and never points to an unpublished draft. The linker rotates through the channel's public,
+processed videos so two Shorts in the same batch do not reuse the same target.
 
 ## One image per Short
 

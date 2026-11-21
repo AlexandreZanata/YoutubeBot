@@ -9,7 +9,7 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-from . import account, assets, channels, chat, config, logic, render, runtime, youtube
+from . import account, assets, catalog, channels, chat, config, logic, render, runtime, youtube
 from .accounts_store import AccountStore
 
 CHANNELS = {
@@ -433,6 +433,78 @@ def render_short(run_dir: Path) -> Path:
     return output
 
 
+def published_longs(context) -> list[dict]:
+    """Public, processed long videos of the channel, used as Short related links."""
+    payload = catalog.fetch_creator_videos(context)
+    found: list[dict] = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            try:
+                length = int(node.get("lengthSeconds") or 0)
+            except (TypeError, ValueError):
+                length = 0
+            if (node.get("videoId") and length >= 120
+                    and node.get("privacy") == "VIDEO_PRIVACY_PUBLIC"
+                    and node.get("status") == "VIDEO_STATUS_PROCESSED"):
+                found.append({"videoId": node["videoId"], "title": node.get("title", "")})
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(payload)
+    seen = set()
+    unique = []
+    for row in found:
+        if row["videoId"] not in seen:
+            seen.add(row["videoId"])
+            unique.append(row)
+    return unique
+
+
+def link_related_video(context, video_id: str, title: str) -> bool:
+    """Attach an already-published long video to a Short in the Studio editor."""
+    page = youtube.open_edit(context, video_id)
+    try:
+        body = " ".join(page.locator("body").inner_text().split())
+        if title[:40] in body:
+            return True
+        opened = False
+        for label in ("Related video", "Vídeo relacionado"):
+            button = page.get_by_text(label, exact=False)
+            if button.count():
+                button.first.click()
+                page.wait_for_timeout(3500)
+                opened = True
+                break
+        if not opened:
+            return False
+        search = page.locator("#search-yours")
+        if search.count():
+            search.first.fill(title[:70])
+            page.wait_for_timeout(2500)
+        card = page.locator("ytcp-entity-card").filter(has_text=title[:40]).first
+        if not card.count():
+            return False
+        card.click()
+        page.wait_for_timeout(2000)
+        for name in ("Select", "Selecionar"):
+            confirm = page.get_by_role("button", name=name, exact=True)
+            if confirm.count() and confirm.last.is_visible():
+                confirm.last.click()
+                page.wait_for_timeout(1500)
+                break
+        page.evaluate("()=>document.querySelector('#save')?.click()")
+        page.wait_for_timeout(4000)
+        page.reload()
+        page.wait_for_timeout(7000)
+        return title[:40] in " ".join(page.locator("body").inner_text().split())
+    finally:
+        page.close()
+
+
 def run(channel_slug: str, count: int = 5, start: date | None = None,
         skip_slots: int = 0, start_index: int = 0) -> list:
     spec = CHANNELS[channel_slug]
@@ -463,6 +535,8 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
         upload_browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{upload_cdp}")
         up = upload_browser.contexts[0]
         account.ensure_channel(up)
+        longs = published_longs(up)
+        used_links: list[str] = []
         runtime.configure_downloads(gen_browser)
         runtime.configure_extension(gen)
         root = config.DATA_DIR / "shorts"
@@ -498,6 +572,18 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
                     up, run_dir, meta, slot, custom_thumbnail=False, end_screen=False)
                 log(f"scheduled {topic} at {logic.slot_label(slot)} "
                     f"({time.time() - started:.0f}s)")
+                try:
+                    upload = json.loads((run_dir / "upload.json").read_text(encoding="utf-8"))
+                    video_id = upload.get("videoId")
+                    if video_id and longs:
+                        target = longs[len(used_links) % len(longs)]
+                        if link_related_video(up, video_id, target["title"]):
+                            used_links.append(target["videoId"])
+                            log(f"related {video_id} -> {target['videoId']}")
+                        else:
+                            log(f"related video not linked for {video_id}")
+                except Exception as error:
+                    log(f"related video warning for {topic}: {error}")
             except Exception as error:
                 failures.append((topic, str(error)))
                 log(f"upload/render failure for {topic}: {error}")
