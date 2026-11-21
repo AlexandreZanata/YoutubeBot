@@ -138,7 +138,7 @@ class QueueTests(unittest.TestCase):
         self.clock.now += timedelta(minutes=5)
         self.queue("send", live=True)
         self.assertEqual([status for _, status in self.statuses()], ["sent", "sent", "pending"])
-        self.assertEqual(len(self.sent_to(self.lead(0)["id"])), 8, "never sent twice")
+        self.assertEqual(len(self.sent_to(self.lead(0)["id"])), 7, "never sent twice")
 
     def test_the_third_bubble_names_the_company_and_nothing_else_changes(self):
         self.import_rows()

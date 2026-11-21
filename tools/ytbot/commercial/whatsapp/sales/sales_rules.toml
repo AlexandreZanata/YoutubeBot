@@ -110,11 +110,11 @@ messages = [
 unnamed = "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e aplicativos. Eu vi que no Google Maps vocês não têm site."
 company_max_chars = 120
 # Each link goes in its own message so WhatsApp loads the preview card.
+# Owner 2026-11-21: three links only, in this order.
 links = [
   "https://sorrifit.com",
-  "https://zaflas.com.br",
-  "https://musicalizese.com.br",
   "https://abastevo.com.br",
+  "https://zaflas.com.br",
 ]
 
 [referral_ask]
@@ -141,7 +141,7 @@ empresa = [
   "Quem fala é o Alexandre, da Zaflas Inova Simples, que cria sistemas, sites e aplicativos.",
   "O contato da empresa veio do perfil público dela no Google Maps, que não mostra site.",
   "As mensagens são enviadas com ajuda de um assistente automático do Alexandre; ele acompanha todas as conversas e responde pessoalmente quando precisa.",
-  "Exemplos de trabalhos: https://sorrifit.com, https://zaflas.com.br, https://musicalizese.com.br e https://abastevo.com.br.",
+  "Exemplos de trabalhos: https://sorrifit.com, https://abastevo.com.br e https://zaflas.com.br.",
 ]
 site_institucional = [
   "Site institucional é o site de apresentação da empresa: estático, só visual, como uma vitrine na internet com quem são, serviços, fotos, endereço, horário e um botão para chamar no WhatsApp.",
@@ -773,9 +773,8 @@ patterns = ['exemplo', 'portfolio', 'trabalhos', 'o que (voces|vcs) ja fizeram',
 messages = [
   "Claro! Alguns trabalhos nossos:",
   "https://sorrifit.com",
-  "https://zaflas.com.br",
-  "https://musicalizese.com.br",
   "https://abastevo.com.br",
+  "https://zaflas.com.br",
 ]
 
 [[intents]]

@@ -21,9 +21,8 @@ class SalesRulesTests(unittest.TestCase):
             "não tem site.",
             "Nós temos alguns exemplos de sistemas e sites que nós criamos:",
             "https://sorrifit.com",
-            "https://zaflas.com.br",
-            "https://musicalizese.com.br",
             "https://abastevo.com.br",
+            "https://zaflas.com.br",
         ])
 
     def test_opening_without_a_company_name_keeps_the_vocês_text(self):
@@ -46,7 +45,7 @@ class SalesRulesTests(unittest.TestCase):
         self.assertEqual(sales_rules.company_name("Dra. Ana Lima"), "Dra. Ana Lima")
 
     def test_opening_intervals_are_the_owner_values(self):
-        self.assertEqual(self.rules.opening_delays(), [4, 2, 8, 8, 4, 4, 4, 4])
+        self.assertEqual(self.rules.opening_delays(), [4, 2, 8, 8, 4, 4, 4])
 
     def test_opening_delays_must_match_the_messages(self):
         raw = copy.deepcopy(self.raw)
