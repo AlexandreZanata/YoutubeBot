@@ -90,6 +90,14 @@ English in code, comments, documentation and commits; user-facing UI may use Por
 - Preserve channel-specific title/description/tags rules and media quality.
 - Never blindly retry an uncertain upload or start the same service operation twice.
 
+## Duration is a target, not a gate
+
+Aim for each channel's documented target length when generating a video. If the finished video
+comes out longer than the target or the ceiling, accept it and publish it: never re-narrate,
+re-render, re-upload or remake a video just to correct its duration. Only regenerate when the
+media is missing or corrupt (for example, a truncated or silent capture). This applies to long
+videos and Shorts.
+
 ## Boundaries
 
 Accounts, browser profiles, OAuth tokens, generated media, model caches and run history

@@ -29,7 +29,9 @@ python3 -m tools.ytbot documentary init|collect|audit|narrate|render|qc
    (`docs/GENERATED-ILLUSTRATIONS.md`) and is never used for the cover.
 6. **Fixed audiovisual standard.** `0.9x` narration, documentary voice filter, subtle analog
    room tone, 1.2 s optical cross-dissolves, supersampled Ken Burns without tremor, chapters
-   with per-image sources in the description, QC before upload.
+   with per-image sources in the description, QC before upload. Duration is a target, not a
+   gate: an episode that comes out longer than planned is accepted and published without
+   re-rendering or re-narrating it.
 7. **Approval before publication.** The first episode of each channel stays private for owner
    review; later episodes use the normal scheduling flow after approval.
 

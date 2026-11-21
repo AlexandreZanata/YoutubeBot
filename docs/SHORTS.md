@@ -24,6 +24,9 @@ them, always with one generated background image and burned-in subtitles.
 The long-form Zaflas videos remain one per day at 11:00 America/Cuiaba (12:00 in
 Sao Paulo/Brasilia). Shorts are separate uploads and keep their own hours.
 
+The 35-to-55-second duration is a target. A Short that comes out longer is accepted and
+published without being re-rendered.
+
 ## Related video link
 
 Every Short links to a different long video already published on the same channel. The link is
