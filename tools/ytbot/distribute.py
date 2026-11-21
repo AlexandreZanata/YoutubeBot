@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
@@ -76,7 +78,20 @@ def command_for(slug: str, count: int) -> list[str]:
     return command
 
 
-def run_distribution(count: int, dry_run: bool = False) -> list:
+def _run_channel(slug: str, amount: int, delay: int = 0) -> int:
+    """Run one channel batch into its own log; staggered start avoids browser races."""
+    if delay:
+        time.sleep(delay)
+    log_path = config.DATA / f"distribute-{slug}.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("w", encoding="utf-8") as handle:
+        result = subprocess.run(command_for(slug, amount), cwd=config.ROOT,
+                                 stdout=handle, stderr=subprocess.STDOUT)
+    log(f"{slug}: exit={result.returncode} (log: {log_path.name})")
+    return result.returncode
+
+
+def run_distribution(count: int, dry_run: bool = False, concurrency: int = 2) -> list:
     scheduled = audit()
     plan = allocate(count, scheduled)
     log(f"future scheduled: {scheduled}")
@@ -89,12 +104,19 @@ def run_distribution(count: int, dry_run: bool = False) -> list:
         answer_all()
     except Exception as error:
         log(f"comments check warning: {error}")
-    for slug in channels.CHANNELS:
-        amount = plan[slug]
-        if not amount:
-            continue
-        log(f"{slug}: generating {amount}")
-        result = subprocess.run(command_for(slug, amount), cwd=config.ROOT)
-        if result.returncode:
-            failures.append((slug, result.returncode))
+    jobs = [(slug, plan[slug]) for slug in channels.CHANNELS if plan.get(slug)]
+    if concurrency <= 1 or len(jobs) <= 1:
+        for slug, amount in jobs:
+            log(f"{slug}: generating {amount}")
+            if _run_channel(slug, amount):
+                failures.append((slug, 1))
+        return failures
+    workers = min(concurrency, len(jobs))
+    log(f"channel tabs: {workers}")
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(_run_channel, slug, amount, index * 30): slug
+                   for index, (slug, amount) in enumerate(jobs)}
+        for future, slug in futures.items():
+            if future.result():
+                failures.append((slug, 1))
     return failures

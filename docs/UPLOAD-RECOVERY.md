@@ -104,4 +104,11 @@ caches.
 - `python3 -m tools.ytbot reschedule --channel <slug>` moves already-scheduled future
   videos to the channel's current slots (same date, order kept, at most the channel
   frequency per day, at least 60 minutes ahead); it never uploads or regenerates.
+- Speed without behavior change (owner decision 2026-11-20): assets stay one tab per
+  video, renders share the GPU through `YTBOT_RENDER_JOBS` (default 2, NVENC fallback
+  kept) and the upload phase pipelines up to 2 Studio tabs (`--upload-parallel`, 1 =
+  sequential). Every upload keeps its own checks, verification and bounded waits.
+  `distribute` produces two channels at once (`--concurrency`, default 2): channel and
+  upload locks stay exclusive, and the shared legacy generation browser is bounded by
+  `YTBOT_GENERATION_SLOTS` (default 2) instead of one exclusive profile lock.
 - Every fix follows the branch/PR/CI rule and is documented here or in the README.

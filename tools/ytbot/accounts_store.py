@@ -210,3 +210,43 @@ class AccountStore:
             yield
         finally:
             os.close(descriptor)
+
+    @contextlib.contextmanager
+    def generation_slots(self, count: int | None = None):
+        """Bound how many batches share the legacy generation browser.
+
+        Upload profiles keep their exclusive lock; batches that generate through
+        the shared legacy browser take one of N slot locks instead of failing on
+        the single profile lock. When every slot is busy the caller queues on
+        slot 0, exactly like the old exclusive lock did.
+        """
+        try:
+            limit = int(count if count is not None
+                        else os.environ.get("YTBOT_GENERATION_SLOTS", "2"))
+        except ValueError:
+            limit = 2
+        limit = max(1, limit)
+        directory = private_directory(self.root / "locks")
+
+        def open_slot(index: int) -> int:
+            return os.open(os.fspath(directory / f"generation-slot-{index}.lock"),
+                           os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+
+        descriptor: int | None = None
+        try:
+            for index in range(limit):
+                candidate = open_slot(index)
+                try:
+                    fcntl.flock(candidate, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    os.close(candidate)
+                    continue
+                descriptor = candidate
+                yield index
+                return
+            descriptor = open_slot(0)
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+            yield 0
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)

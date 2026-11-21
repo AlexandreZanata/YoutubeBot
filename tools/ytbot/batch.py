@@ -73,6 +73,47 @@ def _summary(topics: list[str]) -> None:
     print("\n".join(lines), flush=True)
 
 
+def _upload_stage_safe(upload_context, topic: str, slot, failures: list) -> None:
+    try:
+        pipeline.upload_stage(upload_context, topic, slot)
+    except Exception as error:
+        logic.record_event(logic.run_path(topic), "upload", "error", str(error))
+        failures.append((topic, str(error)))
+        log(f"upload failure for {topic}: {error}")
+
+
+def _upload_worker(upload_cdp: int | None, topic: str, slot, failures: list) -> None:
+    """One upload in its own thread with its own CDP connection (sync API rule)."""
+    with sync_playwright() as playwright:
+        if upload_cdp:
+            browser = playwright.chromium.connect_over_cdp(
+                f"http://127.0.0.1:{upload_cdp}", timeout=60000)
+            upload_context = browser.contexts[0]
+        else:
+            _browser, upload_context = runtime.connect_hidden(playwright)
+        _upload_stage_safe(upload_context, topic, slot, failures)
+
+
+def _upload_phase(upload_context, upload_cdp: int | None, jobs: list,
+                  parallel: int) -> list:
+    """Upload the finished videos; bounded concurrent tabs pipeline the Studio waits."""
+    failures: list = []
+    if not jobs:
+        return failures
+    if parallel <= 1 or len(jobs) == 1:
+        for topic, slot in jobs:
+            _upload_stage_safe(upload_context, topic, slot, failures)
+        return failures
+    workers = min(parallel, len(jobs))
+    log(f"upload tabs: {workers}")
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_upload_worker, upload_cdp, topic, slot, failures)
+                   for topic, slot in jobs]
+        for future in futures:
+            future.result()
+    return failures
+
+
 def _refresh_catalog(context) -> None:
     data = logic.load_catalog()
     if not data and config.CHANNEL_HANDLE:
@@ -91,7 +132,8 @@ def _upload_context(playwright, context, upload_cdp):
 
 
 def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
-              start_date=None, topics: list[str] | None = None) -> list:
+              start_date=None, topics: list[str] | None = None,
+              upload_parallel: int = 2) -> list:
     from . import channels
     if config.CHANNEL and config.CHANNEL.slug in channels.DOCUMENTARY_CHANNELS:
         raise RuntimeError(
@@ -130,7 +172,7 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
             style = (logic.thumbnail_style(index)
                      if config.THUMBNAIL_THEME == "fallem_prince" else "dense")
             logic.set_run_field(logic.run_path(topic), thumbnail_style=style)
-        workers = parallel if parallel > 0 else 1
+        workers = parallel if parallel > 0 else max(1, len(topics))
         log(f"topics: {topics}")
         log(f"tabs: {workers}, slots: {[logic.slot_label(slot) for slot in slots]}")
         asset_failures = _asset_phase(context, topics, workers)
@@ -140,15 +182,9 @@ def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
         except Exception as error:
             log(f"community post warning: {error}")
         failed_topics = {topic for topic, _error in asset_failures}
-        for topic, slot in zip(topics, slots):
-            if topic in failed_topics:
-                continue
-            try:
-                pipeline.upload_stage(upload_context, topic, slot)
-            except Exception as error:
-                logic.record_event(logic.run_path(topic), "upload", "error", str(error))
-                failures.append((topic, str(error)))
-                log(f"upload failure for {topic}: {error}")
+        jobs = [(topic, slot) for topic, slot in zip(topics, slots)
+                if topic not in failed_topics]
+        failures += _upload_phase(upload_context, upload_cdp, jobs, upload_parallel)
     logic.write_records_markdown()
     _summary(topics)
     if failures:

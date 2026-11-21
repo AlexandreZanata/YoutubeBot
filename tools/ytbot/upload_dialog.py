@@ -121,6 +121,59 @@ def _click_done(page) -> None:
     page.wait_for_timeout(10000)
 
 
+def _mouse_click_center(page, selector: str) -> None:
+    """Click the element's exact center with a real input event.
+
+    Studio's yt-touch-feedback layers swallow programmatic clicks on some footer
+    buttons, so the raw mouse event is the reliable path.
+    """
+    point = page.evaluate(
+        "(selector)=>{const b=document.querySelector(selector); if(!b) return null;"
+        "const r=b.getBoundingClientRect(); return [r.x+r.width/2, r.y+r.height/2]}",
+        selector)
+    if not point:
+        raise RuntimeError(f"{selector} was not found")
+    page.mouse.click(point[0], point[1])
+
+
+def _click_save(page) -> None:
+    """Confirm the schedule inside the Edit-visibility dialog of a scheduled video."""
+    log("clicking schedule")
+    deadline = time.time() + 180
+    words = ("Programar", "Schedule", "Salvar", "Save", "Concluir", "Done", "Publish",
+             "Atualizar", "Update")
+    while time.time() < deadline:
+        state = page.evaluate(
+            "()=>{const b=document.querySelector('#save-button'); if(!b) return null;"
+            "const text=(b.innerText||(b.shadowRoot?b.shadowRoot.textContent:'')||'').trim();"
+            "return {text, disabled: b.getAttribute('aria-disabled') || (b.disabled ? 'true' : '')}}")
+        if state and state.get("disabled") != "true" and any(word in state.get("text", "") for word in words):
+            break
+        page.wait_for_timeout(3000)
+    else:
+        raise RuntimeError("schedule button did not become ready")
+    _mouse_click_center(page, "#save-button")
+    page.wait_for_timeout(3000)
+
+
+def _save_edit_page(page) -> None:
+    """Persist the dirty visibility form with the edit page's top save button."""
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        state = page.evaluate(
+            "()=>{const b=document.querySelector('#save'); if(!b) return null;"
+            "return {disabled: b.getAttribute('aria-disabled') || (b.disabled ? 'true' : '')}}")
+        if state is None:
+            log("edit page save button absent; the dialog may have persisted directly")
+            return
+        if state.get("disabled") != "true":
+            _mouse_click_center(page, "#save")
+            page.wait_for_timeout(8000)
+            return
+        page.wait_for_timeout(2000)
+    log("edit page save button never became enabled; verification will decide")
+
+
 def change_scheduled_time(page, slot) -> None:
     """Set a new date and time inside the open dialog of an already-scheduled video."""
     if not page.locator("#datepicker-trigger").count() and not page.locator("ytcp-date-picker input").count():
@@ -131,7 +184,8 @@ def change_scheduled_time(page, slot) -> None:
     log("setting schedule date")
     _set_date(page, slot)
     _verify_model(page, slot)
-    _click_done(page)
+    _click_save(page)
+    _save_edit_page(page)
 
 
 def schedule_in_dialog(page, slot) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from pathlib import Path
@@ -10,7 +11,15 @@ from . import config, flow_media, flow_profiles, logic
 from .audio_tools import fit_narration
 
 
-RENDER_LOCK = threading.Lock()
+def _render_jobs() -> int:
+    """Concurrent renders per batch; the NVENC fallback keeps 2 a safe default."""
+    try:
+        return max(1, int(os.environ.get("YTBOT_RENDER_JOBS", "2")))
+    except ValueError:
+        return 2
+
+
+RENDER_SEMAPHORE = threading.Semaphore(_render_jobs())
 
 
 def log(message: str) -> None:
@@ -18,7 +27,7 @@ def log(message: str) -> None:
 
 
 def render_video(run_dir: Path) -> Path:
-    with RENDER_LOCK:
+    with RENDER_SEMAPHORE:
         selection = flow_profiles.current()
         log(f"flow profile {selection.requested} -> {selection.effective} ({selection.reason or selection.revision})")
         logic.set_run_field(run_dir, flow_profile=selection.record())

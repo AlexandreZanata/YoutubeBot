@@ -176,13 +176,20 @@ capture is visible instead of silent.
 - **Community** is checked after the assets: an empty tab receives one question post with
   the first topic, a short text and a square thumbnail crop. See
   [community](../../docs/COMMUNITY.md).
-- **Rendering** is serialized by a process lock because transcription and NVENC
-  share the GPU. **Uploads and scheduling** stay sequential.
+- **Rendering** is bounded by a semaphore (`YTBOT_RENDER_JOBS`, default 2): two
+  NVENC renders share the GPU at a time and the encoder keeps its libx264 fallback,
+  so a large batch no longer waits on one render at a time.
+- **Uploads and scheduling** pipeline through up to 2 concurrent Studio tabs
+  (`--upload-parallel`, default 2, `1` restores the sequential path). Each video
+  owns its page, dialog and verification; one video's Studio processing wait no
+  longer idles the whole queue. Every upload still waits for its own checks,
+  applies and verifies details, end screen and slot exactly as before.
 
 See the [Whispers From Heaven profile](../../docs/channels/whispers-from-heaven.md) for the analyzed duration, thumbnail palette and metadata patterns.
 
 Use `--parallel N` to override the tab count (`0` means one tab per video).
-With 5 requested videos the bot opens 5 tabs.
+With 5 requested videos the bot opens 5 tabs. Upload tabs are set with
+`--upload-parallel N` and render concurrency with `YTBOT_RENDER_JOBS`.
 
 ### Disk and media
 

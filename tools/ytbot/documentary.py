@@ -58,7 +58,7 @@ def photo_candidates(query: str, limit: int = 4,
     params = {
         "action": "query", "generator": "search",
         "gsrsearch": (f"filetype:bitmap {query} -painting -drawing -lithograph "
-                      f"-engraving -print -sketch -artwork"), "gsrlimit": str(limit), "gsrnamespace": "6",
+                      f"-engraving -sketch"), "gsrlimit": str(limit), "gsrnamespace": "6",
         "prop": "imageinfo", "iiprop": "url|extmetadata", "iiurlwidth": "1920",
         "format": "json",
     }
@@ -177,7 +177,7 @@ def ocean_photo_candidates(query: str, limit: int = 12,
     params = {
         "action": "query", "generator": "search",
         "gsrsearch": (f"filetype:bitmap {query} -painting -drawing -lithograph "
-                      f"-engraving -print -sketch -artwork"), "gsrlimit": str(limit), "gsrnamespace": "6",
+                      f"-engraving -sketch"), "gsrlimit": str(limit), "gsrnamespace": "6",
         "prop": "imageinfo", "iiprop": "url|size|extmetadata", "iiurlwidth": "1920",
         "format": "json",
     }
@@ -901,7 +901,7 @@ DOCUMENTARY_VOICE_FILTER = (
     "equalizer=f=3200:t=q:w=1.2:g=2.5,"
     "equalizer=f=6500:t=q:w=2.0:g=-1.5,"
     "acompressor=threshold=-26dB:ratio=3.2:attack=15:release=180:knee=6:makeup=16dB,"
-    "alimiter=limit=0.84:attack=5:release=50:level=false"
+    "alimiter=limit=0.70:attack=5:release=50:level=false"
 )
 
 
