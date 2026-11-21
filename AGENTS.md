@@ -312,7 +312,8 @@ the channel with the fewest scheduled ones, water-filling until the requested co
 allocated. Channels with a large queue may receive zero. Never ask which channel to use.
 
 Run it with `python3 -m tools.ytbot distribute --count N` (add `--dry-run` to only print the
-plan). Each channel keeps its own prompts, language, article length, background, thumbnail
+plan; `--concurrency` defaults to 2 channels produced at once, bounded by the generation
+slots). Each channel keeps its own prompts, language, article length, background, thumbnail
 style, upload profile, slot hours and `interval_days`; the distribution only decides the
 quantity. See [distribution](docs/DISTRIBUTE.md).
 

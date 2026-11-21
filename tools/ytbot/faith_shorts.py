@@ -213,6 +213,85 @@ CHANNELS = {
     },
 }
 
+# Fresh queues for the next distribution round; kept separate so the curated
+# originals above stay readable.
+QUEUE_EXTENSION = {
+    "reflection": (
+        "Mary at the Tomb: When Grief Looks for Jesus",
+        "The Persistent Widow: When Prayer Feels Unanswered",
+        "Bartimaeus by the Road: When You Cry Out Anyway",
+        "The Servant Girl's Courage: When Small Faith Speaks",
+        "Jonah Under the Plant: When Mercy Offends",
+        "The Road to Emmaus: When Scripture Walks Beside You",
+    ),
+    "zaflas": (
+        "Por que a rotação de pastagem evita verminose?",
+        "Como a época de semeadura muda o estande?",
+        "O que o teor de proteína diz sobre a silagem?",
+        "Por que o trator patina na curva de nível?",
+        "Quando o fósforo fica indisponível no solo?",
+        "Como o clima afeta a qualidade do algodão?",
+    ),
+    "zanata": (
+        "The Prince by Machiavelli: How Power Keeps Itself",
+        "Leviathan by Hobbes: Why People Trade Freedom for Order",
+        "Silent Spring by Rachel Carson: The Cost of a Quiet Morning",
+        "The Selfish Gene by Dawkins: Why Cooperation Can Be Selfish",
+        "The Human Condition by Arendt: What Work and Action Mean",
+        "Nickel and Dimed by Ehrenreich: When Work Does Not Pay",
+    ),
+    "fallem-prince": (
+        "The Lamplighter Who Never Reached the Last Street",
+        "The Cartographer of a Country That Forgot Its Name",
+        "The Bell That Rang Only for the Drowned",
+        "The Widow Who Sold the Sea",
+        "The Clockmaker's Unfinished Confession",
+        "The Orchard Where No Bird Sang",
+    ),
+    "infinite-random-worlds": (
+        "On a world where shadows arrive before their owners, a boy must hide his own.",
+        "In a city built inside a sleeping whale, a mechanic hears the heart slow down.",
+        "On a moon where every lie becomes visible, a diplomat must tell the truth.",
+        "In a country where roads remember everyone who walks them, a courier is followed.",
+        "On a planet where winter is a living creature, a farmer must negotiate with it.",
+        "In a village where the sea visits once a year, a girl waits for the tide to speak.",
+    ),
+    "vocal-pages": (
+        "The Unsent Birthday Message",
+        "The Coffee Cup on the Windowsill",
+        "The Friend You Outgrew",
+        "The Job You Left at the Right Time",
+        "The Apology You Never Got",
+        "The Sunday Evening Feeling",
+    ),
+    "midnight-tales": (
+        "The Lighthouse That Kept a Winter Diary",
+        "The Gardener of the Moonlit Greenhouse",
+        "The Library Beneath the Lake",
+        "The Inn Where the Road Ends",
+        "The Shepherd of the Sleeping Hills",
+        "The House That Learned to Breathe",
+    ),
+    "sepia-atlas": (
+        "The Last Streetcar of 1910",
+        "A Summer on the Farm in 1905",
+        "The Photographer of Ellis Island",
+        "The Factory Bell at Dawn",
+        "The Flood That Changed a Town",
+        "The Plain of the 1904 Fair",
+    ),
+    "bathylora": (
+        "The Fish That Waits in the Dark",
+        "A Brine Pool on the Seafloor",
+        "The Octopus of the Abyssal Plain",
+        "What a Whale Fall Feeds",
+        "The Glow of a Comb Jelly",
+        "The Sound of a Deep-Sea Volcano",
+    ),
+}
+for _slug, _topics in QUEUE_EXTENSION.items():
+    CHANNELS[_slug]["topics"] = CHANNELS[_slug]["topics"] + _topics
+
 
 def log(message: str) -> None:
     print(f"[faith-shorts] {message}", flush=True)

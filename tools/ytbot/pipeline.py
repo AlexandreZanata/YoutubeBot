@@ -60,7 +60,9 @@ def _check_audio(run_dir: Path) -> None:
         return
     expected = chars / 6 / 150 * 60
     actual = get_audio_duration(audio)
-    if expected >= 60 and actual > 0 and abs(actual - expected) > expected * 0.5:
+    # A calm channel can legitimately take much longer than the 150 wpm estimate;
+    # only a truncated capture (far shorter than the article) is a mismatch.
+    if expected >= 60 and actual > 0 and actual < expected * 0.5:
         raise RuntimeError(
             f"narration does not match the article (audio {actual / 60:.1f} min, "
             f"expected about {expected / 60:.1f} min)")

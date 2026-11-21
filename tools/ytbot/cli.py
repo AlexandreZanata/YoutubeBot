@@ -110,7 +110,7 @@ def command_shorts(args) -> None:
 
 def command_reschedule(args) -> None:
     from .reschedule import run
-    failures = run(args.channel, args.dry_run)
+    failures = run(args.channel, args.dry_run, args.enforce_interval)
     print("[ytbot] reschedule finished")
     if failures:
         print(f"[ytbot] {len(failures)} failure(s): {failures}")
@@ -119,7 +119,7 @@ def command_reschedule(args) -> None:
 
 def command_distribute(args) -> None:
     from .distribute import run_distribution
-    failures = run_distribution(args.count, args.dry_run)
+    failures = run_distribution(args.count, args.dry_run, args.concurrency)
     print("[ytbot] distribution finished")
     if failures:
         print(f"[ytbot] channel failures: {failures}")
@@ -148,13 +148,18 @@ def command_run(args) -> None:
     selected = apply_bound_account(args.channel, args.account)
     runtime.start_hidden_chrome()
     with contextlib.ExitStack() as stack:
-        stack.enter_context(store.profile_lock(selected))
+        # The legacy profile is the shared generation browser: concurrent channel
+        # batches bound it through generation slots instead of one exclusive lock.
+        if selected == "legacy":
+            stack.enter_context(store.generation_slots())
+        else:
+            stack.enter_context(store.profile_lock(selected))
         if args.upload_account and args.upload_account != selected:
             stack.enter_context(store.profile_lock(args.upload_account))
         stack.enter_context(channel_lock(args.channel))
         try:
             failures = run_batch(args.count, args.parallel, upload_cdp or None, start_date,
-                                 args.topic or None)
+                                 args.topic or None, args.upload_parallel)
         except RuntimeError as error:
             print(f"[ytbot] {error}")
             raise SystemExit(1)
@@ -219,6 +224,8 @@ def build_parser() -> argparse.ArgumentParser:
     distribute = sub.add_parser("distribute",
                                 help="spread new videos over the channels with fewer scheduled")
     distribute.add_argument("--count", type=int, default=20)
+    distribute.add_argument("--concurrency", type=int, default=2,
+                            help="channels produced at once (1 = sequential)")
     distribute.add_argument("--dry-run", action="store_true")
     distribute.set_defaults(func=command_distribute)
     reschedule = sub.add_parser(
@@ -226,6 +233,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="move already-scheduled future videos to the channel's current slots")
     reschedule.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True)
     reschedule.add_argument("--dry-run", action="store_true")
+    reschedule.add_argument("--enforce-interval", action="store_true",
+                            help="re-space every future video on the channel's interval_days cadence")
     reschedule.set_defaults(func=command_reschedule)
     run = sub.add_parser("run", help="generate, render, upload and schedule videos")
     run.add_argument("--channel", choices=sorted(channels.CHANNELS), required=True,
@@ -240,6 +249,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--upload-cdp", type=int, default=0)
     run.add_argument("--upload-account", default=None,
                      help="separate upload-only account/profile; generation stays in --account")
+    run.add_argument("--upload-parallel", type=int, default=2,
+                     help="concurrent Studio upload tabs; 1 keeps the sequential path")
     run.add_argument("--flow-profile", choices=flow_profiles.NAMES, default=None,
                      help="ASR/render execution profile (or YTBOT_FLOW_PROFILE; default standard)")
     run.set_defaults(func=command_run)

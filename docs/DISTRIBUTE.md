@@ -57,6 +57,19 @@ Each per-channel batch runs the normal `run` command without a start date, so th
 from the channel's last scheduled uploads. A channel that already has videos in the future
 continues after them; it never overlaps or reuses a slot.
 
+## Concurrency
+
+Two channels are produced at the same time by default (`--concurrency 2`, `1` restores the
+fully sequential plan). Isolation is preserved:
+
+- each channel batch keeps its own `channel_lock` and its own upload-profile lock;
+- the shared legacy generation browser is bounded by generation slot locks
+  (`YTBOT_GENERATION_SLOTS`, default 2): a third concurrent batch queues on a slot instead
+  of failing, exactly like the old exclusive lock;
+- channel starts are staggered 30 seconds so hidden Chrome and ChatGPT never race;
+- each channel's full output goes to `.local/ytbot/distribute-<channel>.log`, and the plan
+  log carries one `exit=` line per channel.
+
 ## Failures
 
 A failing channel does not stop the plan. The batch is recorded, the next channel runs, and
