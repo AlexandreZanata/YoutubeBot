@@ -219,8 +219,9 @@ scraped), at most 50 first contacts per day in business hours, never repeats an 
 sends at most one follow-up. Since 2026-11-20 the agent runs openings-only
 (`limits.auto_conversation = false`): a 24h WhatsApp restriction for incongruous automated
 conversations ended the automated replies. The bot sends the full opening combo (greeting,
-presentation, four example links) 5 minutes apart; every reply goes straight to the owner
-(`needs-owner` + notification) and no follow-up is sent. It answers funnel leads by
+presentation, the catalog link `https://comerc.app.br`) 5 minutes apart and then stops
+listening to that chat: replies are not read, recorded, notified or answered, and no follow-up
+is sent. The owner handles every conversation on the phone. It answers funnel leads by
 `tools/ytbot/commercial/whatsapp/sales/sales_rules.toml`, through OpenCode Go: free models
 first (zero price in the live catalog, rotating, paused on timeout or no credits), then only
 `deepseek-v4.1-flash` and `muse-spark-1.3-contributor` as paid fallback; a price, deadline, link

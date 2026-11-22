@@ -102,7 +102,7 @@ messages = [
   "{greeting}",
   "Tudo bem?",
   "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e aplicativos. Eu vi que no Google Maps a empresa {company} ainda não tem site.",
-  "Nós temos alguns exemplos de sistemas e sites que nós criamos:",
+  "Nós temos um catálogo completo com exemplos de sistemas e sites que nós criamos:",
 ]
 # {company} is the business name exactly as on Google Maps (the lead `name`, spaces
 # normalized, at most `company_max_chars`, cut at a word). Without a name, `unnamed` replaces
@@ -110,11 +110,9 @@ messages = [
 unnamed = "Sou o Alexandre da empresa Zaflas Inova Simples, nossa empresa cria sistemas, sites e aplicativos. Eu vi que no Google Maps vocês não têm site."
 company_max_chars = 120
 # Each link goes in its own message so WhatsApp loads the preview card.
-# Owner 2026-11-21: three links only, in this order.
+# Owner 2026-11-22: only the catalog site; it holds the complete portfolio.
 links = [
-  "https://sorrifit.com",
-  "https://abastevo.com.br",
-  "https://zaflas.com.br",
+  "https://comerc.app.br",
 ]
 
 [referral_ask]
@@ -141,7 +139,7 @@ empresa = [
   "Quem fala é o Alexandre, da Zaflas Inova Simples, que cria sistemas, sites e aplicativos.",
   "O contato da empresa veio do perfil público dela no Google Maps, que não mostra site.",
   "As mensagens são enviadas com ajuda de um assistente automático do Alexandre; ele acompanha todas as conversas e responde pessoalmente quando precisa.",
-  "Exemplos de trabalhos: https://sorrifit.com, https://abastevo.com.br e https://zaflas.com.br.",
+  "Nosso catálogo com todos os exemplos de sites e sistemas: https://comerc.app.br.",
 ]
 site_institucional = [
   "Site institucional é o site de apresentação da empresa: estático, só visual, como uma vitrine na internet com quem são, serviços, fotos, endereço, horário e um botão para chamar no WhatsApp.",
@@ -771,10 +769,8 @@ fixed = false
 when = "Pede exemplos, portfólio ou trabalhos feitos."
 patterns = ['exemplo', 'portfolio', 'trabalhos', 'o que (voces|vcs) ja fizeram', 'clientes']
 messages = [
-  "Claro! Alguns trabalhos nossos:",
-  "https://sorrifit.com",
-  "https://abastevo.com.br",
-  "https://zaflas.com.br",
+  "Claro! Aqui está o nosso catálogo com todos os exemplos:",
+  "https://comerc.app.br",
 ]
 
 [[intents]]

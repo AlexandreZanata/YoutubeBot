@@ -585,10 +585,11 @@ live in `[opening]` and `[pacing]` of the rules file.
 - The opening is recorded before the browser acts and its journal keys are per lead, so it is
   never repeated, even after a crash.
 - One follow-up after 72 h without an answer; `no-response` 96 h later, then silence.
-- **Openings-only mode (`limits.auto_conversation = false`, owner 2026-11-20):** the bot sends
-  the opening combo and nothing else. Any reply moves the lead to `needs-owner` and notifies
-  the owner ("Respondeu à nossa mensagem: no modo só-abertura a conversa é sua"); no bot reply
-  is ever sent and no follow-up goes out. The opening spacing is 5 minutes
+- **Openings-only mode (`limits.auto_conversation = false`, owner 2026-11-20/22):** the bot
+  sends the opening combo and nothing else. After the opening it **stops listening** to that
+  chat: incoming messages are not read, recorded, notified or answered, and no follow-up goes
+  out — the owner handles the conversation on the phone. Only a lead who writes *before* any
+  contact surfaces (one notification, never opened). The opening spacing is 5 minutes
   (`between_openings 300-330 s`).
 - Answers wait `pacing.reply_debounce_seconds` (30 s) after the newest incoming bubble, so a
   person splitting a thought into two or three messages is read as one turn and never answered
