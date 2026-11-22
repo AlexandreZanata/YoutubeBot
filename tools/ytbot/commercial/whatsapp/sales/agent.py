@@ -389,6 +389,10 @@ class SalesAgent:
             lead = self.store.find_lead(event.get("chat", ""))
             if lead is None or not self._in_scope(lead["id"]):
                 continue
+            if not self._auto_conversation() and lead["state"] != "new":
+                # Openings-only: after the opening the chat belongs to the owner.
+                # The bot does not read, record, notify or answer it.
+                continue
             if (event.get("kind") == "typing" or event.get("typing")
                     or listener.is_typing_text(event.get("text", ""))):
                 typing_now.add(lead["id"])
@@ -437,7 +441,7 @@ class SalesAgent:
                 changes["state"] = "needs-owner"
                 self.store.update_lead(lead["id"], **changes)
                 if self._remind(lead):
-                    reason = ("Respondeu à nossa mensagem: no modo só-abertura a conversa "
+                    reason = ("Escreveu antes de qualquer contato: não abrimos; a conversa "
                               "é sua" if not self._auto_conversation() else
                               "Mensagem de um contato com respostas automáticas pausadas")
                     self._handoff(lead, reason, event["text"], "needed")

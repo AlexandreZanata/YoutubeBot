@@ -196,7 +196,7 @@ class ClientDossierTests(unittest.TestCase):
                         .with_name(f"{self.lead['id']}.cycle0.jsonl").is_file())
         self.clock.now = MONDAY + timedelta(days=1)
         self.assertEqual(agent.prospect()[0]["state"], "opened")
-        self.assertEqual(len(channel.sent), 14)  # 2 x 7 opening bubbles
+        self.assertEqual(len(channel.sent), 10)  # 2 x 5 opening bubbles
 
     def test_complete_ficha_collects_colors_visual_style_and_explains_domain(self):
         channel = FakeChannel(self.store.journal_path)

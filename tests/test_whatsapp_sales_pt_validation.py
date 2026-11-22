@@ -57,6 +57,31 @@ class PortugueseSalesValidationTests(unittest.TestCase):
     def ask_bubbles(self):
         return list(self.rules.raw["referral_ask"]["messages"])
 
+    # 0. Openings-only (owner 2026-11-22): one combo, then the bot stops listening -------
+    def test_openings_only_sends_the_combo_and_stops_listening(self):
+        rules = load()
+        rules.limits["auto_conversation"] = False
+        fresh = PortugueseSalesValidationTests()
+        fresh.setUp()
+        try:
+            fresh.agent.rules = rules
+            combo = rules.opening_messages(MONDAY, fresh.lead["name"])
+            self.assertEqual(fresh.sent_texts(), combo, "the full opening combo is sent")
+            sent = len(fresh.channel.sent)
+            history = len(fresh.store.history(fresh.lead["id"]))
+            fresh.say("Bom dia, tudo bem?")
+            self.assertEqual(fresh.state(), "opened",
+                             "the bot stops listening: the state does not move")
+            self.assertEqual(len(fresh.channel.sent), sent, "no reply in openings-only mode")
+            self.assertEqual(len(fresh.store.history(fresh.lead["id"])), history,
+                             "the message is not recorded: the chat is the owner's")
+            self.assertEqual(fresh.notes, [], "no notification for an opened chat")
+            fresh.clock.now = MONDAY + timedelta(days=10)
+            fresh.agent.followups()
+            self.assertEqual(len(fresh.channel.sent), sent, "no follow-up")
+        finally:
+            fresh.tearDown()
+
     # 1. A real refusal asks for an indication and hands the chat to the owner ------------
     def test_every_portuguese_refusal_wording_triggers_the_indication_ask(self):
         phrasings = [

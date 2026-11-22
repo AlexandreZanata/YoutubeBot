@@ -90,6 +90,14 @@ English in code, comments, documentation and commits; user-facing UI may use Por
 - Preserve channel-specific title/description/tags rules and media quality.
 - Never blindly retry an uncertain upload or start the same service operation twice.
 
+## Duration is a target, not a gate
+
+Aim for each channel's documented target length when generating a video. If the finished video
+comes out longer than the target or the ceiling, accept it and publish it: never re-narrate,
+re-render, re-upload or remake a video just to correct its duration. Only regenerate when the
+media is missing or corrupt (for example, a truncated or silent capture). This applies to long
+videos and Shorts.
+
 ## Boundaries
 
 Accounts, browser profiles, OAuth tokens, generated media, model caches and run history
@@ -181,7 +189,9 @@ void/two-color poster interpretation is superseded. Alternate the dense prompt w
 Every channel now publishes Vertical Shorts through the `faith-shorts` protocol: 1080x1920,
 35 to 55 seconds, one generated image per Short as its background, burned-in subtitles and no
 custom thumbnail. Every Short must have its own image tied to its story; never reuse a scene from
-another Short, and a near-duplicate background is replaced once. Each channel keeps its own art
+another Short, and a near-duplicate background is replaced once. Each Short also links to a
+different, already-published long video of the same channel in Studio's Related video field
+(never another Short and never an unpublished draft). Each channel keeps its own art
 style, topic queue and slot hours: Zaflas
 09:00/18:00, reflection 08:00/20:00, Whispers 09:00/21:00, zanata 09:00, Fallem Prince 21:00,
 Infinite Random Worlds 09:00, Vocal Pages 21:00, Midnight Tales one every two days at 09:00,
@@ -209,8 +219,9 @@ scraped), at most 50 first contacts per day in business hours, never repeats an 
 sends at most one follow-up. Since 2026-11-20 the agent runs openings-only
 (`limits.auto_conversation = false`): a 24h WhatsApp restriction for incongruous automated
 conversations ended the automated replies. The bot sends the full opening combo (greeting,
-presentation, four example links) 5 minutes apart; every reply goes straight to the owner
-(`needs-owner` + notification) and no follow-up is sent. It answers funnel leads by
+presentation, the catalog link `https://comerc.app.br`) 5 minutes apart and then stops
+listening to that chat: replies are not read, recorded, notified or answered, and no follow-up
+is sent. The owner handles every conversation on the phone. It answers funnel leads by
 `tools/ytbot/commercial/whatsapp/sales/sales_rules.toml`, through OpenCode Go: free models
 first (zero price in the live catalog, rotating, paused on timeout or no credits), then only
 `deepseek-v4.1-flash` and `muse-spark-1.3-contributor` as paid fallback; a price, deadline, link
