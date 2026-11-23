@@ -293,6 +293,7 @@ def submit(
     mode="schedule",
     approved_generate=False,
     flow_profile="standard",
+    shorts_options: dict | None = None,
     launcher=launch_actor,
     store: AccountStore | None = None,
     unit_probe=unit_active,
@@ -302,7 +303,13 @@ def submit(
     channels.get(channel)
     store = store or AccountStore()
     store.account(account)
-    if not 1 <= count <= 10 or mode not in {"generate", "schedule"} or not (approved_generate if mode == "generate" else approved_schedule):
+    valid_modes = {"generate", "schedule", "shorts_generate", "shorts_resume"}
+    needs_generate_approval = mode in {"generate", "shorts_generate", "shorts_resume"}
+    if (
+        not 1 <= count <= 10
+        or mode not in valid_modes
+        or not (approved_generate if needs_generate_approval else approved_schedule)
+    ):
         raise ValueError(
             "count must be 1..10 and explicit scheduled-publication permission is required"
         )
@@ -312,8 +319,24 @@ def submit(
         "count": count,
         "approved_schedule": True,
     }
-    if mode == "generate":
-        request.update(mode="generate", approved_schedule=False, approved_generate=True)
+    if needs_generate_approval:
+        request.update(mode=mode, approved_schedule=False, approved_generate=True)
+    if mode in {"shorts_generate", "shorts_resume"}:
+        from .shorts_video import assert_channel_policy, assert_shorts_scope
+        from .shorts_video.settings import resolve_runtime_settings
+
+        opts = dict(shorts_options or {})
+        visual_mode = str(opts.get("visual_mode") or "ai-video")
+        assert_shorts_scope("shorts", width=1080, height=1920, visual_mode=visual_mode)
+        if visual_mode == "ai-video":
+            resolved = resolve_runtime_settings(
+                visual_mode=visual_mode,
+                provider=opts.get("video_provider"),
+                model=opts.get("video_model"),
+                max_credits_per_short=opts.get("max_credits"),
+            )
+            assert_channel_policy(channel, resolved)
+        request["shorts_options"] = opts
     # Omission and explicit standard keep the pre-profile idempotency fingerprint.
     if flow_profile != "standard":
         request["flow_profile"] = flow_profile
@@ -470,7 +493,38 @@ def execute(operation_id: str) -> None:
                             p.parent.name: p.stat().st_mtime_ns
                             for p in config.RUNS.glob("*/record.json")
                         }
-                        if request.get("mode") == "generate":
+                        if request.get("mode") == "shorts_resume":
+                            from .shorts_video import service_api as shorts_service
+
+                            opts = request.get("shorts_options") or {}
+                            resumed = shorts_service.resume_short_run(
+                                request["channel"], str(opts.get("run_id") or ""), opts
+                            )
+                            results = [resumed]
+                            failures = [] if resumed["state"] == "ready" else [resumed["id"]]
+                        elif request.get("mode") == "shorts_generate":
+                            from playwright.sync_api import sync_playwright
+                            from . import preflight, runtime
+                            from .shorts_video import service_api as shorts_service
+
+                            if not (config.PROFILE / "Default").is_dir():
+                                raise ReadinessBlocked({"ready": False, "code": "profile_missing", "checks": {"google": "unknown", "chatgpt": "unknown"}, "summary": "O perfil dedicado do YoutubeBot não está configurado. Entre no PC de trabalho e conecte Google e ChatGPT. Nenhum vídeo foi criado."})
+                            runtime.start_hidden_chrome()
+                            with sync_playwright() as playwright:
+                                browser, context = runtime.connect_hidden(playwright)
+                                readiness = preflight.check(context)
+                                if not readiness["ready"]:
+                                    raise ReadinessBlocked(readiness)
+                                runtime.configure_downloads(browser)
+                                runtime.configure_extension(context)
+                                results = shorts_service.generate_shorts_batch(
+                                    request["channel"],
+                                    request["count"],
+                                    context,
+                                    request.get("shorts_options"),
+                                )
+                            failures = [item["id"] for item in results if item["state"] != "ready"]
+                        elif request.get("mode") == "generate":
                             from playwright.sync_api import sync_playwright
                             from . import runtime, preflight
                             from .generation import run_generation
@@ -485,26 +539,30 @@ def execute(operation_id: str) -> None:
                                 runtime.configure_downloads(browser)
                                 runtime.configure_extension(context)
                                 failures = run_generation(request["count"], context)
+                            results = None
                         else:
                             failures = run_batch(request["count"], parallel=1)
-                        changed = {
-                            p.parent.name
-                            for p in config.RUNS.glob("*/record.json")
-                            if p.stat().st_mtime_ns != before.get(p.parent.name)
-                        }
-                        results = [
-                            item
-                            for item in runs(request["channel"], 100)
-                            if item["id"] in changed
-                        ][: request["count"]]
+                            results = None
+                        if results is None:
+                            changed = {
+                                p.parent.name
+                                for p in config.RUNS.glob("*/record.json")
+                                if p.stat().st_mtime_ns != before.get(p.parent.name)
+                            }
+                            results = [
+                                item
+                                for item in runs(request["channel"], 100)
+                                if item["id"] in changed
+                            ][: request["count"]]
+                is_gen_only = request.get("mode") in {"generate", "shorts_generate", "shorts_resume"}
                 scheduled = sum(item["state"] == "scheduled" for item in results)
                 generated = sum(item["state"] == "ready" and "video.mp4" in item["artifacts"] for item in results)
-                successful = generated if request.get("mode") == "generate" else scheduled
+                successful = generated if is_gen_only else scheduled
                 failed = max(len(failures), request["count"] - successful)
                 record.update(
                     state="failed" if failed else "completed",
                     error_code="batch_failed" if failed else None,
-                    summary=(f"Generation finished: {generated} video(s) ready, no publication; {failed} incomplete item(s)." if request.get("mode") == "generate" else f"Batch finished: {scheduled} scheduled video(s), {failed} incomplete or failed item(s)."),
+                    summary=(f"Generation finished: {generated} video(s) ready, no publication; {failed} incomplete item(s)." if is_gen_only else f"Batch finished: {scheduled} scheduled video(s), {failed} incomplete or failed item(s)."),
                     result={
                         "scheduled_count": scheduled,
                         "generated_count": generated,
@@ -514,12 +572,27 @@ def execute(operation_id: str) -> None:
                 )
             except ReadinessBlocked as blocked:
                 record.update(state="failed", error_code=blocked.evidence["code"], summary=blocked.evidence["summary"], readiness=blocked.evidence["checks"])
-            except BaseException:
-                record.update(
-                    state="failed",
-                    error_code="execution_failed",
-                    summary="Batch failed; inspect private job logs and existing resumable records.",
-                )
+            except BaseException as error:
+                from .shorts_video.models import CreditBudgetExceededError, ProviderAuthRequiredError
+
+                if isinstance(error, ProviderAuthRequiredError):
+                    record.update(
+                        state="failed",
+                        error_code="flow_login_required",
+                        summary="Google Flow login or manual verification is required in the dedicated Flow browser profile.",
+                    )
+                elif isinstance(error, CreditBudgetExceededError):
+                    record.update(
+                        state="failed",
+                        error_code="credit_limit_reached",
+                        summary="Shorts video credit budget limit reached before completing generation.",
+                    )
+                else:
+                    record.update(
+                        state="failed",
+                        error_code="execution_failed",
+                        summary="Batch failed; inspect private job logs and existing resumable records.",
+                    )
             finally:
                 record["updated_at"] = int(time.time())
                 with job_lock(operation_id):

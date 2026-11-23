@@ -133,8 +133,12 @@ def _upload_context(playwright, context, upload_cdp):
 
 def run_batch(count: int, parallel: int = 0, upload_cdp: int | None = None,
               start_date=None, topics: list[str] | None = None,
-              upload_parallel: int = 2) -> list:
+              upload_parallel: int = 2,
+              visual_mode: str = "static") -> list:
     from . import channels
+    if visual_mode != "static":
+        from .shorts_video.models import assert_shorts_scope
+        assert_shorts_scope("long-form", visual_mode=visual_mode)
     if config.CHANNEL and config.CHANNEL.slug in channels.DOCUMENTARY_CHANNELS:
         raise RuntimeError(
             f"{config.CHANNEL.slug} is a documentary channel: build it with "

@@ -20,8 +20,12 @@ def in_queue(lead: dict) -> bool:
 
 
 def order_key(lead: dict) -> tuple:
-    """Import batch first, then the row order inside the CSV."""
-    return (lead.get("imported_at") or "", int(lead.get("queue_position") or 0),
+    """The queue position alone: import order, or the order an explicit reorder set.
+
+    `queue_position` is unique and monotonic across imports, so it already encodes the
+    batch order; keeping the batch date first would make `reorder` impossible across days.
+    """
+    return (int(lead.get("queue_position") or 0), lead.get("imported_at") or "",
             lead.get("id", ""))
 
 
@@ -57,3 +61,30 @@ def items(store: SalesStore) -> list[dict]:
                      "name": lead.get("name", ""), "phone": mask(lead["phone"]),
                      "status": state, "reason": reason, "opened_at": lead.get("opened_at")})
     return rows
+
+
+def reorder(store: SalesStore, phones: list[str]) -> dict:
+    """Put the given numbers first, in CSV order; everyone else keeps their order after.
+
+    The owner's decision (2026-11-23): a new batch can jump ahead of an older one. Only
+    `queue_position` changes; states, history and fences stay untouched.
+    """
+    from .store import canonical_phone
+
+    wanted = [canonical_phone(phone) for phone in phones]
+    wanted = [phone for phone in wanted if phone]
+    leads = [lead for lead in store.leads().values() if in_queue(lead)]
+    by_phone = {canonical_phone(lead.get("phone", "") or ""): lead for lead in leads}
+    ordered, seen = [], set()
+    for phone in wanted:
+        lead = by_phone.get(phone)
+        if lead is not None and lead["id"] not in seen:
+            ordered.append(lead)
+            seen.add(lead["id"])
+    rest = [lead for lead in sorted(leads, key=order_key) if lead["id"] not in seen]
+    moved = 0
+    for position, lead in enumerate(ordered + rest, start=1):
+        if int(lead.get("queue_position") or 0) != position:
+            store.update_lead(lead["id"], queue_position=position)
+            moved += 1
+    return {"first": len(ordered), "total": len(ordered) + len(rest), "moved": moved}

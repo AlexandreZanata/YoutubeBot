@@ -95,6 +95,30 @@ def _fill_field(page, parent_id: str, text: str) -> bool:
     return False
 
 
+def _apply_synthetic_disclosure(page, meta: dict) -> None:
+    """Select the Altered/Synthetic content disclosure in Studio when requested."""
+    if not meta.get("synthetic_media_disclosure"):
+        return
+    _show_more(page)
+    selected = page.evaluate(
+        """() => {
+          const group = document.querySelector('ytkp-altered-content-select, [name="altered-content"]');
+          if (!group) return false;
+          const yes = [...group.querySelectorAll('tp-yt-paper-radio-button')].find(
+            el => /\\bsim\\b|\\byes\\b/i.test((el.innerText || '').trim())
+          );
+          if (!yes) return false;
+          if (yes.getAttribute('aria-checked') !== 'true') yes.click();
+          return true;
+        }"""
+    )
+    if selected:
+        page.wait_for_timeout(800)
+        log("synthetic/altered content disclosure enabled")
+    else:
+        log("synthetic/altered content disclosure control not found; verify in Studio")
+
+
 def apply_details(page, run_dir: Path, meta: dict, *, custom_thumbnail: bool = True) -> None:
     if not _fill_field(page, "title-textarea", meta["title"]):
         upload_dialog.fill_editable(page, 0, meta["title"])
@@ -104,6 +128,10 @@ def apply_details(page, run_dir: Path, meta: dict, *, custom_thumbnail: bool = T
         _apply_tags(page, meta)
     except Exception as error:
         log(f"tags warning: {error}")
+    try:
+        _apply_synthetic_disclosure(page, meta)
+    except Exception as error:
+        log(f"synthetic disclosure warning: {error}")
     thumbnail = run_dir / "thumbnail.png"
     field = page.locator('input[type=file][accept*="image"]')
     if custom_thumbnail and thumbnail.is_file() and field.count():

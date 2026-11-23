@@ -118,7 +118,10 @@ def _extra_assets(context, topic: str, run_dir: Path) -> None:
         logic.record_event(run_dir, "render", "ok")
 
 
-def asset_stage(context, topic: str) -> Path:
+def asset_stage(context, topic: str, *, visual_mode: str = "static") -> Path:
+    if visual_mode != "static":
+        from .shorts_video.models import assert_shorts_scope
+        assert_shorts_scope("long-form", visual_mode=visual_mode)
     run_dir = logic.run_path(topic)
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "topic.txt").write_text(topic, encoding="utf-8")

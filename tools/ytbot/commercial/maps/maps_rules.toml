@@ -252,6 +252,13 @@ offer = "site + catálogo"
 short = "catálogo"
 
 [[groups]]
+key = "climatizacao"
+label = "Climatização"
+weight = 10
+offer = "site + formulário de orçamento; sistemas de ordens de serviço e visitas"
+short = "orçamento"
+
+[[groups]]
 key = "hotelaria"
 label = "Hotelaria"
 weight = 8
@@ -260,8 +267,28 @@ short = "reservas"
 
 # Search order is the priority order: the run walks this list until the daily limit.
 [[searches]]
-group = "saude"
-query = "academia"
+group = "climatizacao"
+query = "climatizadores"
+
+[[searches]]
+group = "climatizacao"
+query = "ar-condicionado"
+
+[[searches]]
+group = "climatizacao"
+query = "climatização"
+
+[[searches]]
+group = "climatizacao"
+query = "instalação de ar-condicionado"
+
+[[searches]]
+group = "climatizacao"
+query = "manutenção de ar-condicionado"
+
+[[searches]]
+group = "climatizacao"
+query = "loja de ar-condicionado"
 
 [[searches]]
 group = "saude"
@@ -366,10 +393,6 @@ query = "serralheria"
 [[searches]]
 group = "casa"
 query = "energia solar"
-
-[[searches]]
-group = "casa"
-query = "ar-condicionado"
 
 [[searches]]
 group = "casa"
@@ -494,6 +517,11 @@ query = "hotel"
 [[searches]]
 group = "hotelaria"
 query = "pousada"
+
+# De-prioritized on 2026-11-23: the fitness cycle already ran; keep it last.
+[[searches]]
+group = "saude"
+query = "academia"
 
 [exclusions]
 category_terms = [

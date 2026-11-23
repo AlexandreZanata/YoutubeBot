@@ -167,6 +167,23 @@ class QueueTests(unittest.TestCase):
         preview, _ = self.queue("send")
         self.assertIn("fora do horário de abertura", preview["blocked"])
 
+    def test_reorder_puts_a_new_batch_first(self):
+        rows = [{"name": f"Loja {index}", "phone": PHONES[index]} for index in range(4)]
+        self.import_rows(rows)
+        later = [{"name": "Clima A", "phone": PHONES[20]},
+                 {"name": "Clima B", "phone": PHONES[21]}]
+        self.import_rows(later)
+        before = [item["name"] for item in self.store_queue()]
+        self.assertEqual(before[:2], ["Loja 0", "Loja 1"])
+        result = queue.reorder(self.store, [PHONES[21], PHONES[20]])
+        self.assertEqual(result["first"], 2)
+        after = [item["name"] for item in self.store_queue()]
+        self.assertEqual(after[:2], ["Clima B", "Clima A"])
+        self.assertEqual(after[2:], before[:4], "the rest keeps its relative order")
+
+    def store_queue(self):
+        return queue.items(self.store)
+
     def test_the_daily_limit_holds(self):
         limit = int(self.rules.limits["daily_openings"])
         rows = [{"name": f"Loja {index}", "phone": PHONES[index]} for index in range(limit + 2)]
