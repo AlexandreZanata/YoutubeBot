@@ -1,0 +1,323 @@
+{
+ "001|refusal|Não quero site, não": [
+  "Não quero site, não"
+ ],
+ "002|refusal|não preciso de site": [
+  "não preciso de site"
+ ],
+ "003|refusal|não precisamos de sistem": [
+  "não precisamos de sistema não"
+ ],
+ "004|refusal|não quero aplicativo não": [
+  "não quero aplicativo não"
+ ],
+ "005|refusal|não quero site não, obri": [
+  "não quero site não, obrigado"
+ ],
+ "006|refusal|NAO PRECISO NAO": [
+  "NAO PRECISO NAO"
+ ],
+ "007|refusal|negativo": [
+  "negativo"
+ ],
+ "008|refusal|nop": [
+  "nop"
+ ],
+ "009|refusal|não brother, valeu": [
+  "não brother, valeu"
+ ],
+ "010|refusal|não fechamos nada não": [
+  "não fechamos nada não"
+ ],
+ "011|refusal|não dá pra fazer agora n": [
+  "não dá pra fazer agora não"
+ ],
+ "012|refusal|prefiro não": [
+  "prefiro não"
+ ],
+ "013|refusal|pra mim não": [
+  "pra mim não"
+ ],
+ "014|refusal|melhor não": [
+  "melhor não"
+ ],
+ "015|refusal|nao kero": [
+  "nao kero"
+ ],
+ "016|refusal|não vou fechar": [
+  "não vou fechar"
+ ],
+ "017|refusal|deixa quieto": [
+  "deixa quieto"
+ ],
+ "018|refusal|esquece, valeu": [
+  "esquece, valeu"
+ ],
+ "019|refusal|não adianta, obrigado": [
+  "não adianta, obrigado"
+ ],
+ "020|refusal|acredito que não": [
+  "acredito que não"
+ ],
+ "021|refusal|apos preco": [
+  "Quanto custa?",
+  "Nesse momento não estou precisando"
+ ],
+ "022|refusal|apos preco 2": [
+  "qual o valor?",
+  "tá fora do meu orçamento agora, obrigado"
+ ],
+ "023|refusal|apos sistema": [
+  "Vocês fazem aplicativo de agendamento?",
+  "Não tenho interesse"
+ ],
+ "025|refusal|apos interesse site": [
+  "quero um site simples",
+  "Não, obrigado"
+ ],
+ "026|refusal|apos exemplos": [
+  "gostei dos exemplos",
+  "mas não preciso agora"
+ ],
+ "027|refusal|apos orcamento pergunta": [
+  "Quanto custa?",
+  "Sim, quero",
+  "não tenho interesse"
+ ],
+ "028|refusal|apos domain": [
+  "quanto custa o domínio?",
+  "obrigado, mas não"
+ ],
+ "029|refusal|apos servidor": [
+  "e o servidor?",
+  "sem dinheiro agora, obrigado"
+ ],
+ "030|refusal|apos app price": [
+  "quanto fica um sistema de agendamento?",
+  "vou deixar pra lá, obrigado"
+ ],
+ "031|refusal|apos agendar": [
+  "como funciona?",
+  "No momento não"
+ ],
+ "032|refusal|apos quem e voce": [
+  "quem é?",
+  "não quero, obrigado"
+ ],
+ "033|opt_out_after_ask|para apos ask": [
+  "Não tenho interesse",
+  "Para de me mandar mensagem"
+ ],
+ "034|opt_out_after_ask|remove apos ask": [
+  "não preciso agora",
+  "meu número, me remove"
+ ],
+ "035|opt_out_after_ask|spam apos ask": [
+  "agora não",
+  "isso é spam"
+ ],
+ "036|opt_out_after_ask|bloqueia apos ask": [
+  "dispensei, valeu",
+  "vou bloquear"
+ ],
+ "037|opt_out|não me mande mais": [
+  "não me mande mais"
+ ],
+ "038|opt_out|remova o meu contato": [
+  "remova o meu contato"
+ ],
+ "039|opt_out|não me chame mais": [
+  "não me chame mais"
+ ],
+ "040|opt_out|sai fora": [
+  "sai fora"
+ ],
+ "041|opt_out|tira meu numero dai": [
+  "tira meu numero dai"
+ ],
+ "042|opt_out|pode tirar meu contato": [
+  "pode tirar meu contato da lista"
+ ],
+ "043|opt_out|vou denunciar": [
+  "vou denunciar"
+ ],
+ "044|opt_out|para de me enviar": [
+  "para de me enviar"
+ ],
+ "045|later_or_callback|mais tarde te falo": [
+  "mais tarde te falo"
+ ],
+ "046|later_or_callback|quem sabe mais tarde": [
+  "quem sabe mais tarde"
+ ],
+ "047|later_or_callback|depois eu vejo": [
+  "depois eu vejo"
+ ],
+ "048|later_or_callback|vou pensar com calma": [
+  "vou pensar com calma"
+ ],
+ "049|later_or_callback|me chama semana que vem": [
+  "me chama semana que vem"
+ ],
+ "050|later_or_callback|agora não posso, me cham": [
+  "agora não posso, me chama amanhã"
+ ],
+ "051|later_or_callback|vou conversar com meu só": [
+  "vou conversar com meu sócio e te falo"
+ ],
+ "052|later_or_callback|deixa eu ver e eu te cha": [
+  "deixa eu ver e eu te chamo"
+ ],
+ "053|later_or_callback|ano que vem talvez": [
+  "ano que vem talvez"
+ ],
+ "054|later_or_callback|me chama em janeiro": [
+  "me chama em janeiro"
+ ],
+ "055|price_or_system|Quanto custa?": [
+  "Quanto custa?"
+ ],
+ "056|price_or_system|quanto custa um site?": [
+  "quanto custa um site?"
+ ],
+ "057|price_or_system|qual o valor do site?": [
+  "qual o valor do site?"
+ ],
+ "058|price_or_system|quanto custa o domínio?": [
+  "quanto custa o domínio?"
+ ],
+ "059|price_or_system|e o servidor?": [
+  "e o servidor?"
+ ],
+ "060|price_or_system|tem mensalidade?": [
+  "tem mensalidade?"
+ ],
+ "061|price_or_system|quanto custa um aplicati": [
+  "quanto custa um aplicativo?"
+ ],
+ "062|price_or_system|quanto fica um sistema d": [
+  "quanto fica um sistema de agendamento?"
+ ],
+ "063|price_or_system|quanto custa um site par": [
+  "quanto custa um site para minha academia?"
+ ],
+ "064|price_or_system|qual o valor total?": [
+  "qual o valor total?"
+ ],
+ "065|price_or_system|quero um site simples": [
+  "quero um site simples"
+ ],
+ "066|price_or_system|quero um sistema de pedi": [
+  "quero um sistema de pedidos"
+ ],
+ "067|price_or_system|fazem app de delivery?": [
+  "fazem app de delivery?"
+ ],
+ "068|price_or_system|quero uma plataforma de ": [
+  "quero uma plataforma de rifas"
+ ],
+ "069|price_or_system|vocês fazem site de cass": [
+  "vocês fazem site de cassino?"
+ ],
+ "070|price_or_system|quero um sistema de gest": [
+  "quero um sistema de gestão"
+ ],
+ "071|forwarded_to_decider|Irei encaminhar para o r": [
+  "Irei encaminhar para o responsável!!"
+ ],
+ "072|forwarded_to_decider|vou encaminhar para o ma": [
+  "vou encaminhar para o marketing"
+ ],
+ "073|forwarded_to_decider|já encaminhei pro comerc": [
+  "já encaminhei pro comercial"
+ ],
+ "074|forwarded_to_decider|vou repassar para a dire": [
+  "vou repassar para a diretoria"
+ ],
+ "075|forwarded_to_decider|vou enviar para o setor ": [
+  "vou enviar para o setor responsável"
+ ],
+ "076|gatekeeper|Sou funcionária, o dono ": [
+  "Sou funcionária, o dono não está"
+ ],
+ "077|gatekeeper|aqui é a recepção": [
+  "aqui é a recepção"
+ ],
+ "078|gatekeeper|vou falar com o gerente": [
+  "vou falar com o gerente"
+ ],
+ "079|gatekeeper|não sou eu que decido": [
+  "não sou eu que decido"
+ ],
+ "080|gatekeeper|vou mostrar pro meu chef": [
+  "vou mostrar pro meu chefe"
+ ],
+ "081|referral|passa numero": [
+  "Sou funcionária, o dono não está",
+  "o dono é 65 99999-0002"
+ ],
+ "082|referral|manda contato": [
+  "aqui é a recepção",
+  "pode falar com 65 99999-0003"
+ ],
+ "083|referral|numero do gerente": [
+  "não sou eu que decido",
+  "gerente: +55 65 99999-0004"
+ ],
+ "084|other|Boa tarde, tudo bem e ": [
+  "Boa tarde, tudo bem e você?"
+ ],
+ "085|other|Obrigado": [
+  "Obrigado"
+ ],
+ "086|other|valeu, obrigado": [
+  "valeu, obrigado"
+ ],
+ "087|other|ok": [
+  "ok"
+ ],
+ "088|other|como funciona?": [
+  "como funciona?"
+ ],
+ "089|other|já temos site": [
+  "já temos site"
+ ],
+ "090|other|áudio": [
+  "áudio"
+ ],
+ "091|other|Photo": [
+  "Photo"
+ ],
+ "092|other|Sticker": [
+  "Sticker"
+ ],
+ "093|other|Olá! Esta é uma mensag": [
+  "Olá! Esta é uma mensagem automática. Retornaremos em breve."
+ ],
+ "094|other|isso é robô?": [
+  "isso é robô?"
+ ],
+ "095|other|Como você conseguiu me": [
+  "Como você conseguiu meu número?"
+ ],
+ "096|who_or_confused|quem é?": [
+  "quem é?"
+ ],
+ "097|who_or_confused|Não sei, o que vocês faz": [
+  "Não sei, o que vocês fazem mesmo?"
+ ],
+ "098|who_or_confused|que empresa é essa?": [
+  "que empresa é essa?"
+ ],
+ "099|who_or_confused|de onde falam?": [
+  "de onde falam?"
+ ],
+ "100|who_or_confused|vocês são empresa mesmo?": [
+  "vocês são empresa mesmo?"
+ ],
+ "024|later_or_callback|apos entrevista": [
+  "quero um sistema de pedidos",
+  "somos eu e mais dois",
+  "não vou fechar hoje"
+ ]
+}
