@@ -119,3 +119,17 @@ Fast is currently qualification-gated and resolves to standard. It never activat
 hardware discovery and never changes content, accounts or scheduling. Resource limits
 remain unchanged. See [performance profiles](PERFORMANCE-PROFILES.md) for qualification,
 private dependency installation, benchmark boundaries and measured evidence.
+
+## Shorts-only AI video verbs
+
+Bounded additive verbs (`schema_version: 1`) support AI-generated Shorts without exposing
+credentials, cookies, raw paths or long-form access:
+
+- `shorts-providers`: reports provider availability, Google Flow readiness and credit totals.
+- `shorts-estimate --channel SLUG --count 1..10`: estimates credits with zero spending.
+- `shorts-generate --operation-id UUID --channel SLUG --count 1..10 --approved-generation`:
+  admits a generation-only Shorts job (`mode=shorts_generate`, never uploads).
+- `shorts-resume --operation-id UUID --channel SLUG --run-id SLUG --approved-generation`:
+  resumes an interrupted Short run (`mode=shorts_resume`, never uploads).
+- `shorts-inspect --channel SLUG --run-id SLUG`: returns redacted scene statuses, failure
+  reasons and final `video.mp4` readiness.

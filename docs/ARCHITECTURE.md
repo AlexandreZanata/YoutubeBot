@@ -19,6 +19,11 @@ algorithms are preserved; new account/adapter modules compose them.
   [community](COMMUNITY.md).
 - `tools/ytbot/shorts.py`: vertical Shorts pipeline for Zaflas with short scripts, portrait
   render, upload-only account and 09:00/18:00 scheduling. See [Shorts](SHORTS.md).
+- `tools/ytbot/shorts_video/`: Shorts-only AI video storyboard planner, Google Flow isolated
+  browser/assisted workflow, paid Gemini API opt-in adapter, credit budget ledger and FFmpeg
+  9:16 assembly. Strictly refuses long-form contexts. See [Google Flow Shorts](GOOGLE-FLOW-SHORTS.md).
+- `src/ui/shorts_video_panel.py`: Shorts-only AI video configuration, Google Flow connection
+  status, non-blocking worker progress and clip preview panel inside `main_window.py`.
 - `tools/ytbot/distribute.py`: audits the future scheduled uploads per channel and spreads a
   block of new videos toward the emptiest channels. See [distribution](DISTRIBUTE.md).
 - `tools/ytbot/cleanup.py`: pre-run trash, staging and scheduled-media cleanup with the space

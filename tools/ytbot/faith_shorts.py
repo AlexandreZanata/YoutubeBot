@@ -506,15 +506,34 @@ def link_related_video(context, video_id: str, title: str) -> bool:
 
 
 def run(channel_slug: str, count: int = 5, start: date | None = None,
-        skip_slots: int = 0, start_index: int = 0) -> list:
+        skip_slots: int = 0, start_index: int = 0,
+        *,
+        visual_mode: str | None = None,
+        video_provider: str | None = None,
+        video_model: str | None = None,
+        max_credits: float | None = None,
+        max_scenes: int | None = None,
+        fallback_to_static: bool | None = None,
+        dry_run: bool = False) -> list:
+    from .shorts_video import assert_channel_policy, assert_shorts_scope
+    from .shorts_video.pipeline import render_ai_short
+    from .shorts_video.settings import resolve_runtime_settings
+
     spec = CHANNELS[channel_slug]
     channels.apply(channel_slug)
-    store = AccountStore()
-    store.activate(spec["upload"])
-    runtime.start_hidden_chrome()
-    upload_cdp = store.account(spec["upload"])["cdp_port"]
-    store.activate("legacy")
-    runtime.start_hidden_chrome()
+    resolved = resolve_runtime_settings(
+        visual_mode=visual_mode or "static",
+        provider=video_provider,
+        model=video_model,
+        max_credits_per_short=max_credits,
+        max_scenes_per_short=max_scenes,
+        fallback_to_static=fallback_to_static,
+    )
+    effective_mode = resolved["visual_mode"]
+    assert_shorts_scope("shorts", width=1080, height=1920, visual_mode=effective_mode)
+    if effective_mode == "ai-video":
+        assert_channel_policy(channel_slug, resolved)
+
     topics = []
     for candidate in list(spec["topics"])[start_index:]:
         run_dir = config.DATA_DIR / "shorts" / logic.slug(candidate)
@@ -529,6 +548,42 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
                         start or (date.today() + timedelta(days=1)), skip_slots,
                         occupied_slots(config.DATA_DIR / "shorts"),
                         spec.get("interval_days", 1))
+    root = config.DATA_DIR / "shorts"
+    if dry_run:
+        for topic, slot in zip(topics, slots):
+            run_dir = root / logic.slug(topic)
+            run_dir.mkdir(parents=True, exist_ok=True)
+            short_path = run_dir / "short.txt"
+            script_text = short_path.read_text(encoding="utf-8") if short_path.is_file() else topic
+            if effective_mode == "ai-video":
+                summary = render_ai_short(
+                    run_dir,
+                    channel_slug,
+                    topic,
+                    script_text,
+                    visual_mode=effective_mode,
+                    video_provider=video_provider,
+                    video_model=video_model,
+                    max_credits_per_short=max_credits,
+                    max_scenes=max_scenes,
+                    fallback_to_static=fallback_to_static,
+                    dry_run=True,
+                )
+                log(
+                    f"dry-run {topic} ({logic.slot_label(slot)}): provider={summary['provider']} "
+                    f"model={summary['model']} scenes={summary['scene_count']} "
+                    f"est_credits={summary['estimated_credits']} budget={summary['budget_reason']}"
+                )
+            else:
+                log(f"dry-run {topic} ({logic.slot_label(slot)}): mode=static")
+        return []
+
+    store = AccountStore()
+    store.activate(spec["upload"])
+    runtime.start_hidden_chrome()
+    upload_cdp = store.account(spec["upload"])["cdp_port"]
+    store.activate("legacy")
+    runtime.start_hidden_chrome()
     failures = []
     with sync_playwright() as playwright:
         gen_browser, gen = runtime.connect_hidden(playwright)
@@ -539,7 +594,6 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
         used_links: list[str] = []
         runtime.configure_downloads(gen_browser)
         runtime.configure_extension(gen)
-        root = config.DATA_DIR / "shorts"
         for topic, slot in zip(topics, slots):
             run_dir = root / logic.slug(topic)
             run_dir.mkdir(parents=True, exist_ok=True)
@@ -564,8 +618,31 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
             try:
                 assets.generate_thumbnail(gen, run_dir, "short-background")
                 ensure_unique_background(gen, run_dir, root)
-                render_short(run_dir)
+                ai_result = None
+                if effective_mode == "ai-video":
+                    ai_result = render_ai_short(
+                        run_dir,
+                        channel_slug,
+                        topic,
+                        text,
+                        visual_mode=effective_mode,
+                        video_provider=video_provider,
+                        video_model=video_model,
+                        max_credits_per_short=max_credits,
+                        max_scenes=max_scenes,
+                        fallback_to_static=fallback_to_static,
+                        static_fallback_fn=render_short,
+                    )
+                else:
+                    render_short(run_dir)
                 meta = metadata(topic, text, spec)
+                if ai_result and ai_result.get("visual_mode") == "ai-video":
+                    meta["visual_mode"] = "ai-video"
+                    meta["video_provider"] = ai_result.get("provider", "")
+                    meta["video_model"] = ai_result.get("model", "")
+                    meta["synthetic_media_disclosure"] = bool(
+                        ai_result.get("synthetic_disclosure_required", True)
+                    )
                 (run_dir / "metadata.json").write_text(
                     json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
                 youtube.upload_and_schedule_with_context(

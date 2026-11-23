@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 from src.ui.mode_views import create_classic_fields, create_auto_story_fields
 from src.ui.narration_panel import NarrationPanel
 from src.ui.main_window_actions import VideoGeneratorActions
+from src.ui.shorts_video_panel import ShortsVideoPanel
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 IMAGENS_DIR = PROJECT_ROOT / "imagens"
@@ -67,6 +68,9 @@ class VideoGeneratorApp(VideoGeneratorActions, QMainWindow):
         self.stack.addWidget(self.w_classic)
         self.stack.addWidget(self.w_story)
         body_layout.addWidget(self.stack)
+
+        self.shorts_video_panel = ShortsVideoPanel(self)
+        body_layout.addWidget(self.shorts_video_panel)
 
         self.progress_bar = QProgressBar()
         layout.addWidget(self.progress_bar)

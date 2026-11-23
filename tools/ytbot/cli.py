@@ -73,7 +73,13 @@ def command_comments(args) -> None:
 
 def command_distribute_shorts(args) -> None:
     from .shorts_distribute import run_distribution
-    failures = run_distribution(args.count, args.dry_run)
+    failures = run_distribution(
+        args.count,
+        args.dry_run,
+        visual_mode=getattr(args, "visual_mode", None),
+        video_provider=getattr(args, "video_provider", None),
+        video_model=getattr(args, "video_model", None),
+    )
     print("[ytbot] shorts distribution finished")
     if failures:
         print(f"[ytbot] shorts channel failures: {failures}")
@@ -83,7 +89,20 @@ def command_distribute_shorts(args) -> None:
 def command_faith_shorts(args) -> None:
     from .faith_shorts import run
     start = datetime.strptime(args.start_date, "%Y-%m-%d").date() if args.start_date else None
-    failures = run(args.channel, args.count, start, args.skip_slots, args.start_index)
+    failures = run(
+        args.channel,
+        args.count,
+        start,
+        args.skip_slots,
+        args.start_index,
+        visual_mode=getattr(args, "visual_mode", None),
+        video_provider=getattr(args, "video_provider", None),
+        video_model=getattr(args, "video_model", None),
+        max_credits=getattr(args, "max_credits", None),
+        max_scenes=getattr(args, "max_scenes", None),
+        fallback_to_static=(False if getattr(args, "no_static_fallback", False) else None),
+        dry_run=bool(getattr(args, "dry_run", False)),
+    )
     print("[ytbot] faith shorts finished")
     if failures:
         print(f"[ytbot] {len(failures)} failure(s): {failures}")
@@ -98,14 +117,148 @@ def command_cleanup(args) -> None:
 def command_shorts(args) -> None:
     from . import cleanup
     from .shorts import run_shorts
-    cleanup.before_run()
+    if not getattr(args, "dry_run", False):
+        cleanup.before_run()
     start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date() if args.start_date else None
-    failures = run_shorts(args.channel, args.count, args.per_day, start_date,
-                          args.upload_account, args.start_index, args.skip_slots)
+    failures = run_shorts(
+        args.channel,
+        args.count,
+        args.per_day,
+        start_date,
+        args.upload_account,
+        args.start_index,
+        args.skip_slots,
+        visual_mode=getattr(args, "visual_mode", None),
+        video_provider=getattr(args, "video_provider", None),
+        video_model=getattr(args, "video_model", None),
+        max_credits=getattr(args, "max_credits", None),
+        max_scenes=getattr(args, "max_scenes", None),
+        fallback_to_static=(False if getattr(args, "no_static_fallback", False) else None),
+        dry_run=bool(getattr(args, "dry_run", False)),
+    )
     print("[ytbot] shorts process finished")
     if failures:
         print(f"[ytbot] {len(failures)} shorts failure(s): {failures}")
         raise SystemExit(1)
+
+
+def command_shorts_video(args) -> None:
+    import shutil
+    from pathlib import Path
+    from .shorts_video import credits, flow_browser, settings
+    from .shorts_video.pipeline import render_ai_short
+    from .shorts_video.providers import get_provider
+    from .shorts_video.settings import resolve_runtime_settings
+
+    action = args.action
+    if action == "status":
+        active = settings.load_settings()
+        flow_status = flow_browser.check_flow_readiness(probe_browser=bool(args.probe))
+        provider_status = {
+            name: get_provider(name).check_availability(active)
+            for name in settings.VALID_PROVIDERS
+        }
+        print(json.dumps({
+            "settings": active,
+            "flow": flow_status,
+            "providers": provider_status,
+            "credits": credits.ledger_summary(),
+        }, indent=2, ensure_ascii=False))
+        return
+    if action == "login":
+        pid = flow_browser.open_visible_login()
+        print(f"[shorts-video] Google Flow visible browser opened (pid={pid})")
+        return
+    if action == "stop":
+        flow_browser.stop_flow_browser()
+        print("[shorts-video] Google Flow browser stopped")
+        return
+    if action == "configure":
+        updates = {}
+        if args.enable:
+            updates["enabled"] = True
+            updates["visual_mode"] = "ai-video"
+        elif args.disable:
+            updates["enabled"] = False
+            updates["visual_mode"] = "static"
+        if args.video_provider:
+            updates["provider"] = args.video_provider
+        if args.video_model:
+            updates["model"] = args.video_model
+        if args.quality:
+            updates["quality"] = args.quality
+        if args.max_credits_short is not None:
+            updates["max_credits_per_short"] = args.max_credits_short
+        if args.max_credits_batch is not None:
+            updates["max_credits_per_batch"] = args.max_credits_batch
+        if args.max_scenes is not None:
+            updates["max_scenes_per_short"] = args.max_scenes
+        if args.allow_paid_api:
+            updates["allow_paid_api"] = True
+        elif args.disallow_paid_api:
+            updates["allow_paid_api"] = False
+        if args.fallback_static:
+            updates["fallback_to_static"] = True
+        elif args.no_static_fallback:
+            updates["fallback_to_static"] = False
+        saved = settings.save_settings(updates)
+        print(json.dumps(saved, indent=2, ensure_ascii=False))
+        return
+    if action == "estimate":
+        channels.apply(args.channel)
+        resolved = resolve_runtime_settings(
+            visual_mode="ai-video",
+            provider=args.video_provider,
+            model=args.video_model,
+            max_credits_per_short=args.max_credits,
+            max_scenes_per_short=args.max_scenes,
+        )
+        topic = args.topic or "Sample Short topic"
+        run_dir = config.DATA_DIR / "shorts" / logic.slug(topic)
+        short_file = run_dir / "short.txt"
+        script_text = short_file.read_text(encoding="utf-8") if short_file.is_file() else topic
+        summary = render_ai_short(
+            run_dir,
+            args.channel,
+            topic,
+            script_text,
+            visual_mode="ai-video",
+            video_provider=resolved["provider"],
+            video_model=resolved["model"],
+            max_credits_per_short=resolved["max_credits_per_short"],
+            max_scenes=resolved["max_scenes_per_short"],
+            dry_run=True,
+        )
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+        return
+    if action == "import":
+        channels.apply(args.channel)
+        run_dir = config.DATA_DIR / "shorts" / logic.slug(args.topic)
+        clips_dir = run_dir / "clips"
+        clips_dir.mkdir(parents=True, exist_ok=True)
+        if args.source_dir:
+            src = Path(args.source_dir)
+            if not src.is_dir():
+                raise SystemExit(f"import source directory not found: {src}")
+            for clip in sorted(src.glob("*.mp4")):
+                shutil.copy2(clip, clips_dir / clip.name)
+        short_file = run_dir / "short.txt"
+        script_text = short_file.read_text(encoding="utf-8") if short_file.is_file() else args.topic
+        from . import faith_shorts, shorts as legacy_shorts
+        fallback_fn = legacy_shorts.render_short if args.channel == "zaflas" else faith_shorts.render_short
+        summary = render_ai_short(
+            run_dir,
+            args.channel,
+            args.topic,
+            script_text,
+            visual_mode="ai-video",
+            video_provider=args.video_provider or "manual-import",
+            video_model=args.video_model,
+            static_fallback_fn=fallback_fn,
+        )
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+        return
+    raise SystemExit(f"unknown shorts-video action: {action}")
 
 
 def command_reschedule(args) -> None:
@@ -194,12 +347,22 @@ def build_parser() -> argparse.ArgumentParser:
                         help="skip this many topics in the shorts queue")
     shorts.add_argument("--skip-slots", type=int, default=0,
                         help="skip this many leading schedule slots")
+    shorts.add_argument("--visual-mode", choices=("static", "ai-video"), default=None)
+    shorts.add_argument("--video-provider", choices=("google-flow", "gemini-api", "manual-import"), default=None)
+    shorts.add_argument("--video-model", choices=("veo-2-fast", "veo-3-fast", "veo-2-quality", "veo-3-quality"), default=None)
+    shorts.add_argument("--max-credits", type=float, default=None)
+    shorts.add_argument("--max-scenes", type=int, default=None)
+    shorts.add_argument("--no-static-fallback", action="store_true")
+    shorts.add_argument("--dry-run", action="store_true")
     shorts.set_defaults(func=command_shorts)
     distribute_shorts = sub.add_parser(
         "distribute-shorts",
         help="spread Shorts over the channels that use them")
     distribute_shorts.add_argument("--count", type=int, default=10)
     distribute_shorts.add_argument("--dry-run", action="store_true")
+    distribute_shorts.add_argument("--visual-mode", choices=("static", "ai-video"), default=None)
+    distribute_shorts.add_argument("--video-provider", choices=("google-flow", "gemini-api", "manual-import"), default=None)
+    distribute_shorts.add_argument("--video-model", choices=("veo-2-fast", "veo-3-fast", "veo-2-quality", "veo-3-quality"), default=None)
     distribute_shorts.set_defaults(func=command_distribute_shorts)
     faith = sub.add_parser("faith-shorts",
                            help="religious Shorts with one generated background per short")
@@ -211,7 +374,37 @@ def build_parser() -> argparse.ArgumentParser:
                        help="skip this many leading schedule slots")
     faith.add_argument("--start-index", type=int, default=0,
                        help="skip this many topics in the channel queue")
+    faith.add_argument("--visual-mode", choices=("static", "ai-video"), default=None)
+    faith.add_argument("--video-provider", choices=("google-flow", "gemini-api", "manual-import"), default=None)
+    faith.add_argument("--video-model", choices=("veo-2-fast", "veo-3-fast", "veo-2-quality", "veo-3-quality"), default=None)
+    faith.add_argument("--max-credits", type=float, default=None)
+    faith.add_argument("--max-scenes", type=int, default=None)
+    faith.add_argument("--no-static-fallback", action="store_true")
+    faith.add_argument("--dry-run", action="store_true")
     faith.set_defaults(func=command_faith_shorts)
+    shorts_video = sub.add_parser(
+        "shorts-video",
+        help="manage Shorts-only Google Flow / AI video provider settings, login and imports",
+    )
+    shorts_video.add_argument("action", choices=("status", "login", "stop", "configure", "estimate", "import"))
+    shorts_video.add_argument("--channel", choices=sorted(channels.CHANNELS), default="zaflas")
+    shorts_video.add_argument("--topic", default="")
+    shorts_video.add_argument("--source-dir", default="")
+    shorts_video.add_argument("--probe", action="store_true")
+    shorts_video.add_argument("--enable", action="store_true")
+    shorts_video.add_argument("--disable", action="store_true")
+    shorts_video.add_argument("--video-provider", choices=("google-flow", "gemini-api", "manual-import"), default=None)
+    shorts_video.add_argument("--video-model", choices=("veo-2-fast", "veo-3-fast", "veo-2-quality", "veo-3-quality"), default=None)
+    shorts_video.add_argument("--quality", choices=("fast", "standard", "quality"), default=None)
+    shorts_video.add_argument("--max-credits", type=float, default=None)
+    shorts_video.add_argument("--max-credits-short", type=float, default=None)
+    shorts_video.add_argument("--max-credits-batch", type=float, default=None)
+    shorts_video.add_argument("--max-scenes", type=int, default=None)
+    shorts_video.add_argument("--allow-paid-api", action="store_true")
+    shorts_video.add_argument("--disallow-paid-api", action="store_true")
+    shorts_video.add_argument("--fallback-static", action="store_true")
+    shorts_video.add_argument("--no-static-fallback", action="store_true")
+    shorts_video.set_defaults(func=command_shorts_video)
     clean = sub.add_parser("cleanup", help="free trash, staging and already scheduled media")
     clean.add_argument("--dry-run", action="store_true")
     clean.set_defaults(func=command_cleanup)

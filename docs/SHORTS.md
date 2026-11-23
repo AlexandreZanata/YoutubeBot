@@ -118,3 +118,10 @@ hand Studio a path under `channels/zaflas/shorts` directly.
   content list before sending the file again.
 - A short with a recorded `upload.json` video ID is never uploaded twice; schedule the draft.
 - Record failures and continue with the next topic.
+
+## Optional AI Video Mode (Shorts Only)
+
+Shorts optionally support `--visual-mode ai-video` using Google Flow (`google-flow`),
+manual clip import (`manual-import`), or explicitly approved paid Gemini Video API
+(`gemini-api`), while keeping `--visual-mode static` as the default. Long-form pipelines
+never use AI video clips. See [Google Flow Shorts](GOOGLE-FLOW-SHORTS.md).

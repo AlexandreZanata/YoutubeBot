@@ -131,3 +131,6 @@ ZaturoBot can also request generation-only batches through the fixed service CLI
 actor verifies the dedicated Google/ChatGPT sessions before work and returns precise
 bounded readiness errors. Generation does not upload or schedule. See
 [service contracts](docs/SERVICE.md); existing extension/studio/upload commands are unchanged.
+
+For opt-in Shorts-only AI video clip generation with Google AI Pro / Google Flow, see
+[Google Flow Shorts](docs/GOOGLE-FLOW-SHORTS.md).

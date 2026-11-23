@@ -134,21 +134,75 @@ def render_short(run_dir: Path) -> Path:
 
 def run_shorts(channel_slug: str, count: int = 12, per_day: int = 2,
                start: date | None = None, upload_account: str = "zaflas",
-               start_index: int = 0, skip_slots: int = 0) -> list:
+               start_index: int = 0, skip_slots: int = 0,
+               *,
+               visual_mode: str | None = None,
+               video_provider: str | None = None,
+               video_model: str | None = None,
+               max_credits: float | None = None,
+               max_scenes: int | None = None,
+               fallback_to_static: bool | None = None,
+               dry_run: bool = False) -> list:
     from playwright.sync_api import sync_playwright
+    from .shorts_video import assert_channel_policy, assert_shorts_scope
+    from .shorts_video.pipeline import render_ai_short
+    from .shorts_video.settings import resolve_runtime_settings
 
     channels.apply(channel_slug)
     if not (config.PROMPTS / "shorts.txt").is_file():
         raise RuntimeError(f"{channel_slug} has no shorts prompt")
+    resolved = resolve_runtime_settings(
+        visual_mode=visual_mode or "static",
+        provider=video_provider,
+        model=video_model,
+        max_credits_per_short=max_credits,
+        max_scenes_per_short=max_scenes,
+        fallback_to_static=fallback_to_static,
+    )
+    effective_mode = resolved["visual_mode"]
+    assert_shorts_scope("shorts", width=1080, height=1920, visual_mode=effective_mode)
+    if effective_mode == "ai-video":
+        assert_channel_policy(channel_slug, resolved)
+
+    topics = list(SHORT_TOPICS[start_index:start_index + count])
+    slots = short_slots(len(topics), per_day, start, skip_slots,
+                        occupied_slots(config.DATA_DIR / "shorts"))
+    root = config.DATA_DIR / "shorts"
+    if dry_run:
+        for topic, slot in zip(topics, slots):
+            run_dir = root / logic.slug(topic)
+            run_dir.mkdir(parents=True, exist_ok=True)
+            short_path = run_dir / "short.txt"
+            script_text = short_path.read_text(encoding="utf-8") if short_path.is_file() else topic
+            if effective_mode == "ai-video":
+                summary = render_ai_short(
+                    run_dir,
+                    channel_slug,
+                    topic,
+                    script_text,
+                    visual_mode=effective_mode,
+                    video_provider=video_provider,
+                    video_model=video_model,
+                    max_credits_per_short=max_credits,
+                    max_scenes=max_scenes,
+                    fallback_to_static=fallback_to_static,
+                    dry_run=True,
+                )
+                log(
+                    f"dry-run {topic} ({logic.slot_label(slot)}): provider={summary['provider']} "
+                    f"model={summary['model']} scenes={summary['scene_count']} "
+                    f"est_credits={summary['estimated_credits']} budget={summary['budget_reason']}"
+                )
+            else:
+                log(f"dry-run {topic} ({logic.slot_label(slot)}): mode=static")
+        return []
+
     store = AccountStore()
     store.activate(upload_account)
     runtime.start_hidden_chrome()
     upload_cdp = store.account(upload_account)["cdp_port"]
     store.activate("legacy")
     runtime.start_hidden_chrome()
-    topics = list(SHORT_TOPICS[start_index:start_index + count])
-    slots = short_slots(len(topics), per_day, start, skip_slots,
-                        occupied_slots(config.DATA_DIR / "shorts"))
     failures = []
     with sync_playwright() as playwright:
         gen_browser, gen = runtime.connect_hidden(playwright)
@@ -157,7 +211,6 @@ def run_shorts(channel_slug: str, count: int = 12, per_day: int = 2,
         account.ensure_channel(up)
         runtime.configure_downloads(gen_browser)
         runtime.configure_extension(gen)
-        root = config.DATA_DIR / "shorts"
         for topic, slot in zip(topics, slots):
             run_dir = root / logic.slug(topic)
             run_dir.mkdir(parents=True, exist_ok=True)
@@ -188,9 +241,32 @@ def run_shorts(channel_slug: str, count: int = 12, per_day: int = 2,
                 if not (run_dir / "thumbnail.png").is_file():
                     assets.generate_thumbnail(gen, run_dir, "shorts")
                 log(f"thumbnail {clock.time() - thumb_start:.0f}s")
-                render_short(run_dir)
+                ai_result = None
+                if effective_mode == "ai-video":
+                    ai_result = render_ai_short(
+                        run_dir,
+                        channel_slug,
+                        topic,
+                        text,
+                        visual_mode=effective_mode,
+                        video_provider=video_provider,
+                        video_model=video_model,
+                        max_credits_per_short=max_credits,
+                        max_scenes=max_scenes,
+                        fallback_to_static=fallback_to_static,
+                        static_fallback_fn=render_short,
+                    )
+                else:
+                    render_short(run_dir)
                 log(f"render {clock.time() - finish_start:.0f}s")
                 meta = short_metadata(topic, text)
+                if ai_result and ai_result.get("visual_mode") == "ai-video":
+                    meta["visual_mode"] = "ai-video"
+                    meta["video_provider"] = ai_result.get("provider", "")
+                    meta["video_model"] = ai_result.get("model", "")
+                    meta["synthetic_media_disclosure"] = bool(
+                        ai_result.get("synthetic_disclosure_required", True)
+                    )
                 (run_dir / "metadata.json").write_text(
                     json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
                 upload_start = clock.time()
