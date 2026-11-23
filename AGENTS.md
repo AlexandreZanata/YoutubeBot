@@ -273,6 +273,14 @@ sub-millisecond local queries of prior VPS offers and price history (plus automa
 during `commercial products`), use `commercial reference --network mercadolivre` (with `--refresh`
 when a fresh ETag snapshot from the VPS is needed). See [commercial](docs/COMMERCIAL.md).
 
+## Video editing skills
+
+`skills/ffmpeg-skill/` vendors the MIT-licensed ffmpeg-skill agent skill (42 typed FFmpeg
+tools, contract and optional MCP server). Link it once per workstation with
+`ln -sfn "$PWD/skills/ffmpeg-skill" ~/.config/opencode/skills/ffmpeg-skill`. It is for the
+agent's video editing work; the bot's render/upload paths stay unchanged. See
+[video skills](docs/VIDEO-SKILLS.md).
+
 ## Social promotion
 
 The promotion module publishes the owner's GitHub projects in Brazilian Portuguese. The
