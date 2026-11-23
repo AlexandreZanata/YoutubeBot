@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import signal
+import time
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -366,6 +367,25 @@ class Session:
             agent.channel = self.channel
 
 
+def run_openings(agent, args, out=None, stopped=None) -> None:
+    """Openings-only loop over any transport: no listener, cooldown enforced by the agent."""
+    out = out or (lambda line: print(line, flush=True))
+    stopped = stopped or (lambda: False)
+    cycles = 0
+    while True:
+        if stopped():
+            return
+        summary = agent.cycle([], prospect=True, limit=args.limit)
+        out(json.dumps(summary, ensure_ascii=False))
+        cycles += 1
+        if args.once or (args.max_cycles and cycles >= args.max_cycles):
+            return
+        for _ in range(max(1, int(args.interval))):
+            if stopped():
+                return
+            time.sleep(1)
+
+
 def run_cycles(agent, session, args, listen=None, out=None, stopped=None) -> None:
     """Listen, answer, follow up and open leads until told to stop.
 
@@ -442,6 +462,27 @@ def command_run(args, store_factory, page_factory) -> None:
               flush=True)
     if not store.acquire():
         raise SystemExit("[sales] another sales run is active; one conversation at a time")
+    transport = getattr(args, "transport", "browser")
+    if transport == "evolution":
+        from . import evolution
+
+        try:
+            channel = evolution.EvolutionChannel(evolution.settings(), store.journal_path,
+                                                 SalesPacing.from_rules(rules))
+        except evolution.EvolutionError as error:
+            store.release()
+            raise SystemExit(f"[sales] {error}")
+        agent = SalesAgent(rules, store, channel if args.live else None, model,
+                           live=args.live, paced_openings=not args.once,
+                           allowed_leads=allowed)
+        if args.live:
+            for item in agent.reconcile_openings():
+                print(json.dumps({"reconciled": item}, ensure_ascii=False), flush=True)
+        try:
+            run_openings(agent, args)
+        finally:
+            store.release()
+        return
     try:
         session = Session(args, page_factory, rules, store)
     except RuntimeError as error:
@@ -517,6 +558,26 @@ def command_queue(args, store_factory, page_factory) -> None:
     if not store.acquire():
         raise SystemExit("[sales] another sales process is sending (run or queue send); "
                          "only one process sends at a time")
+    if getattr(args, "transport", "browser") == "evolution":
+        from . import evolution
+
+        try:
+            channel = evolution.EvolutionChannel(evolution.settings(), store.journal_path,
+                                                 SalesPacing.from_rules(rules))
+            agent = SalesAgent(rules, store, channel, None, live=True)
+            reconciled = agent.reconcile_openings()
+            if reconciled:
+                central.write(store, now)
+                _print({"sent": [], "reconciled": reconciled})
+                return
+            results = agent.prospect(limit, queue_only=True)
+            central.write(store, agent.now())
+            _print({"sent": results})
+        except evolution.EvolutionError as error:
+            raise SystemExit(f"[sales] {error}")
+        finally:
+            store.release()
+        return
     session = None
     try:
         reconciled = SalesAgent(rules, store, None, None, live=False).reconcile_openings()
@@ -633,6 +694,8 @@ def add_parser(actions, store_factory, page_factory) -> None:
                        help="show what would be sent (the default for send)")
     queue.add_argument("--limit", type=int, default=1,
                        help="numbers to open in this run, one conversation at a time (default 1)")
+    queue.add_argument("--transport", choices=("browser", "evolution"), default="browser",
+                       help="browser (default) or the Evolution API gateway")
     run = action("run", "listen, answer, follow up and (with --prospect) open new leads",
                  partial(command_run, store_factory=store_factory, page_factory=page_factory))
     run.add_argument("--live", action="store_true", help="actually send")
@@ -649,3 +712,5 @@ def add_parser(actions, store_factory, page_factory) -> None:
     run.add_argument("--only-csv", default=None,
                      help="path to a reviewed CSV; only attend leads in this CSV (plus their referrals)")
     run.add_argument("--no-llm", action="store_true")
+    run.add_argument("--transport", choices=("browser", "evolution"), default="browser",
+                     help="browser (default) or the Evolution API gateway (openings only)")

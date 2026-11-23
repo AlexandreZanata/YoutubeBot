@@ -74,7 +74,7 @@ class SalesAgentTests(unittest.TestCase):
         self.assertIn(f"a empresa {lead['name']} ainda não tem site", texts[2])
         self.assertEqual(self.store.lead(lead["id"])["state"], "opened")
         history = self.store.history(lead["id"])
-        self.assertEqual([entry["kind"] for entry in history], ["opening"] * 5)
+        self.assertEqual([entry["kind"] for entry in history], ["opening"] * 4)
         journal = sender.read_journal(self.store.journal_path)
         self.assertTrue(all(entry.get("kind") == "sales-opening" for entry in journal))
         rules = listener.load_rules(self.store.contact_rules_path)
@@ -82,7 +82,7 @@ class SalesAgentTests(unittest.TestCase):
 
     def test_opening_uses_the_owner_intervals(self):
         _, _, channel = self.opened_lead()
-        self.assertEqual([item["delay"] for item in channel.sent], [4, 2, 8, 8, 4])
+        self.assertEqual([item["delay"] for item in channel.sent], [4, 2, 8, 8])
 
     def test_reply_delay_follows_message_length(self):
         _, agent, channel = self.opened_lead()
@@ -100,14 +100,14 @@ class SalesAgentTests(unittest.TestCase):
 
     def test_chat_list_echo_of_our_message_is_not_an_incoming_message(self):
         lead, agent, channel = self.opened_lead()
-        agent.ingest([self.event("https://comerc.app.br")])
+        agent.ingest([self.event("Nós temos um catálogo completo com exemplos de sistemas e sites que nós criamos. Se quiser, eu te envio o link.")])
         self.assertIsNone(self.store.lead(lead["id"])["awaiting"])
         self.assertEqual(agent.reply_pending(), [])
 
     def test_opening_is_never_repeated(self):
         lead, agent, channel = self.opened_lead()
         self.assertEqual(agent.prospect(), [])
-        self.assertEqual(len(channel.sent), 5)
+        self.assertEqual(len(channel.sent), 4)
         self.assertEqual(agent.open_lead(self.store.lead(lead["id"]))["state"], "already-opened")
 
     def test_saved_contact_name_binds_the_chat_so_replies_reach_the_lead(self):
@@ -136,7 +136,7 @@ class SalesAgentTests(unittest.TestCase):
         agent.ingest([self.event("Quanto custa?")])
         replies = agent.reply_pending()
         self.assertEqual(replies[0]["lead"], lead["id"])
-        self.assertGreater(len(channel.sent), 5)
+        self.assertGreater(len(channel.sent), 4)
         self.assertEqual(self.pauses, [])
 
     def test_switching_to_another_chat_still_pauses(self):
@@ -333,7 +333,7 @@ class SalesAgentTests(unittest.TestCase):
         _, agent, channel = self.opened_lead()
         agent.ingest([{"id": "x", "chat": "Mãe", "text": "Oi filho"}])
         self.assertEqual(agent.reply_pending(), [])
-        self.assertEqual(len(channel.sent), 5)
+        self.assertEqual(len(channel.sent), 4)
 
     def test_refusal_sends_the_referral_ask_and_hands_to_the_owner(self):
         lead, agent, channel = self.opened_lead()
@@ -404,7 +404,7 @@ class SalesAgentTests(unittest.TestCase):
         lead, agent, channel = self.opened_lead()
         agent.ingest([self.event("Olá! Esta é uma mensagem automática. Retornaremos em breve.")])
         agent.reply_pending()
-        self.assertEqual(len(channel.sent), 5)
+        self.assertEqual(len(channel.sent), 4)
         self.assertIsNone(self.store.lead(lead["id"])["awaiting"])
 
     def test_unknown_question_sends_ack_and_hands_off(self):
@@ -424,7 +424,7 @@ class SalesAgentTests(unittest.TestCase):
                            {"dir": "out", "text": "Te ligo já já"}]
         agent.ingest([self.event("Quanto custa?")])
         self.assertEqual(agent.reply_pending()[0]["state"], "owner")
-        self.assertEqual(len(channel.sent), 5)
+        self.assertEqual(len(channel.sent), 4)
 
     def opening_bubbles(self):
         return [{"dir": "out", "text": text}
@@ -437,7 +437,7 @@ class SalesAgentTests(unittest.TestCase):
             {"dir": "in", "text": "ok"}]
         agent.ingest([self.event("ok")])
         self.assertEqual(agent.reply_pending()[0]["state"], "owner")
-        self.assertEqual(len(channel.sent), 5)
+        self.assertEqual(len(channel.sent), 4)
 
     def test_old_personal_messages_before_the_bot_do_not_count(self):
         lead, agent, channel = self.opened_lead()
@@ -445,7 +445,7 @@ class SalesAgentTests(unittest.TestCase):
             {"dir": "in", "text": "Quanto custa?"}]
         agent.ingest([self.event("Quanto custa?")])
         self.assertEqual(agent.reply_pending()[0]["state"], "engaged")
-        self.assertGreater(len(channel.sent), 5)
+        self.assertGreater(len(channel.sent), 4)
 
     def test_archived_cycle_owner_messages_before_new_opening_do_not_pause(self):
         from tools.ytbot.commercial.whatsapp.sales.agent import owner_reset
@@ -465,7 +465,7 @@ class SalesAgentTests(unittest.TestCase):
         channel.bubbles = self.opening_bubbles() + [{"dir": "out", "text": "Só ignora"}]
         self.clock.now = MONDAY + timedelta(hours=73)
         self.assertEqual(agent.followups()[0]["state"], "owner")
-        self.assertEqual(len(channel.sent), 5)
+        self.assertEqual(len(channel.sent), 4)
 
     def test_full_chat_text_replaces_the_truncated_preview(self):
         lead, agent, channel = self.opened_lead()
@@ -488,7 +488,7 @@ class SalesAgentTests(unittest.TestCase):
         self.assertEqual(agent.reply_pending(), [])
         self.clock.now = MONDAY.replace(hour=23) + timedelta(hours=9)
         self.assertEqual(len(agent.reply_pending()), 1)
-        self.assertGreater(len(channel.sent), 5)
+        self.assertGreater(len(channel.sent), 4)
 
     def test_same_event_is_never_answered_twice(self):
         lead, agent, channel = self.opened_lead()
@@ -505,7 +505,7 @@ class SalesAgentTests(unittest.TestCase):
         listener.save_rules(self.store.contact_rules_path, "block", ["+5565900000001"])
         agent.ingest([self.event("Quanto custa?")])
         self.assertEqual(agent.reply_pending()[0]["state"], "blocked-by-rules")
-        self.assertEqual(len(channel.sent), 5)
+        self.assertEqual(len(channel.sent), 4)
 
     def test_daily_reply_cap_hands_the_chat_to_the_owner(self):
         lead, agent, _ = self.opened_lead()
@@ -544,7 +544,7 @@ class SalesAgentTests(unittest.TestCase):
         agent.ingest([self.event("Quanto custa?")])
         self.assertEqual(agent.reply_pending()[0]["state"], "error")
         self.assertEqual(self.store.lead(lead["id"])["awaiting"], "e1")
-        self.assertEqual(len(channel.sent), 5)
+        self.assertEqual(len(channel.sent), 4)
 
     def test_owner_notification_carries_the_contact(self):
         lead, agent, channel = self.opened_lead()
@@ -600,7 +600,7 @@ class SalesAgentTests(unittest.TestCase):
         self.clock.now = MONDAY + timedelta(minutes=45)
         agent.ingest([self.event("Tem alguém aí?", event_id="e4")])
         self.assertEqual(len(self.notes), count + 1)
-        self.assertEqual(len(channel.sent), 6)  # 5 opening + 1 reply
+        self.assertEqual(len(channel.sent), 5)  # 5 opening + 1 reply
 
     def test_long_conversation_without_quote_goes_to_the_owner(self):
         lead, agent, channel = self.opened_lead()
@@ -624,7 +624,7 @@ class SalesAgentTests(unittest.TestCase):
         self.clock.now = MONDAY + timedelta(days=30)
         agent.followups()
         agent.prospect()
-        self.assertEqual(len(channel.sent), 6)  # 5 opening + 1 follow-up
+        self.assertEqual(len(channel.sent), 5)  # 5 opening + 1 follow-up
         self.assertEqual(self.store.lead(lead["id"])["state"], "no-response")
 
     def test_lead_who_answered_gets_no_follow_up(self):
@@ -633,7 +633,7 @@ class SalesAgentTests(unittest.TestCase):
         agent.reply_pending()
         self.clock.now = MONDAY + timedelta(days=5)
         self.assertEqual(agent.followups(), [])
-        self.assertEqual(len(channel.sent), 5)
+        self.assertEqual(len(channel.sent), 4)
 
 
 if __name__ == "__main__":
