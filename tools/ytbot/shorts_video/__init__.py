@@ -11,6 +11,7 @@ from .models import (
     Storyboard,
     assert_channel_policy,
     assert_shorts_scope,
+    assert_video_scope,
 )
 from .settings import DEFAULT_SETTINGS, load_settings, resolve_runtime_settings, save_settings
 
@@ -26,6 +27,7 @@ __all__ = [
     "Storyboard",
     "assert_channel_policy",
     "assert_shorts_scope",
+    "assert_video_scope",
     "load_settings",
     "resolve_runtime_settings",
     "save_settings",

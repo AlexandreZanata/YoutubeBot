@@ -231,6 +231,35 @@ def command_shorts_video(args) -> None:
         )
         print(json.dumps(summary, indent=2, ensure_ascii=False))
         return
+    if action == "movie":
+        channels.apply(args.channel)
+        if not args.run_dir:
+            raise SystemExit("movie requires --run-dir with narration and clips")
+        run_dir = Path(args.run_dir)
+        topic = args.topic or run_dir.name.replace("-", " ").strip()
+        resolved = resolve_runtime_settings(
+            visual_mode="ai-video",
+            provider=args.video_provider,
+            model=args.video_model,
+            max_credits_per_short=args.max_credits,
+            max_scenes_per_short=args.max_scenes,
+        )
+        summary = render_ai_short(
+            run_dir,
+            args.channel,
+            topic,
+            topic,
+            visual_mode="ai-video",
+            video_provider=resolved["provider"],
+            video_model=resolved["model"],
+            max_credits_per_short=resolved["max_credits_per_short"],
+            max_scenes=resolved["max_scenes_per_short"],
+            width=args.width,
+            height=args.height,
+            context_kind="long-video",
+        )
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+        return
     if action == "import":
         channels.apply(args.channel)
         run_dir = config.DATA_DIR / "shorts" / logic.slug(args.topic)
@@ -386,10 +415,16 @@ def build_parser() -> argparse.ArgumentParser:
         "shorts-video",
         help="manage Shorts-only Google Flow / AI video provider settings, login and imports",
     )
-    shorts_video.add_argument("action", choices=("status", "login", "stop", "configure", "estimate", "import"))
+    shorts_video.add_argument(
+        "action",
+        choices=("status", "login", "stop", "configure", "estimate", "import", "movie"),
+    )
     shorts_video.add_argument("--channel", choices=sorted(channels.CHANNELS), default="zaflas")
     shorts_video.add_argument("--topic", default="")
     shorts_video.add_argument("--source-dir", default="")
+    shorts_video.add_argument("--run-dir", default="")
+    shorts_video.add_argument("--width", type=int, default=1920)
+    shorts_video.add_argument("--height", type=int, default=1080)
     shorts_video.add_argument("--probe", action="store_true")
     shorts_video.add_argument("--enable", action="store_true")
     shorts_video.add_argument("--disable", action="store_true")

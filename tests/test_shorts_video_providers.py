@@ -18,6 +18,7 @@ from tools.ytbot.shorts_video import (
     ShortsOnlyViolationError,
     assert_channel_policy,
     assert_shorts_scope,
+    assert_video_scope,
     credits,
     flow_browser,
     settings,
@@ -109,6 +110,30 @@ class ShortsOnlyScopeAndPolicyTests(unittest.TestCase):
         with self.assertRaises(ShortsOnlyViolationError):
             assert_shorts_scope("shorts", width=1920, height=1080, visual_mode="ai-video")
         assert_shorts_scope("shorts", width=1080, height=1920, visual_mode="ai-video")
+
+    def test_long_video_scope_accepts_landscape_movie_only(self):
+        assert_video_scope("long-video", width=1920, height=1080, visual_mode="ai-video")
+        assert_video_scope("movie", width=1920, height=1080, visual_mode="ai-video")
+        with self.assertRaises(ShortsOnlyViolationError):
+            assert_video_scope("long-video", width=1080, height=1920, visual_mode="ai-video")
+        with self.assertRaises(ShortsOnlyViolationError):
+            assert_video_scope("movie", width=1920, height=1080, visual_mode="hologram")
+
+    def test_movie_storyboard_plans_horizontal_scenes(self):
+        from tools.ytbot.shorts_video.storyboard import plan_movie_storyboard
+
+        storyboard = plan_movie_storyboard(
+            "infinite-random-worlds",
+            "The City That Sold Its Shadows",
+            "A girl follows a stolen shadow through a drowned city.",
+            total_duration_sec=32.0,
+            settings={**settings.load_settings(), "max_scenes_per_short": 4},
+        )
+        self.assertEqual(storyboard.scope, "long-video")
+        self.assertEqual(storyboard.aspect_ratio, "16:9")
+        self.assertLessEqual(len(storyboard.scenes), 4)
+        self.assertIn("1920x1080", storyboard.scenes[0].generation_prompt)
+        self.assertNotIn("9:16", storyboard.scenes[0].generation_prompt)
 
     def test_long_form_batch_and_pipeline_refuse_ai_video_mode(self):
         with self.assertRaises(ShortsOnlyViolationError):

@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 from .. import config
-from .models import Storyboard, assert_shorts_scope
+from .models import Storyboard, assert_video_scope
 from .validator import validate_clip
 
 
@@ -59,9 +59,10 @@ def adapt_clip_to_vertical(
     fps: int = 30,
     fit_mode: str = "crop",
     fade_sec: float = 0.25,
+    context: str = "shorts",
 ) -> Path:
-    """Normalize any generated clip into a silent 1080x1920 30fps H.264 Shorts segment."""
-    assert_shorts_scope("shorts", width=width, height=height, visual_mode="ai-video")
+    """Normalize any generated clip into a silent H.264 segment for its aspect ratio."""
+    assert_video_scope(context, width=width, height=height)
     validation = validate_clip(input_clip, min_duration=0.4)
     if not validation.valid:
         raise RuntimeError(f"cannot adapt invalid clip {input_clip.name}: {validation.reason}")
@@ -146,9 +147,10 @@ def render_static_fallback_clip(
     height: int = 1920,
     fps: int = 30,
     fade_sec: float = 0.25,
+    context: str = "shorts",
 ) -> Path:
-    """Render a smooth vertical motion clip from a still fallback image."""
-    assert_shorts_scope("shorts", width=width, height=height, visual_mode="ai-video")
+    """Render a smooth motion clip from a still fallback image."""
+    assert_video_scope(context, width=width, height=height)
     if not image_path.is_file():
         raise FileNotFoundError(f"fallback image is missing: {image_path}")
 
@@ -248,9 +250,10 @@ def assemble_short_video(
     width: int = 1080,
     height: int = 1920,
     fps: int = 30,
+    context: str = "shorts",
 ) -> Path:
     """Assemble validated clips and any static fallbacks with untouched narration & subtitles."""
-    assert_shorts_scope("shorts", width=width, height=height, visual_mode="ai-video")
+    assert_video_scope(context, width=width, height=height)
     from src.engine.audio_mixer import get_audio_duration
 
     narration = narration_path or (run_dir / "narration.aac")
@@ -289,6 +292,7 @@ def assemble_short_video(
                     width=width,
                     height=height,
                     fps=fps,
+                    context=context,
                 )
             else:
                 if fallback_source is None:
@@ -302,6 +306,7 @@ def assemble_short_video(
                         width=width,
                         height=height,
                         fps=fps,
+                        context=context,
                     )
                 else:
                     render_static_fallback_clip(
@@ -312,6 +317,7 @@ def assemble_short_video(
                         width=width,
                         height=height,
                         fps=fps,
+                        context=context,
                     )
             normalized_paths.append(norm_path)
 

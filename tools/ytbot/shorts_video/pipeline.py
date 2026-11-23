@@ -20,11 +20,11 @@ from .models import (
     SceneSpec,
     Storyboard,
     assert_channel_policy,
-    assert_shorts_scope,
+    assert_video_scope,
 )
 from .providers import VideoGenerationProvider, get_provider
 from .settings import resolve_runtime_settings
-from .storyboard import load_storyboard, plan_short_storyboard, save_storyboard
+from .storyboard import load_storyboard, plan_movie_storyboard, plan_short_storyboard, save_storyboard
 from .validator import validate_clip
 
 
@@ -92,6 +92,9 @@ def render_ai_short(
     transcript_segments: list[dict[str, Any]] | None = None,
     narration_duration_sec: float | None = None,
     max_retries: int = 2,
+    width: int = 1080,
+    height: int = 1920,
+    context_kind: str = "shorts",
 ) -> dict[str, Any]:
     """Plan, generate/import, validate and assemble a 9:16 AI video Short.
 
@@ -111,7 +114,9 @@ def render_ai_short(
         allow_documentary_illustrative=allow_documentary_illustrative,
     )
     settings["channel"] = channel_slug
-    assert_shorts_scope("shorts", width=1080, height=1920, visual_mode=settings["visual_mode"])
+    assert_video_scope(
+        context_kind, width=width, height=height, visual_mode=settings["visual_mode"]
+    )
     assert_channel_policy(channel_slug, settings)
 
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -166,14 +171,25 @@ def render_ai_short(
             storyboard = existing
             _merge_scene_states(run_dir, storyboard)
         else:
-            storyboard = plan_short_storyboard(
-                channel_slug,
-                topic,
-                script_text,
-                total_duration_sec=duration,
-                transcript_segments=segments,
-                settings=settings,
-            )
+            if height < width:
+                storyboard = plan_movie_storyboard(
+                    channel_slug,
+                    topic,
+                    script_text,
+                    total_duration_sec=duration,
+                    transcript_segments=segments,
+                    settings=settings,
+                    max_scenes=settings.get("max_scenes_per_short"),
+                )
+            else:
+                storyboard = plan_short_storyboard(
+                    channel_slug,
+                    topic,
+                    script_text,
+                    total_duration_sec=duration,
+                    transcript_segments=segments,
+                    settings=settings,
+                )
             save_storyboard(run_dir, storyboard)
             for scene in storyboard.scenes:
                 _save_scene_state(run_dir, scene)
@@ -410,12 +426,12 @@ def render_ai_short(
         subtitle = save_ass_subtitles(
             segments,
             run_dir / "narration.ass",
-            font_size=72,
-            width=1080,
-            height=1920,
+            font_size=72 if height >= width else 48,
+            width=width,
+            height=height,
             alignment=5,
             outline_width=5,
-            margin_horizontal=72,
+            margin_horizontal=72 if height >= width else 120,
         )
         output = assemble_short_video(
             run_dir,
@@ -423,6 +439,9 @@ def render_ai_short(
             narration_path=narration,
             subtitle_path=subtitle,
             narr_vol=config.NARRATION_VOLUME,
+            width=width,
+            height=height,
+            context=context_kind,
         )
         storyboard.status = "completed"
         storyboard.error = ""

@@ -1,9 +1,14 @@
 # Google AI Video Generation for YouTube Shorts Only
 
-AI-generated video clips (`tools/ytbot/shorts_video/`) are restricted exclusively to
-vertical **YouTube Shorts** (`1080x1920`, `9:16`, `30 fps`). Long-form videos
-(`run`, `batch`, `distribute`, `documentary`) never use AI video clips and enforce
-`ShortsOnlyViolationError` if invoked with `visual_mode="ai-video"`.
+AI-generated video clips (`tools/ytbot/shorts_video/`) default to vertical **YouTube Shorts**
+(`1080x1920`, `9:16`, `30 fps`). Long-form videos (`run`, `batch`, `distribute`,
+`documentary`) never use AI video clips and enforce `ShortsOnlyViolationError` if invoked with
+`visual_mode="ai-video"`.
+
+A separate opt-in **mini movie** path (`shorts-video movie`) renders an existing run directory
+(`narration.aac` plus `clips/`) as a horizontal **16:9** film (`1920x1080`, `30 fps`). It is
+explicit, budgeted by the same credit settings, and never converts a regular batch into AI
+video.
 
 ## Google AI Pro vs. Gemini Video API Billing
 
@@ -55,6 +60,13 @@ Legacy static Shorts remain the default when `--visual-mode` is omitted or set t
 
 ```bash
 python3 -m tools.ytbot shorts --channel zaflas --count 1 --visual-mode static
+```
+
+Mini movie (long-form 16:9) from a prepared run directory:
+
+```bash
+python3 -m tools.ytbot shorts-video movie --channel infinite-random-worlds \
+  --run-dir .local/ytbot/channels/infinite-random-worlds/runs/<slug> --width 1920 --height 1080
 ```
 
 Opt-in AI video Shorts generation & assisted import:

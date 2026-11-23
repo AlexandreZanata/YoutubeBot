@@ -14,6 +14,12 @@ SHORTS_CONTEXTS = frozenset({
     "shorts_generate",
     "shorts_resume",
 })
+LONG_CONTEXTS = frozenset({
+    "movie",
+    "long-video",
+    "long_generate",
+    "long_resume",
+})
 VALID_VISUAL_MODES = frozenset({"static", "ai-video"})
 VALID_SCENE_STATUSES = frozenset({
     "pending",
@@ -59,6 +65,37 @@ class ProviderUnavailableError(RuntimeError):
     """Raised when a video provider cannot generate or import the requested clip."""
 
 
+def assert_video_scope(
+    context_kind: str,
+    *,
+    width: int,
+    height: int,
+    visual_mode: str = "ai-video",
+) -> None:
+    """Enforce the aspect ratio of the AI video context: portrait Shorts or landscape long video."""
+    normalized_context = (context_kind or "").strip().lower()
+    if visual_mode not in VALID_VISUAL_MODES:
+        raise ShortsOnlyViolationError(f"Unsupported AI video visual mode: {visual_mode!r}")
+    if width <= 0 or height <= 0:
+        raise ShortsOnlyViolationError(f"invalid video dimensions: {width}x{height}")
+    if normalized_context in SHORTS_CONTEXTS:
+        if width >= height:
+            raise ShortsOnlyViolationError(
+                f"Shorts AI video clips require vertical 9:16 dimensions, got {width}x{height}."
+            )
+        return
+    if normalized_context in LONG_CONTEXTS:
+        if width <= height:
+            raise ShortsOnlyViolationError(
+                f"Long AI video clips require horizontal 16:9 dimensions, got {width}x{height}."
+            )
+        return
+    raise ShortsOnlyViolationError(
+        "AI video clip generation is allowed only for YouTube Shorts or the long-video "
+        f"movie pipeline, never for '{context_kind}'."
+    )
+
+
 def assert_shorts_scope(
     context_kind: str,
     *,
@@ -66,19 +103,8 @@ def assert_shorts_scope(
     height: int = 1920,
     visual_mode: str = "static",
 ) -> None:
-    """Enforce that AI video generation and assembly only run for vertical Shorts."""
-    normalized_context = (context_kind or "").strip().lower()
-    if normalized_context not in SHORTS_CONTEXTS:
-        raise ShortsOnlyViolationError(
-            "AI video clip generation is exclusively allowed for YouTube Shorts, "
-            f"never for '{context_kind}'."
-        )
-    if visual_mode not in VALID_VISUAL_MODES:
-        raise ShortsOnlyViolationError(f"Unsupported Shorts visual mode: {visual_mode!r}")
-    if width <= 0 or height <= 0 or width >= height:
-        raise ShortsOnlyViolationError(
-            f"Shorts AI video clips require vertical 9:16 dimensions, got {width}x{height}."
-        )
+    """Keep the historical Shorts-only guard (portrait 9:16)."""
+    assert_video_scope(context_kind, width=width, height=height, visual_mode=visual_mode)
 
 
 def assert_channel_policy(channel_slug: str, settings: dict[str, Any] | None = None) -> None:

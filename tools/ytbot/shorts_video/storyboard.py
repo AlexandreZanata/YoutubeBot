@@ -10,7 +10,13 @@ from typing import Any
 from .. import channels
 from ..accounts_store import write_private
 from . import credits
-from .models import SceneSpec, Storyboard, assert_channel_policy, assert_shorts_scope
+from .models import (
+    SceneSpec,
+    Storyboard,
+    assert_channel_policy,
+    assert_shorts_scope,
+    assert_video_scope,
+)
 from .settings import load_settings
 
 CHANNEL_VISUAL_GUIDES: dict[str, dict[str, str]] = {
@@ -209,14 +215,68 @@ def plan_short_storyboard(
     settings: dict[str, Any] | None = None,
 ) -> Storyboard:
     """Create a vertical 9:16 scene storyboard aligned to the Short narration."""
-    assert_shorts_scope("shorts", width=1080, height=1920, visual_mode="ai-video")
+    return _plan_storyboard(
+        channel_slug,
+        topic,
+        script_text,
+        total_duration_sec=total_duration_sec,
+        transcript_segments=transcript_segments,
+        settings=settings,
+        context="shorts",
+        aspect_ratio="9:16",
+        width=1080,
+        height=1920,
+    )
+
+
+def plan_movie_storyboard(
+    channel_slug: str,
+    topic: str,
+    script_text: str,
+    *,
+    total_duration_sec: float = 60.0,
+    transcript_segments: list[dict[str, Any]] | None = None,
+    settings: dict[str, Any] | None = None,
+    max_scenes: int | None = None,
+) -> Storyboard:
+    """Create a horizontal 16:9 scene storyboard for a long-form mini movie."""
+    return _plan_storyboard(
+        channel_slug,
+        topic,
+        script_text,
+        total_duration_sec=total_duration_sec,
+        transcript_segments=transcript_segments,
+        settings=settings,
+        context="long-video",
+        aspect_ratio="16:9",
+        width=1920,
+        height=1080,
+        max_scenes=max_scenes,
+    )
+
+
+def _plan_storyboard(
+    channel_slug: str,
+    topic: str,
+    script_text: str,
+    *,
+    total_duration_sec: float,
+    transcript_segments: list[dict[str, Any]] | None,
+    settings: dict[str, Any] | None,
+    context: str,
+    aspect_ratio: str,
+    width: int,
+    height: int,
+    max_scenes: int | None = None,
+) -> Storyboard:
+    assert_video_scope(context, width=width, height=height)
     active = settings or load_settings()
     assert_channel_policy(channel_slug, active)
     channel = channels.get(channel_slug)
 
     provider = str(active.get("provider", "google-flow"))
     model = str(active.get("model", "veo-2-fast"))
-    max_scenes = int(active.get("max_scenes_per_short", 6))
+    scene_limit = int(max_scenes or active.get("max_scenes_per_short", 6))
     duration = max(5.0, float(total_duration_sec))
 
     guide = CHANNEL_VISUAL_GUIDES.get(channel_slug, CHANNEL_VISUAL_GUIDES["vocal-pages"])
@@ -227,7 +287,7 @@ def plan_short_storyboard(
     )
 
     segments = _segment_script_with_timestamps(
-        script_text, duration, max_scenes, transcript_segments
+        script_text, duration, scene_limit, transcript_segments
     )
     per_scene_credits = credits.estimate_scene_cost(provider, model, active)
 
@@ -244,13 +304,19 @@ def plan_short_storyboard(
             if channel.language == "pt-BR"
             else ""
         )
+        orientation = "Horizontal 16:9 cinematic video clip (1920x1080)" if width > height else "Vertical 9:16 cinematic video clip (1080x1920)"
+        framing = (
+            "Framing: keep the focal subject centered with generous negative space; no burned-in subtitles."
+            if width > height
+            else "Framing: keep the focal subject in the middle and lower two thirds, leaving the upper third calmer for centered burned-in subtitles."
+        )
         prompt = (
-            f"Vertical 9:16 cinematic video clip (1080x1920). Topic: {topic}. "
+            f"{orientation}. Topic: {topic}. "
             f"Narrative moment: {excerpt}. {lang_hint}"
             f"Visual style: {guide['style']}. Color palette: {guide['palette']}. "
             f"Lighting: {guide['lighting']}. Camera movement: {motion} ({guide['camera']}). "
             f"Continuity: {continuity_anchor} "
-            f"Framing: keep the focal subject in the middle and lower two thirds, leaving the upper third calmer for centered burned-in subtitles. "
+            f"{framing} "
             f"Rules: {guide['constraints']}; absolutely no text, no letters, no numbers, no logos, no watermarks."
         )
         scenes.append(
@@ -263,7 +329,7 @@ def plan_short_storyboard(
                 duration_sec=scene_dur,
                 visual_description=visual_desc,
                 generation_prompt=prompt,
-                aspect_ratio="9:16",
+                aspect_ratio=aspect_ratio,
                 estimated_credits=per_scene_credits,
                 provider=provider,
                 model=model,
@@ -276,11 +342,11 @@ def plan_short_storyboard(
         channel=channel_slug,
         topic=topic,
         language=channel.language,
-        scope="shorts",
+        scope="long-video" if width > height else "shorts",
         visual_mode="ai-video",
         provider=provider,
         model=model,
-        aspect_ratio="9:16",
+        aspect_ratio=aspect_ratio,
         total_duration_sec=round(duration, 2),
         estimated_total_credits=total_est,
         actual_total_credits=0.0,
@@ -298,7 +364,7 @@ def format_flow_prompt_sheet(storyboard: Storyboard, run_dir: Path) -> str:
         f"# Google Flow Shorts Storyboard: {storyboard.topic}",
         "",
         f"- Channel: `{storyboard.channel}` (`{storyboard.language}`)",
-        f"- Aspect Ratio: `{storyboard.aspect_ratio}` (1080x1920 Shorts only)",
+        f"- Aspect Ratio: `{storyboard.aspect_ratio}` ({storyboard.scope})",
         f"- Provider / Model: `{storyboard.provider}` / `{storyboard.model}`",
         f"- Total Narration Duration: `{storyboard.total_duration_sec:.2f}s`",
         f"- Estimated Credits: `{storyboard.estimated_total_credits:.1f}`",
@@ -307,7 +373,7 @@ def format_flow_prompt_sheet(storyboard: Storyboard, run_dir: Path) -> str:
         "## Instructions for Google Flow (Assisted Workflow)",
         "",
         "1. Open Google Flow (`https://labs.google/fx/tools/flow`) in your logged-in Google AI Pro account.",
-        "2. Set aspect ratio to **9:16 (Portrait)** and select your preferred Veo model.",
+        f"2. Set aspect ratio to **{storyboard.aspect_ratio}** and select your preferred Veo model.",
         "3. Generate each scene below and save the downloaded `.mp4` files inside:",
         f"   `{run_dir / 'clips'}` (named `scene_01.mp4`, `scene_02.mp4`, ...).",
         "4. Re-run the Short command or click Resume in the Desktop Studio to validate and assemble.",
