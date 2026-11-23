@@ -292,6 +292,36 @@ QUEUE_EXTENSION = {
 for _slug, _topics in QUEUE_EXTENSION.items():
     CHANNELS[_slug]["topics"] = CHANNELS[_slug]["topics"] + _topics
 
+QUEUE_EXTENSION_2 = {
+    "sepia-atlas": (
+        "A Boarding House Breakfast in 1905",
+        "The Letter That Took Six Weeks to Arrive",
+        "When the Circus Came to Town in 1902",
+        "The Icebox Before the Refrigerator",
+        "A Sunday Drive in 1908",
+        "The Corner Drugstore in 1910",
+        "The Schoolteacher's One-Room Year",
+        "The Flood That Took the Bridge",
+        "A Photograph of Main Street, 1904",
+        "The Night the Lights Went Out",
+    ),
+    "bathylora": (
+        "The Octopus That Broods for Four Years",
+        "A Whale Skeleton Full of Life",
+        "The Fish with a Lantern on Its Head",
+        "What Lives at Four Thousand Meters?",
+        "The Glass Sponge That Filters the Dark",
+        "A Brine Pool at the Bottom of the Sea",
+        "The Jellyfish That Glows When Touched",
+        "The Squid That Lives Without Sunlight",
+        "How a Vent Chimney Grows",
+        "The Sound of a Deep-Sea Volcano",
+    ),
+}
+for _slug, _topics in QUEUE_EXTENSION_2.items():
+    CHANNELS[_slug]["topics"] = CHANNELS[_slug]["topics"] + _topics
+
+
 
 def log(message: str) -> None:
     print(f"[faith-shorts] {message}", flush=True)

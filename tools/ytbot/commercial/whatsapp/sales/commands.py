@@ -490,6 +490,16 @@ def command_queue(args, store_factory, page_factory) -> None:
     rules, store, now = _context(args, store_factory)
     quiet = SalesAgent(rules, store, None, None, live=False, log=lambda message: None)
     limit = max(1, int(args.limit))
+    if args.operation == "reorder":
+        path = Path(args.csv or "")
+        if not args.csv or not path.is_file():
+            raise SystemExit("[sales] queue reorder needs --csv <reviewed file>")
+        import csv as _csv
+
+        with path.open(encoding="utf-8-sig", newline="") as handle:
+            phones = [row.get("phone", "") for row in _csv.DictReader(handle)]
+        _print({"reordered": sales_queue.reorder(store, phones)})
+        return
     if args.operation == "list":
         rows = sales_queue.items(store)
         sendable = [row for row in rows if row["status"] in sales_queue.SENDABLE]
@@ -615,7 +625,9 @@ def add_parser(actions, store_factory, page_factory) -> None:
     queue = action("queue", "the opening queue: list it or send the next number(s)",
                    partial(command_queue, store_factory=store_factory,
                            page_factory=page_factory))
-    queue.add_argument("operation", choices=("list", "send"))
+    queue.add_argument("operation", choices=("list", "send", "reorder"))
+    queue.add_argument("--csv", default=None,
+                       help="reorder only: the CSV whose rows go first, in that order")
     queue.add_argument("--live", action="store_true", help="actually send (send only)")
     queue.add_argument("--dry-run", action="store_true",
                        help="show what would be sent (the default for send)")
