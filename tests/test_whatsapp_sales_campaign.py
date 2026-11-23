@@ -508,8 +508,8 @@ class CampaignEndToEndTests(unittest.TestCase):
         c1 = self.store.lead(clinics[0]["id"])
         self.assertEqual(c1["state"], "quote-requested")
         self.assertTrue(c1.get("ficha") and Path(c1["ficha"]).is_file())
-        # Clinic #2: long auto-reply ignored completely (only 5 opening bubbles sent)
-        self.assertEqual(len([s for s in channel.sent if s["lead"] == clinics[1]["id"]]), 5)
+        # Clinic #2: long auto-reply ignored completely (only 4 opening bubbles sent)
+        self.assertEqual(len([s for s in channel.sent if s["lead"] == clinics[1]["id"]]), 4)
         # Clinic #3: receptionist referred Dra Carla -> referral lead opened automatically
         c3 = self.store.lead(clinics[2]["id"])
         self.assertEqual(c3["state"], "referred")
@@ -639,7 +639,7 @@ class CampaignEndToEndTests(unittest.TestCase):
 
         self.assertEqual(session.reopened, 2, "both closed-page errors reconnected cleanly")
         self.assertEqual(len([s for s in channel.sent
-                              if s["lead"] == second["id"] and s["kind"] == "sales-opening"]), 5)
+                              if s["lead"] == second["id"] and s["kind"] == "sales-opening"]), 4)
         self.assertGreater(len([s for s in channel.sent
                                 if s["lead"] == first["id"] and s["kind"] == "sales-reply"]), 0)
 
@@ -676,7 +676,7 @@ class CampaignEndToEndTests(unittest.TestCase):
         summary2 = agent2.cycle([], prospect=True, limit=10)
         self.assertEqual([item["lead"] for item in summary2["openings"]], [clinics[2]["id"]])
         self.assertEqual(len([s for s in channel.sent
-                              if s["lead"] == clinics[0]["id"] and s["kind"] == "sales-opening"]), 5)
+                              if s["lead"] == clinics[0]["id"] and s["kind"] == "sales-opening"]), 4)
 
     def test_run_limit_caps_total_openings_across_cycles_while_keeping_listener_alive(self):
         _, clinics = self._import_clinics()

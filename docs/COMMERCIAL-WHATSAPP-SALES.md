@@ -240,6 +240,20 @@ python3 -m tools.ytbot commercial sales queue send --network whatsapp --live --l
   the four links are unchanged, and the opening never goes through the model. The phone number
   is never written in a message.
 
+## Evolution API transport (owner 2026-11-23)
+
+`--transport evolution` sends the openings through a local Evolution API gateway instead of
+the browser: Postgres + Redis + Evolution on `127.0.0.1:8091`, from the private
+`.local/evolution/docker-compose.yml`, paired once by QR. The key lives in
+`.local/evolution/evolution.env` and is never logged. `sales run --transport evolution`
+opens leads with the same journal, fences, pacing and daily limit; `sales queue send
+--transport evolution` sends one number. The browser path stays the default.
+
+Honest limit: Evolution's default mode is Baileys, an unofficial WhatsApp Web client that
+WhatsApp actively detects. It removes the browser/session fragility; it does not make cold
+outreach safe. Keep the volume low, never put a link in the first message, and stop on the
+first restriction.
+
 ## Conversation state machine
 
 ```text
