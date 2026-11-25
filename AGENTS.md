@@ -284,6 +284,14 @@ tools, contract and optional MCP server). Link it once per workstation with
 agent's video editing work; the bot's render/upload paths stay unchanged. See
 [video skills](docs/VIDEO-SKILLS.md).
 
+## X disabled (temporary, owner decision 2026-11-25)
+
+X (Twitter) access is **disabled** on the corporate network until the owner asks to re-enable it.
+Do not open x.com, not even for a status check, discovery, reply or post. The guard lives in
+`tools/ytbot/social/x/guard.py` and is armed by `.local/social/x/DISABLED`; every X entry point
+refuses before touching the browser. Re-enable only by removing that marker on the owner's
+explicit request.
+
 ## Social promotion
 
 The promotion module publishes the owner's GitHub projects in Brazilian Portuguese. The

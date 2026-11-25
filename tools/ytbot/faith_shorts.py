@@ -322,6 +322,31 @@ for _slug, _topics in QUEUE_EXTENSION_2.items():
     CHANNELS[_slug]["topics"] = CHANNELS[_slug]["topics"] + _topics
 
 
+QUEUE_EXTENSION_3 = {
+    "whispers-from-heaven": (
+        "The Widow Who Fed the Prophet First",
+        "The Servant Girl Who Spoke the Name",
+        "The Well Where Three Generations Waited",
+        "The Prison That Could Not Hold the Song",
+        "The Table Set for the One Who Left",
+    ),
+    "midnight-tales": (
+        "The Lighthouse Keeper Who Painted the Fog",
+        "The Apothecary's Garden of Sleeping Flowers",
+        "The Last Tram Through the Snow",
+        "The Bookbinder Who Repaired Dreams",
+        "The Teahouse at the Edge of the Rain",
+    ),
+    "zanata": (
+        "The Art of War by Sun Tzu: Winning Before the First Battle",
+        "Meditations by Marcus Aurelius: The Discipline of the Present",
+        "The Republic by Plato: The Price of Justice",
+    ),
+}
+for _slug, _topics in QUEUE_EXTENSION_3.items():
+    CHANNELS[_slug]["topics"] = CHANNELS[_slug]["topics"] + _topics
+
+
 
 def log(message: str) -> None:
     print(f"[faith-shorts] {message}", flush=True)

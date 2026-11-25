@@ -11,6 +11,7 @@ from . import browser, discovery
 from .instagram import account as instagram_account
 from .store import SocialStore
 from .x import account as x_account
+from .x import guard as x_guard
 from .x import publish
 
 NETWORKS = ("x", "instagram")
@@ -27,6 +28,8 @@ def _network(name: str):
 
 
 def command_open(args) -> None:
+    if args.network == "x":
+        x_guard.require_enabled()
     store = SocialStore()
     network = _network(args.network)
     browser.open_visible(store, args.network, getattr(network, "OPEN_URL", network.LOGIN_URL),
@@ -39,6 +42,8 @@ def command_open(args) -> None:
 def command_status(args) -> None:
     from playwright.sync_api import sync_playwright
 
+    if args.network == "x":
+        x_guard.require_enabled()
     store = SocialStore()
     network = _network(args.network)
     browser.ensure_background(store, args.network, network.LOGIN_URL, network.CDP_PORT,
@@ -63,6 +68,8 @@ def command_status(args) -> None:
 def command_discover(args) -> None:
     from playwright.sync_api import sync_playwright
 
+    if args.network == "x":
+        x_guard.require_enabled()
     try:
         store = SocialStore()
         network = _network(args.network)
@@ -92,6 +99,8 @@ def command_discover(args) -> None:
 def command_reply(args) -> None:
     from playwright.sync_api import sync_playwright
 
+    if args.network == "x":
+        x_guard.require_enabled()
     try:
         text = Path(args.file).read_text(encoding="utf-8").strip() if args.file else args.text
         store = SocialStore()
@@ -149,6 +158,7 @@ def command_agenda(args) -> None:
 
 
 def command_post(args) -> None:
+    x_guard.require_enabled()
     try:
         _post(args)
     except Exception as error:
