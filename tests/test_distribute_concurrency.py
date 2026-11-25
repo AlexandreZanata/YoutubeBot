@@ -2,6 +2,7 @@
 import threading
 import time
 import unittest
+from datetime import datetime
 from unittest.mock import patch
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -76,7 +77,8 @@ class DistributionConcurrencyTests(unittest.TestCase):
 
         plan = {"whispers-from-heaven": 1, "vocal-pages": 1}
         with patch.object(distribute, "audit", return_value={}), \
-             patch.object(distribute, "allocate", return_value=plan), \
+             patch.object(distribute, "audit_dates", return_value={}), \
+             patch.object(distribute, "allocate_by_date", return_value=plan), \
              patch.object(distribute.subprocess, "run", side_effect=fake_run), \
              patch.object(distribute.time, "sleep", lambda seconds: None), \
              patch.object(distribute.config, "DATA", Path(self.tmp.name)), \
@@ -96,7 +98,8 @@ class DistributionConcurrencyTests(unittest.TestCase):
 
         plan = {"whispers-from-heaven": 1, "vocal-pages": 1}
         with patch.object(distribute, "audit", return_value={}), \
-             patch.object(distribute, "allocate", return_value=plan), \
+             patch.object(distribute, "audit_dates", return_value={}), \
+             patch.object(distribute, "allocate_by_date", return_value=plan), \
              patch.object(distribute.subprocess, "run", side_effect=fake_run), \
              patch.object(distribute.config, "DATA", Path(self.tmp.name)), \
              patch("tools.ytbot.comments.answer_all"):
@@ -109,7 +112,8 @@ class DistributionConcurrencyTests(unittest.TestCase):
 
         plan = {"whispers-from-heaven": 2}
         with patch.object(distribute, "audit", return_value={}), \
-             patch.object(distribute, "allocate", return_value=plan), \
+             patch.object(distribute, "audit_dates", return_value={}), \
+             patch.object(distribute, "allocate_by_date", return_value=plan), \
              patch.object(distribute.subprocess, "run", side_effect=fake_run), \
              patch.object(distribute.config, "DATA", Path(self.tmp.name)), \
              patch("tools.ytbot.comments.answer_all"):
@@ -119,3 +123,22 @@ class DistributionConcurrencyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DateBasedAllocationTests(unittest.TestCase):
+    def test_queue_that_ends_first_receives_the_next_videos(self):
+        dates = {
+            "reflection": datetime(2026, 12, 4, 21, 0),
+            "whispers-from-heaven": datetime(2026, 12, 4, 22, 0),
+            "bathylora": datetime(2026, 12, 9, 21, 0),
+            "sepia-atlas": datetime(2026, 12, 10, 21, 0),
+        }
+        plan = distribute.allocate_by_date(10, dates)
+        self.assertEqual(plan["reflection"] + plan["whispers-from-heaven"], 10)
+        self.assertEqual(plan["bathylora"], 0)
+        self.assertEqual(plan["sepia-atlas"], 0)
+
+    def test_empty_queue_goes_before_any_scheduled_channel(self):
+        dates = {"reflection": None, "whispers-from-heaven": datetime(2026, 12, 4, 22, 0)}
+        plan = distribute.allocate_by_date(1, dates)
+        self.assertEqual(plan, {"reflection": 1, "whispers-from-heaven": 0})
