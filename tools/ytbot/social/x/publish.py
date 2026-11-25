@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 from ...accounts_store import read_private, write_private
 from ..store import SocialStore
-from . import pacing
+from . import guard, pacing
 
 
 PROJECT_HOSTS = (
@@ -132,6 +132,7 @@ def _save_reply(store: SocialStore, network: str, status_id: str, record: dict) 
 
 def reply(context, store: SocialStore, network: str, target_url: str, text: str, *,
           dry_run: bool = False, for_post: str = "") -> dict:
+    guard.require_enabled()
     match = re.search(r"/status/(\d+)", target_url)
     if not match:
         raise RuntimeError("the reply target must be an X status URL")
@@ -224,6 +225,7 @@ def _confirmed(page) -> bool:
 
 def publish(context, store: SocialStore, network: str, item: dict, *,
             dry_run: bool = False) -> dict:
+    guard.require_enabled()
     if item["format"] not in ("text", "image"):
         raise RuntimeError(f"{item['id']} is a {item['format']} item; this publisher supports text and image only")
     text = agenda.render_text(item)

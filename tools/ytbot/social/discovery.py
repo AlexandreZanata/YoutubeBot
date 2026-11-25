@@ -121,6 +121,8 @@ def _parse(row: dict) -> dict | None:
 
 
 def search(page, query: str, *, days: int = 7, own_handle: str = "") -> list[dict]:
+    from .x import guard as x_guard
+    x_guard.require_enabled()
     page.goto(f"https://x.com/search?q={quote_plus(query)}&src=typed_query&f=live",
               wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(6000)

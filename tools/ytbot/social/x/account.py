@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from . import guard
+
 LOGIN_URL = "https://x.com/home"
 CDP_PORT = 9322
 BACKGROUND_DISPLAY = ":90"
@@ -33,6 +35,7 @@ def parse_display_name(text: str) -> str:
 
 
 def inspect(page) -> dict:
+    guard.require_enabled()
     page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(5000)
     url = page.url

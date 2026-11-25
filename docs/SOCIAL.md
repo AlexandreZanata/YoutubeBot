@@ -121,3 +121,12 @@ same profile safely.
 - Never put session cookies, tokens, screenshots with account data or private paths in Git.
 - A closed browser or an expired session returns to `login-required`; the owner signs in
   again in the visible window.
+
+
+## Temporary X disable
+
+The owner disabled X access on the corporate network on 2026-11-25. Every X command refuses
+before opening the browser: the guard is `tools/ytbot/social/x/guard.py`, armed while
+`.local/social/x/DISABLED` exists. Status checks, discovery, replies and publishing all stop
+with `XDisabledError`. Do not bypass it; remove the marker only when the owner asks to
+re-enable X.
