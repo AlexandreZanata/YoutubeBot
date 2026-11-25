@@ -5,15 +5,16 @@ where a block of new videos should be produced. The owner never has to pick the 
 
 ## What it does
 
-1. Audits every registered channel.
-2. Counts the uploads already scheduled in the future for each one.
-3. Gives the next video to the channel with the fewest future scheduled uploads.
-4. Repeats until the requested count is allocated, so a channel that was empty catches up
-   before a channel that already has many scheduled videos receives anything.
+1. Audits every registered channel and reads the **date of its last scheduled video**.
+2. Gives the next video to the channel whose queue ends earliest (an empty queue comes first).
+3. Advances that channel's end date using its own slot hours and `interval_days`.
+4. Repeats until the requested count is allocated, so the channels that would run out first
+   are extended before a channel with a long queue receives anything.
 5. Runs one batch per channel, in sequence, each with its own profile.
 
-The allocation is a water fill: the channels level out, and a channel with a large queue can
-receive zero. That is intentional.
+The allocation is a water fill by queue end date, not just by count: two channels with the
+same number of videos can end weeks apart, and the earlier one is served first. A channel with
+a long queue can receive zero. That is intentional.
 
 ## Command
 
@@ -26,15 +27,18 @@ python3 -m tools.ytbot distribute --count 20 --dry-run
 
 ## Audit
 
-`distribute.future_scheduled` reads the channel's `runs/*/upload.json` records and counts only
-the uploads whose `scheduled` flag is true and whose slot is still in the future. The audit
-is cheap and runs before any browser opens.
+`distribute.last_scheduled` reads the channel's `runs/*/upload.json` records and returns the
+latest slot whose `scheduled` flag is true and whose date is still in the future.
+`distribute.audit_dates` builds that map for every long-form channel and
+`distribute.allocate_by_date` water-fills by that date. The audit is cheap and runs before any
+browser opens.
 
 The plan is printed before the first batch:
 
 ```text
 [distribute] future scheduled: {'zaflas': 4, 'fallem-prince': 70, 'infinite-random-worlds': 0, ...}
-[distribute] plan: {'zaflas': 3, 'fallem-prince': 0, 'infinite-random-worlds': 7, ...}
+[distribute] queue ends: reflection=2026-12-04 21:00, whispers-from-heaven=2026-12-04 22:00, ...
+[distribute] plan: {'reflection': 5, 'whispers-from-heaven': 5, 'fallem-prince': 0, ...}
 ```
 
 ## Channel isolation

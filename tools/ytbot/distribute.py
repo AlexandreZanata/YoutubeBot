@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import channels, config, logic
@@ -64,6 +64,63 @@ def allocate(count: int, scheduled: dict[str, int]) -> dict[str, int]:
     return added
 
 
+def last_scheduled(slug: str, now: datetime | None = None) -> datetime | None:
+    """Latest future scheduled slot for a channel (None when the queue is empty)."""
+    now = now or datetime.now()
+    latest = None
+    for upload in runs_root(slug).glob("*/upload.json"):
+        try:
+            data = json.loads(upload.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        slot = logic.slot_from_label(data.get("slot", ""), None)
+        if data.get("scheduled") and slot and slot > now:
+            if latest is None or slot > latest:
+                latest = slot
+    return latest
+
+
+def audit_dates() -> dict[str, datetime | None]:
+    """Latest scheduled slot per long-form channel; the queue end drives distribution."""
+    return {slug: last_scheduled(slug) for slug in channels.CHANNELS
+            if slug not in channels.DOCUMENTARY_CHANNELS}
+
+
+def _next_slot(slug: str, last: datetime | None, now: datetime | None = None) -> datetime:
+    """Advance a channel's queue end by one video, following its own slots and cadence."""
+    channel = channels.get(slug)
+    hours = sorted(set(channel.slots)) or (0,)
+    if last is None:
+        base = now or datetime.now()
+        earliest = base + timedelta(minutes=config.MIN_LEAD_MINUTES)
+        for hour in hours:
+            candidate = base.replace(hour=hour, minute=0, second=0, microsecond=0)
+            if candidate >= earliest:
+                return candidate
+        return (base + timedelta(days=1)).replace(
+            hour=hours[0], minute=0, second=0, microsecond=0)
+    for hour in hours:
+        if hour > last.hour:
+            return last.replace(hour=hour, minute=0, second=0, microsecond=0)
+    return (last + timedelta(days=max(1, channel.interval_days))).replace(
+        hour=hours[0], minute=0, second=0, microsecond=0)
+
+
+def allocate_by_date(count: int, last_dates: dict[str, datetime | None]) -> dict[str, int]:
+    """Water-fill by queue end: every video goes to the channel that runs out first."""
+    if count < 0:
+        raise ValueError("count must be zero or positive")
+    order = list(last_dates)
+    current = dict(last_dates)
+    added = {slug: 0 for slug in order}
+    for _ in range(count):
+        slug = min(order, key=lambda name: (
+            current[name] or datetime.min, order.index(name)))
+        current[slug] = _next_slot(slug, current[slug])
+        added[slug] += 1
+    return added
+
+
 def audit() -> dict[str, int]:
     return {slug: future_scheduled(slug) for slug in channels.CHANNELS
             if slug not in channels.DOCUMENTARY_CHANNELS}
@@ -93,8 +150,12 @@ def _run_channel(slug: str, amount: int, delay: int = 0) -> int:
 
 def run_distribution(count: int, dry_run: bool = False, concurrency: int = 2) -> list:
     scheduled = audit()
-    plan = allocate(count, scheduled)
+    dates = audit_dates()
+    plan = allocate_by_date(count, dates)
     log(f"future scheduled: {scheduled}")
+    log("queue ends: " + ", ".join(
+        f"{slug}={value:%Y-%m-%d %H:%M}" if value else f"{slug}=empty"
+        for slug, value in dates.items()))
     log(f"plan: {plan}")
     failures: list = []
     if dry_run:

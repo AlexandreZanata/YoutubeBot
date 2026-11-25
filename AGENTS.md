@@ -337,9 +337,12 @@ to Community posts.
 ## Intelligent distribution
 
 "Distribuição inteligente" or "distribui" is the mode that chooses the channels by itself.
-Audit the future scheduled uploads of every registered channel, then give each new video to
-the channel with the fewest scheduled ones, water-filling until the requested count is
-allocated. Channels with a large queue may receive zero. Never ask which channel to use.
+Audit the future scheduled uploads of every registered channel and compare the **date of each
+channel's last scheduled video**, not only the count. The next video goes to the channel whose
+queue ends earliest, advancing that channel's end date by its own slot hours and
+`interval_days`, and repeating until the requested count is allocated. An empty queue always
+comes first. Channels whose last slot is far away may receive zero. Never ask which channel
+to use.
 
 Run it with `python3 -m tools.ytbot distribute --count N` (add `--dry-run` to only print the
 plan; `--concurrency` defaults to 2 channels produced at once, bounded by the generation
