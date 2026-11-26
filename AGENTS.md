@@ -164,6 +164,11 @@ media generation or paid action belongs in CI fixtures.
 
 ## Codex media on work PCs
 
+When Codex fails for any reason (usage limit, login, timeout or an empty media task), fall back to
+ChatGPT web for that task: topics, metadata, thumbnails and Community art. The fallback is
+automatic and logged; never stop a batch because Codex errored.
+
+
 When Codex is installed, use `codex_media.py` for thumbnails, metadata and automatic topic suggestions; ChatGPT keeps
 article generation and Read aloud only. The coordinator must be `gpt-6.1-terra` with low
 reasoning effort, or owner-selected `gpt-6-luna` with low effort. The native image tool
@@ -194,8 +199,9 @@ owner approved (male, ~148 Hz). The bot's render and upload paths are unchanged.
 Gemini is used **only for Shorts**. Long videos keep ChatGPT: the Gemini web app refuses long
 read-aloud texts (tested 2026-11-26 with 576 and 2,000 words), so it cannot narrate a 60+
 minute episode. The approved Gemini read-aloud voice is fixed: never re-measure or change it per run; keep the
-same voice until the owner asks. The engine is selected with `faith-shorts --engine gemini` and
-`distribute-shorts` passes it automatically.
+same voice until the owner asks. If Gemini errors or times out, that Short falls back to ChatGPT
+web automatically (script, background and narration), so the batch never stops. The engine is
+selected with `faith-shorts --engine gemini` and `distribute-shorts` passes it automatically.
 
 ## Shorts
 

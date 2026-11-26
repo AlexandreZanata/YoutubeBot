@@ -384,8 +384,12 @@ def _generate_art(topic: str, context=None) -> Path | None:
     prompt = ("Create one square 1:1 image for a YouTube community post. No text, no letters, "
               "no numbers, no logos, no watermarks, no borders. Style: " + style +
               ". Illustrate this question: " + topic[:160])
-    value = codex_media._execute(run_dir, f"art-{date.today():%Y%m%d}", prompt, schema,
-                                 images=True)
+    try:
+        value = codex_media._execute(run_dir, f"art-{date.today():%Y%m%d}", prompt, schema,
+                                     images=True)
+    except Exception as error:
+        log(f"Codex community art failed ({error}); using ChatGPT web")
+        return _browser_art(topic, context) if context is not None else None
     root = (Path.home() / ".codex" / "generated_images").resolve()
     source = codex_media._bounded_image(value.get("image_path", ""), root)
     if source is None:

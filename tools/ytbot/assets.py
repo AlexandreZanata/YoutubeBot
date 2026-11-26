@@ -25,8 +25,8 @@ def generate_metadata(context, run_dir: Path, topic: str) -> dict:
     if codex_media.available():
         try:
             return codex_media.generate_metadata(run_dir, topic)
-        except codex_media.CodexUsageLimit as error:
-            log(str(error))
+        except Exception as error:
+            log(f"Codex metadata failed ({error}); using ChatGPT web")
     page = context.new_page()
     try:
         page.goto("https://chatgpt.com/", timeout=90000)
@@ -73,12 +73,10 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
         for attempt in range(2):
             try:
                 return codex_media.generate_thumbnail(run_dir, style, variation)
-            except codex_media.CodexUsageLimit as error:
-                log(str(error))
-                break
-            except (ValueError, RuntimeError):
+            except Exception as error:
+                log(f"Codex thumbnail failed ({error}); trying ChatGPT web after this attempt")
                 if attempt:
-                    raise
+                    break
                 stale = run_dir / "thumbnail.png"
                 if stale.is_file():
                     stale.rename(run_dir / f"thumbnail-attempt-{int(time.time())}.png")

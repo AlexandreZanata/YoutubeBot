@@ -38,8 +38,8 @@ def prepare_topics(context, count: int, scheduled_titles: list[str] | None = Non
             generated = (codex_media.generate_topics(requested, existing + chosen)
                          if codex_media.available()
                          else chat.generate_topics(context, requested, existing + chosen))
-        except codex_media.CodexUsageLimit as error:
-            print(f"[topics] {error}", flush=True)
+        except Exception as error:
+            print(f"[topics] Codex topics failed ({error}); using ChatGPT web", flush=True)
             generated = chat.generate_topics(context, requested, existing + chosen)
         _add_new_topics(generated, existing, chosen, count)
     if len(chosen) < count:
