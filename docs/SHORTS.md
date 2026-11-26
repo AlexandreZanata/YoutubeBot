@@ -138,4 +138,5 @@ lighter Cove). The local renderer still burns the subtitles and assembles the 10
 video. `faith-shorts --engine gemini` selects it explicitly and `distribute-shorts` passes
 it for every new Shorts batch; `--engine chatgpt` keeps the old ChatGPT path. Long videos
 keep ChatGPT: the Gemini web app refuses long read-aloud texts (tested with 576 and 2,000
-words), so it cannot narrate a 60+ minute episode.
+words), so it cannot narrate a 60+ minute episode. The approved Gemini read-aloud voice is
+fixed; do not re-measure or change it per run.
