@@ -7,6 +7,7 @@ PulseAudio monitor, trimmed, and encoded as AAC for the existing Shorts renderer
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import time
 from pathlib import Path
@@ -28,6 +29,28 @@ def log(message: str) -> None:
 
 def available() -> bool:
     return flow_browser.cdp_alive(CDP_PORT)
+
+
+@contextlib.contextmanager
+def _session(playwright=None):
+    """Reuse the caller's Playwright instance when one is already running."""
+    if playwright is not None:
+        browser = playwright.chromium.connect_over_cdp(
+            f"http://127.0.0.1:{CDP_PORT}", timeout=60000)
+        try:
+            yield browser
+        finally:
+            browser.close()
+        return
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as own:
+        browser = own.chromium.connect_over_cdp(
+            f"http://127.0.0.1:{CDP_PORT}", timeout=60000)
+        try:
+            yield browser
+        finally:
+            browser.close()
 
 
 CAPTURE_SINK = "ytbot_gemini_capture"
@@ -119,11 +142,10 @@ def _last_reply(page, timeout: int = 240) -> str:
     raise GeminiUnavailableError("Gemini did not answer in time")
 
 
-def generate_script(topic: str, language: str = "en", max_words: int = 130) -> str:
+def generate_script(topic: str, language: str = "en", max_words: int = 130,
+                    playwright=None) -> str:
     """Ask Gemini for the Short narration in the channel language."""
-    with _sync_playwright() as playwright:
-        browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}",
-                                                      timeout=60000)
+    with _session(playwright) as browser:
         context = browser.contexts[0]
         page = context.new_page()
         try:
@@ -143,15 +165,12 @@ def generate_script(topic: str, language: str = "en", max_words: int = 130) -> s
             return text
         finally:
             page.close()
-            browser.close()
 
 
-def generate_image(prompt: str, destination: Path) -> Path:
+def generate_image(prompt: str, destination: Path, playwright=None) -> Path:
     """Generate one vertical 9:16 image in Gemini and save the original size."""
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with _sync_playwright() as playwright:
-        browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}",
-                                                      timeout=60000)
+    with _session(playwright) as browser:
         page = browser.contexts[0].new_page()
         try:
             _open_chat(page)
@@ -173,16 +192,14 @@ def generate_image(prompt: str, destination: Path) -> Path:
             raise GeminiUnavailableError("Gemini did not return an image in time")
         finally:
             page.close()
-            browser.close()
 
 
-def read_aloud(text: str, destination: Path, *, timeout: int = 600) -> Path:
-    """Read the text in Gemini and capture the audio from the system monitor."""
+def read_aloud(text: str, destination: Path, *, timeout: int = 600,
+               playwright=None) -> Path:
+    """Read the text in Gemini and capture the audio from the private sink."""
     destination.parent.mkdir(parents=True, exist_ok=True)
     monitor = _ensure_capture_sink()
-    with _sync_playwright() as playwright:
-        browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}",
-                                                      timeout=60000)
+    with _session(playwright) as browser:
         page = browser.contexts[0].new_page()
         raw = destination.with_suffix(".capture.wav")
         try:
@@ -204,13 +221,8 @@ def read_aloud(text: str, destination: Path, *, timeout: int = 600) -> Path:
             recorder.wait(timeout=record_seconds + 60)
         finally:
             page.close()
-            browser.close()
     if not raw.is_file() or raw.stat().st_size < 4096:
         raise GeminiUnavailableError("Gemini read-aloud audio was not captured")
     return _trim_audio(raw, destination)
 
 
-def _sync_playwright():
-    from playwright.sync_api import sync_playwright
-
-    return sync_playwright()

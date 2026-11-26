@@ -191,8 +191,10 @@ and the read-aloud narration come from the owner's signed-in Gemini session in t
 Flow browser profile (no API key). The narration audio is captured from the default
 PulseAudio monitor, trimmed and encoded as AAC; the voice is the Gemini read-aloud voice the
 owner approved (male, ~148 Hz). The bot's render and upload paths are unchanged.
-Long videos keep ChatGPT generation until the owner asks to switch them too. The engine is
-selected with `faith-shorts --engine gemini` and `distribute-shorts` passes it automatically.
+Gemini is used **only for Shorts**. Long videos keep ChatGPT: the Gemini web app refuses long
+read-aloud texts (tested 2026-11-26 with 576 and 2,000 words), so it cannot narrate a 60+
+minute episode. The engine is selected with `faith-shorts --engine gemini` and
+`distribute-shorts` passes it automatically.
 
 ## Shorts
 

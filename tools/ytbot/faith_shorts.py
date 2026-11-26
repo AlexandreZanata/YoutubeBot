@@ -691,9 +691,9 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
                 if engine == "gemini":
                     from . import gemini
                     language = config.CHANNEL.language if config.CHANNEL else "en"
-                    text = gemini.generate_script(topic, language)
+                    text = gemini.generate_script(topic, language, playwright=playwright)
                     (run_dir / "short.txt").write_text(text, encoding="utf-8")
-                    gemini.read_aloud(text, run_dir / "narration.aac")
+                    gemini.read_aloud(text, run_dir / "narration.aac", playwright=playwright)
                     log(f"gemini short saved: {len(text.split())} words")
                 else:
                     text = generate_script(page, topic, run_dir)
@@ -715,7 +715,7 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
                         f"Crie uma imagem vertical 9:16 cinematográfica para este Short: {topic}. "
                         f"Cena: {text[:400]}. Sem texto, sem letras, sem marca d'água. "
                         f"A imagem deve preencher um quadro 1080x1920.")
-                    gemini.generate_image(prompt, run_dir / "thumbnail.png")
+                    gemini.generate_image(prompt, run_dir / "thumbnail.png", playwright=playwright)
                 else:
                     assets.generate_thumbnail(gen, run_dir, "short-background")
                     ensure_unique_background(gen, run_dir, root)
