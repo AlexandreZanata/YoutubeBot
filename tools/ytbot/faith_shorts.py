@@ -561,7 +561,7 @@ def link_related_video(context, video_id: str, title: str) -> bool:
 
 
 def run(channel_slug: str, count: int = 5, start: date | None = None,
-        skip_slots: int = 0, start_index: int = 0,
+        skip_slots: int = 0, start_index: int = 0, engine: str = "chatgpt",
         *,
         visual_mode: str | None = None,
         video_provider: str | None = None,
@@ -658,8 +658,16 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
             started = time.time()
             page = gen.new_page()
             try:
-                text = generate_script(page, topic, run_dir)
-                chat.capture_audio(page, gen, run_dir)
+                if engine == "gemini":
+                    from . import gemini
+                    language = config.CHANNEL.language if config.CHANNEL else "en"
+                    text = gemini.generate_script(topic, language)
+                    (run_dir / "short.txt").write_text(text, encoding="utf-8")
+                    gemini.read_aloud(text, run_dir / "narration.aac")
+                    log(f"gemini short saved: {len(text.split())} words")
+                else:
+                    text = generate_script(page, topic, run_dir)
+                    chat.capture_audio(page, gen, run_dir)
             except Exception as error:
                 failures.append((topic, str(error)))
                 log(f"asset failure for {topic}: {error}")
@@ -671,8 +679,16 @@ def run(channel_slug: str, count: int = 5, start: date | None = None,
                 except Exception:
                     pass
             try:
-                assets.generate_thumbnail(gen, run_dir, "short-background")
-                ensure_unique_background(gen, run_dir, root)
+                if engine == "gemini":
+                    from . import gemini
+                    prompt = (
+                        f"Crie uma imagem vertical 9:16 cinematográfica para este Short: {topic}. "
+                        f"Cena: {text[:400]}. Sem texto, sem letras, sem marca d'água. "
+                        f"A imagem deve preencher um quadro 1080x1920.")
+                    gemini.generate_image(prompt, run_dir / "thumbnail.png")
+                else:
+                    assets.generate_thumbnail(gen, run_dir, "short-background")
+                    ensure_unique_background(gen, run_dir, root)
                 ai_result = None
                 if effective_mode == "ai-video":
                     ai_result = render_ai_short(

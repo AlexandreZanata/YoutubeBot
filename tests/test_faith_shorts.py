@@ -81,3 +81,10 @@ class FaithShortsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_shorts_distribution_uses_the_gemini_engine(self):
+        from tools.ytbot import shorts_distribute
+
+        command = shorts_distribute.command_for("reflection", 1)
+        self.assertIn("--engine", command)
+        self.assertEqual(command[command.index("--engine") + 1], "gemini")

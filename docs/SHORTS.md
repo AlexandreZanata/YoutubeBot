@@ -125,3 +125,16 @@ Shorts optionally support `--visual-mode ai-video` using Google Flow (`google-fl
 manual clip import (`manual-import`), or explicitly approved paid Gemini Video API
 (`gemini-api`), while keeping `--visual-mode static` as the default. Long-form pipelines
 never use AI video clips. See [Google Flow Shorts](GOOGLE-FLOW-SHORTS.md).
+
+
+## Gemini engine
+
+Shorts are generated with Gemini (owner approval 2026-11-26). The script, the vertical
+background image and the read-aloud narration all come from the signed-in Gemini session in
+the Google Flow browser profile (`https://gemini.google.com/app`, CDP port 9345). No API key
+is used. Narration is captured from the default PulseAudio monitor, trimmed of silence and
+encoded as AAC; the approved voice is the Gemini read-aloud male voice (~148 Hz, close to a
+lighter Cove). The local renderer still burns the subtitles and assembles the 1080x1920
+video. `faith-shorts --engine gemini` selects it explicitly and `distribute-shorts` passes
+it for every new Shorts batch; `--engine chatgpt` keeps the old ChatGPT path. Long videos
+keep ChatGPT until the owner asks to migrate them.
