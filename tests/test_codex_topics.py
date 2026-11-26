@@ -1,6 +1,7 @@
 """Automatic topic suggestions keep ChatGPT limited to article and audio work."""
 from pathlib import Path
 import tempfile
+import unittest
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -46,3 +47,34 @@ class CodexTopicContracts(TestCase):
             chosen = topics.prepare_topics(Mock(), 1)
         self.assertEqual(chosen, ['A unique topic about attention'])
         chat.assert_called()
+
+
+class UniqueThumbnailTests(TestCase):
+    def test_duplicate_thumbnail_is_detected(self):
+        import tempfile
+        from pathlib import Path
+        from PIL import Image
+        from tools.ytbot import assets
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ("one", "two"):
+                run = root / name
+                run.mkdir()
+                Image.new("RGB", (320, 180), (90, 70, 50)).save(run / "thumbnail.png")
+            self.assertIsNotNone(assets.duplicate_thumbnail(root / "two"))
+
+    def test_distinct_thumbnail_passes(self):
+        import tempfile
+        from pathlib import Path
+        from PIL import Image
+        from tools.ytbot import assets
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = root / "one"
+            second = root / "two"
+            first.mkdir(); second.mkdir()
+            Image.linear_gradient("L").resize((320, 180)).convert("RGB").save(first / "thumbnail.png")
+            Image.linear_gradient("L").rotate(90).resize((320, 180)).convert("RGB").save(second / "thumbnail.png")
+            self.assertIsNone(assets.duplicate_thumbnail(second))

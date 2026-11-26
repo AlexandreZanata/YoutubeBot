@@ -48,6 +48,40 @@ def generate_metadata(context, run_dir: Path, topic: str) -> dict:
         page.close()
 
 
+
+
+def thumbnail_signature(path: Path) -> int:
+    with Image.open(path) as image:
+        small = image.convert("L").resize((16, 16), Image.Resampling.LANCZOS)
+        pixels = list(small.getdata())
+    mean = sum(pixels) / len(pixels)
+    return sum(1 << index for index, value in enumerate(pixels) if value > mean)
+
+
+def duplicate_thumbnail(run_dir: Path, limit: int = 6) -> Path | None:
+    """Return another run in the same channel whose thumbnail is effectively identical."""
+    thumb = run_dir / "thumbnail.png"
+    if not thumb.is_file():
+        return None
+    signature = thumbnail_signature(thumb)
+    for other in run_dir.parent.glob("*/thumbnail.png"):
+        if other.parent == run_dir:
+            continue
+        try:
+            if bin(signature ^ thumbnail_signature(other)).count("1") < limit:
+                return other
+        except Exception:
+            continue
+    return None
+
+
+def ensure_unique_thumbnail(run_dir: Path) -> None:
+    duplicate = duplicate_thumbnail(run_dir)
+    if duplicate is not None:
+        raise RuntimeError(
+            f"thumbnail is reused from {duplicate.parent.name}; every video needs its own thumbnail")
+
+
 def image_data_url(page) -> str | None:
     return page.evaluate(
         """async () => {
@@ -73,7 +107,9 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
     if codex_media.available():
         for attempt in range(2):
             try:
-                return codex_media.generate_thumbnail(run_dir, style, variation)
+                thumb = codex_media.generate_thumbnail(run_dir, style, variation)
+                ensure_unique_thumbnail(run_dir)
+                return thumb
             except Exception as error:
                 log(f"Codex thumbnail failed ({error}); trying ChatGPT web after this attempt")
                 if attempt:
@@ -129,6 +165,7 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
                     json.dumps({"provider": "chatgpt-browser", "style": style}),
                     encoding="utf-8")
                 log("thumbnail saved")
+                ensure_unique_thumbnail(run_dir)
                 return destination
             body = page.locator("body").inner_text()
             if "violate our content policies" in body.lower():
