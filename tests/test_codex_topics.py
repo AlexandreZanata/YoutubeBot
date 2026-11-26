@@ -41,8 +41,8 @@ class CodexTopicContracts(TestCase):
         chat.assert_not_called()
         context.new_page.assert_not_called()
 
-    def test_installed_codex_failure_never_falls_back_to_chatgpt_topics(self):
-        with patch.object(topics, '_read_queued_topics', return_value=[]), patch.object(topics.logic, 'load_catalog', return_value=[]), patch.object(codex_media, 'available', return_value=True), patch.object(codex_media, 'generate_topics', side_effect=RuntimeError('fenced')), patch.object(topics.chat, 'generate_topics') as chat:
-            with self.assertRaisesRegex(RuntimeError, 'fenced'):
-                topics.prepare_topics(Mock(), 1)
-        chat.assert_not_called()
+    def test_installed_codex_failure_falls_back_to_chatgpt_topics(self):
+        with patch.object(topics, '_read_queued_topics', return_value=[]), patch.object(topics.logic, 'load_catalog', return_value=[]), patch.object(codex_media, 'available', return_value=True), patch.object(codex_media, 'generate_topics', side_effect=RuntimeError('fenced')), patch.object(topics.chat, 'generate_topics', return_value=['A unique topic about attention']) as chat:
+            chosen = topics.prepare_topics(Mock(), 1)
+        self.assertEqual(chosen, ['A unique topic about attention'])
+        chat.assert_called()

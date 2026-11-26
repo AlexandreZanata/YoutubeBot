@@ -139,4 +139,5 @@ video. `faith-shorts --engine gemini` selects it explicitly and `distribute-shor
 it for every new Shorts batch; `--engine chatgpt` keeps the old ChatGPT path. Long videos
 keep ChatGPT: the Gemini web app refuses long read-aloud texts (tested with 576 and 2,000
 words), so it cannot narrate a 60+ minute episode. The approved Gemini read-aloud voice is
-fixed; do not re-measure or change it per run.
+fixed; do not re-measure or change it per run. If Gemini errors or times out, the Short falls
+back to the ChatGPT web path automatically.
