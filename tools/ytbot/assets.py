@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import os
 import io
 import json
 import time
@@ -77,12 +78,20 @@ def generate_thumbnail(context, run_dir: Path, style: str = "dense", timeout: in
                 log(f"Codex thumbnail failed ({error}); trying ChatGPT web after this attempt")
                 if attempt:
                     break
+                import shutil
+                stamp = f"{int(time.time())}-{os.getpid()}"
                 stale = run_dir / "thumbnail.png"
                 if stale.is_file():
-                    stale.rename(run_dir / f"thumbnail-attempt-{int(time.time())}.png")
+                    stale.rename(run_dir / f"thumbnail-attempt-{stamp}.png")
                 state = run_dir / ".codex-media" / "thumbnail"
                 if state.is_dir():
-                    state.rename(state.with_name(f"thumbnail-attempt-{int(time.time())}"))
+                    target = state.with_name(f"thumbnail-attempt-{stamp}")
+                    if target.exists():
+                        shutil.rmtree(target, ignore_errors=True)
+                    try:
+                        state.rename(target)
+                    except OSError:
+                        shutil.rmtree(state, ignore_errors=True)
     page = context.new_page()
     try:
         page.goto("https://chatgpt.com/", timeout=90000)
