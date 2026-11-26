@@ -193,7 +193,8 @@ PulseAudio monitor, trimmed and encoded as AAC; the voice is the Gemini read-alo
 owner approved (male, ~148 Hz). The bot's render and upload paths are unchanged.
 Gemini is used **only for Shorts**. Long videos keep ChatGPT: the Gemini web app refuses long
 read-aloud texts (tested 2026-11-26 with 576 and 2,000 words), so it cannot narrate a 60+
-minute episode. The engine is selected with `faith-shorts --engine gemini` and
+minute episode. The approved Gemini read-aloud voice is fixed: never re-measure or change it per run; keep the
+same voice until the owner asks. The engine is selected with `faith-shorts --engine gemini` and
 `distribute-shorts` passes it automatically.
 
 ## Shorts
