@@ -95,6 +95,7 @@ def command_faith_shorts(args) -> None:
         start,
         args.skip_slots,
         args.start_index,
+        getattr(args, "engine", "chatgpt"),
         visual_mode=getattr(args, "visual_mode", None),
         video_provider=getattr(args, "video_provider", None),
         video_model=getattr(args, "video_model", None),
@@ -403,6 +404,8 @@ def build_parser() -> argparse.ArgumentParser:
                        help="skip this many leading schedule slots")
     faith.add_argument("--start-index", type=int, default=0,
                        help="skip this many topics in the channel queue")
+    faith.add_argument("--engine", choices=("chatgpt", "gemini"), default="chatgpt",
+                       help="generation engine for script, background and narration")
     faith.add_argument("--visual-mode", choices=("static", "ai-video"), default=None)
     faith.add_argument("--video-provider", choices=("google-flow", "gemini-api", "manual-import"), default=None)
     faith.add_argument("--video-model", choices=("veo-2-fast", "veo-3-fast", "veo-2-quality", "veo-3-quality"), default=None)

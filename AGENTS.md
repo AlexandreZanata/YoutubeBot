@@ -184,6 +184,16 @@ but invent a unique subject and metaphor for each article. The earlier large whi
 void/two-color poster interpretation is superseded. Alternate the dense prompt with
 `thumbnail-classic.txt`: six dense and six classic in a twelve-video batch.
 
+## Gemini Shorts engine (owner approval 2026-11-26)
+
+New Shorts are generated with **Gemini** by default: the script, the 9:16 background image
+and the read-aloud narration come from the owner's signed-in Gemini session in the Google
+Flow browser profile (no API key). The narration audio is captured from the default
+PulseAudio monitor, trimmed and encoded as AAC; the voice is the Gemini read-aloud voice the
+owner approved (male, ~148 Hz). The bot's render and upload paths are unchanged.
+Long videos keep ChatGPT generation until the owner asks to switch them too. The engine is
+selected with `faith-shorts --engine gemini` and `distribute-shorts` passes it automatically.
+
 ## Shorts
 
 Every channel now publishes Vertical Shorts through the `faith-shorts` protocol: 1080x1920,

@@ -61,6 +61,8 @@ def command_for(
     spec = SHORTS_CHANNELS[slug]
     command = [sys.executable, "-m", "tools.ytbot", spec["command"], "--channel", slug,
                "--count", str(amount), "--start-index", str(used_topics(slug))]
+    if spec["command"] == "faith-shorts":
+        command += ["--engine", "gemini"]
     if visual_mode:
         command.extend(["--visual-mode", visual_mode])
     if video_provider:
