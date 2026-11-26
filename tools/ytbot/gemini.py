@@ -7,6 +7,7 @@ PulseAudio monitor, trimmed, and encoded as AAC for the existing Shorts renderer
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import time
 from pathlib import Path
@@ -30,16 +31,70 @@ def available() -> bool:
     return flow_browser.cdp_alive(CDP_PORT)
 
 
-def _default_monitor() -> str:
-    """Return the PulseAudio monitor source of the default output sink."""
-    try:
-        sink = subprocess.run(["pactl", "get-default-sink"], capture_output=True,
-                              text=True, timeout=10, check=True).stdout.strip()
-    except (OSError, subprocess.SubprocessError) as error:
-        raise GeminiUnavailableError(f"cannot read the default audio sink: {error}") from error
-    if not sink:
-        raise GeminiUnavailableError("no default audio sink for Gemini narration capture")
-    return f"{sink}.monitor"
+@contextlib.contextmanager
+def _session(playwright=None):
+    """Reuse the caller's Playwright instance when one is already running."""
+    if playwright is not None:
+        browser = playwright.chromium.connect_over_cdp(
+            f"http://127.0.0.1:{CDP_PORT}", timeout=60000)
+        try:
+            yield browser
+        finally:
+            browser.close()
+        return
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as own:
+        browser = own.chromium.connect_over_cdp(
+            f"http://127.0.0.1:{CDP_PORT}", timeout=60000)
+        try:
+            yield browser
+        finally:
+            browser.close()
+
+
+CAPTURE_SINK = "ytbot_gemini_capture"
+
+
+def _ensure_capture_sink() -> str:
+    """Create a private null sink so Gemini audio never mixes with ChatGPT playback."""
+    listing = subprocess.run(["pactl", "list", "short", "sinks"], capture_output=True,
+                             text=True, timeout=10).stdout
+    if CAPTURE_SINK not in listing:
+        subprocess.run(["pactl", "load-module", "module-null-sink",
+                        f"sink_name={CAPTURE_SINK}",
+                        f"sink_properties=device.description={CAPTURE_SINK}"],
+                       capture_output=True, text=True, timeout=15, check=False)
+    return f"{CAPTURE_SINK}.monitor"
+
+
+def _flow_chrome_pids() -> set[str]:
+    out = subprocess.run(["ps", "-eo", "pid,cmd"], capture_output=True, text=True,
+                         timeout=10).stdout
+    return {line.split()[0] for line in out.splitlines()
+            if f"--remote-debugging-port={CDP_PORT}" in line and "chrome" in line}
+
+
+def _move_chrome_streams() -> list[str]:
+    """Route the Gemini browser's audio streams into the private capture sink."""
+    pids = _flow_chrome_pids()
+    if not pids:
+        return []
+    listing = subprocess.run(["pactl", "list", "sink-inputs"], capture_output=True,
+                             text=True, timeout=10).stdout
+    moved = []
+    current = None
+    for line in listing.splitlines():
+        line = line.strip()
+        if line.startswith("Sink Input #"):
+            current = line.split("#")[1]
+        if current and "application.process.id" in line:
+            pid = line.split("=")[-1].strip().strip('"')
+            if pid in pids:
+                subprocess.run(["pactl", "move-sink-input", current, CAPTURE_SINK],
+                               check=False, timeout=10)
+                moved.append(current)
+    return moved
 
 
 def _trim_audio(source: Path, destination: Path) -> Path:
@@ -87,11 +142,10 @@ def _last_reply(page, timeout: int = 240) -> str:
     raise GeminiUnavailableError("Gemini did not answer in time")
 
 
-def generate_script(topic: str, language: str = "en", max_words: int = 130) -> str:
+def generate_script(topic: str, language: str = "en", max_words: int = 130,
+                    playwright=None) -> str:
     """Ask Gemini for the Short narration in the channel language."""
-    with _sync_playwright() as playwright:
-        browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}",
-                                                      timeout=60000)
+    with _session(playwright) as browser:
         context = browser.contexts[0]
         page = context.new_page()
         try:
@@ -111,15 +165,12 @@ def generate_script(topic: str, language: str = "en", max_words: int = 130) -> s
             return text
         finally:
             page.close()
-            browser.close()
 
 
-def generate_image(prompt: str, destination: Path) -> Path:
+def generate_image(prompt: str, destination: Path, playwright=None) -> Path:
     """Generate one vertical 9:16 image in Gemini and save the original size."""
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with _sync_playwright() as playwright:
-        browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}",
-                                                      timeout=60000)
+    with _session(playwright) as browser:
         page = browser.contexts[0].new_page()
         try:
             _open_chat(page)
@@ -141,16 +192,14 @@ def generate_image(prompt: str, destination: Path) -> Path:
             raise GeminiUnavailableError("Gemini did not return an image in time")
         finally:
             page.close()
-            browser.close()
 
 
-def read_aloud(text: str, destination: Path, *, timeout: int = 600) -> Path:
-    """Read the text in Gemini and capture the audio from the system monitor."""
+def read_aloud(text: str, destination: Path, *, timeout: int = 600,
+               playwright=None) -> Path:
+    """Read the text in Gemini and capture the audio from the private sink."""
     destination.parent.mkdir(parents=True, exist_ok=True)
-    monitor = _default_monitor()
-    with _sync_playwright() as playwright:
-        browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}",
-                                                      timeout=60000)
+    monitor = _ensure_capture_sink()
+    with _session(playwright) as browser:
         page = browser.contexts[0].new_page()
         raw = destination.with_suffix(".capture.wav")
         try:
@@ -167,16 +216,13 @@ def read_aloud(text: str, destination: Path, *, timeout: int = 600) -> Path:
             page.get_by_label("Mostrar mais opções").last.click()
             page.wait_for_timeout(1200)
             page.get_by_text("Ouvir", exact=True).last.click()
+            page.wait_for_timeout(1500)
+            _move_chrome_streams()
             recorder.wait(timeout=record_seconds + 60)
         finally:
             page.close()
-            browser.close()
     if not raw.is_file() or raw.stat().st_size < 4096:
         raise GeminiUnavailableError("Gemini read-aloud audio was not captured")
     return _trim_audio(raw, destination)
 
 
-def _sync_playwright():
-    from playwright.sync_api import sync_playwright
-
-    return sync_playwright()
