@@ -347,6 +347,36 @@ for _slug, _topics in QUEUE_EXTENSION_3.items():
     CHANNELS[_slug]["topics"] = CHANNELS[_slug]["topics"] + _topics
 
 
+QUEUE_EXTENSION_4 = {
+    "zaflas": (
+        "Como o pastejo rotacionado recupera pastagens degradadas",
+        "Pulverização noturna: o que muda com a inversão térmica",
+        "Manejo de bezerros na desmama: menos estresse, mais peso",
+        "Sombreamento no confinamento: o efeito no consumo e no ganho",
+    ),
+    "fallem-prince": (
+        "Why We Mistake Intensity for Meaning",
+        "The Quiet Violence of Always Being Busy",
+        "What We Owe to the Person We Used to Be",
+        "The Fear of Being Ordinary",
+    ),
+    "infinite-random-worlds": (
+        "A City Where Every Door Opens to the Same Room",
+        "The Ocean That Remembers Every Ship",
+        "A World Where Sleep Is a Place You Can Visit",
+        "The Library That Only Lends Forgotten Memories",
+    ),
+    "vocal-pages": (
+        "The Friend You Outgrew Without Noticing",
+        "The Version of You That Only Exists in Old Photos",
+        "The Silence After a Difficult Conversation",
+        "The Habit of Apologizing Before You Speak",
+    ),
+}
+for _slug, _topics in QUEUE_EXTENSION_4.items():
+    CHANNELS[_slug]["topics"] = CHANNELS[_slug]["topics"] + _topics
+
+
 
 def log(message: str) -> None:
     print(f"[faith-shorts] {message}", flush=True)

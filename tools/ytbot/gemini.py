@@ -30,16 +30,48 @@ def available() -> bool:
     return flow_browser.cdp_alive(CDP_PORT)
 
 
-def _default_monitor() -> str:
-    """Return the PulseAudio monitor source of the default output sink."""
-    try:
-        sink = subprocess.run(["pactl", "get-default-sink"], capture_output=True,
-                              text=True, timeout=10, check=True).stdout.strip()
-    except (OSError, subprocess.SubprocessError) as error:
-        raise GeminiUnavailableError(f"cannot read the default audio sink: {error}") from error
-    if not sink:
-        raise GeminiUnavailableError("no default audio sink for Gemini narration capture")
-    return f"{sink}.monitor"
+CAPTURE_SINK = "ytbot_gemini_capture"
+
+
+def _ensure_capture_sink() -> str:
+    """Create a private null sink so Gemini audio never mixes with ChatGPT playback."""
+    listing = subprocess.run(["pactl", "list", "short", "sinks"], capture_output=True,
+                             text=True, timeout=10).stdout
+    if CAPTURE_SINK not in listing:
+        subprocess.run(["pactl", "load-module", "module-null-sink",
+                        f"sink_name={CAPTURE_SINK}",
+                        f"sink_properties=device.description={CAPTURE_SINK}"],
+                       capture_output=True, text=True, timeout=15, check=False)
+    return f"{CAPTURE_SINK}.monitor"
+
+
+def _flow_chrome_pids() -> set[str]:
+    out = subprocess.run(["ps", "-eo", "pid,cmd"], capture_output=True, text=True,
+                         timeout=10).stdout
+    return {line.split()[0] for line in out.splitlines()
+            if f"--remote-debugging-port={CDP_PORT}" in line and "chrome" in line}
+
+
+def _move_chrome_streams() -> list[str]:
+    """Route the Gemini browser's audio streams into the private capture sink."""
+    pids = _flow_chrome_pids()
+    if not pids:
+        return []
+    listing = subprocess.run(["pactl", "list", "sink-inputs"], capture_output=True,
+                             text=True, timeout=10).stdout
+    moved = []
+    current = None
+    for line in listing.splitlines():
+        line = line.strip()
+        if line.startswith("Sink Input #"):
+            current = line.split("#")[1]
+        if current and "application.process.id" in line:
+            pid = line.split("=")[-1].strip().strip('"')
+            if pid in pids:
+                subprocess.run(["pactl", "move-sink-input", current, CAPTURE_SINK],
+                               check=False, timeout=10)
+                moved.append(current)
+    return moved
 
 
 def _trim_audio(source: Path, destination: Path) -> Path:
@@ -147,7 +179,7 @@ def generate_image(prompt: str, destination: Path) -> Path:
 def read_aloud(text: str, destination: Path, *, timeout: int = 600) -> Path:
     """Read the text in Gemini and capture the audio from the system monitor."""
     destination.parent.mkdir(parents=True, exist_ok=True)
-    monitor = _default_monitor()
+    monitor = _ensure_capture_sink()
     with _sync_playwright() as playwright:
         browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}",
                                                       timeout=60000)
@@ -167,6 +199,8 @@ def read_aloud(text: str, destination: Path, *, timeout: int = 600) -> Path:
             page.get_by_label("Mostrar mais opções").last.click()
             page.wait_for_timeout(1200)
             page.get_by_text("Ouvir", exact=True).last.click()
+            page.wait_for_timeout(1500)
+            _move_chrome_streams()
             recorder.wait(timeout=record_seconds + 60)
         finally:
             page.close()
